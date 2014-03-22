@@ -1,0 +1,121 @@
+OT extension:
+
+Start with
+
+       s(0)     s(1)     ... s(k-1)
+r(0)   t(0,0)   t(0,1)   ... t(0,k-1)
+r(1)   t(1,0)   t(1,1)   ... .
+.      .        .        ... .
+.      .        .        ... .
+.      .        .        ... .
+r(m-1) t(m-1,1) t(m-1,2) ... t(m-1,k-1)
+
+
+R generates r and t
+S generates s and x
+
+Use OT:
+for all rows i and columns j,
+R sends either t(i,j) or t(i,j) ^ r(i) according to s(j)
+(Do this by k oblivious transfers of (column j of t, r ^ (column j of t)) according to s(j))
+
+Then for all rows i and columns j,
+R knows r(i) and t(i,j)
+S knows s(j) and ((r(i) & s(j)) ^ t(i,j))
+
+Now S is set up to do m oblivious transfers of k-bits to R.  Number these by the rows of the matrix
+(indexed by i where 0<=i<m).
+
+Say we are on the ith transfer and S has two messages xi0 and xi1, each with k bits, e.g., xi0(0)...xi0(k-1)
+
+Then for all columns j S sends both
+
+    xi0(j) ^ (r(i) & s(j)) ^ t(i,j)
+    xi1(j) ^ (r(i) & s(j)) ^ t(i,j) ^ s(j)
+
+Now R can calculate
+
+    xi0(j) ^ (r(i) & s(j)) ^ t(i,j)        ^ t(i,j) == xi0(j) ^ (r(i) & s(j))
+    xi1(j) ^ (r(i) & s(j)) ^ t(i,j) ^ s(j) ^ t(i,j) == xi1(j) ^ (r(i) & s(j)) ^ s(j)
+
+Now if r(i) == 0 then the first  quantity is xi0(j), the second is xi1(j) ^ s(j) and R does not know s(j)
+But if r(i) == 1 then the second quantity is xi1(j), the first  is xi0(j) ^ s(j) and R does not know s(j)
+
+MODIFICATION so that S can send messages of some length l <> k.
+
+It helps here to think a row at a time.  Suppose we are on the ith
+transfer and let ti denote the ith row of t.  Then the above is
+equivalent to S sending
+
+    xi0 ^ (r(i) & s) ^ ti
+    xi1 ^ (r(i) & s) ^ ti ^ s
+
+And R calculates
+
+    xi0 ^ (r(i) & s) ^ ti     ^ ti == xi0 ^ (r(i) & s)
+    xi1 ^ (r(i) & s) ^ ti ^ s ^ ti == xi1 ^ (r(i) & s) ^ s
+
+Now if r(i) == 0 then the first  quantity is xi0, the second is xi1 ^ s and R does not know s
+But if r(i) == 1 then the second quantity is xi1, the first  is xi0 ^ s and R does not know s
+
+So use a random oracle H: 2^k -> 2^l known to both S and R.  S sends both
+
+    xi0 ^ H((r(i) & s) ^ ti)
+    xi1 ^ H((r(i) & s) ^ ti ^ s)
+
+(now xi0 and xi1 have l bits instead of k bits)
+
+And R calculates
+
+    xi0 ^ H((r(i) & s) ^ ti)     ^ H(ti)
+    xi1 ^ H((r(i) & s) ^ ti ^ s) ^ H(ti)
+
+Now if r(i) == 0 then
+
+    xi0 ^ H((r(i) & s) ^ ti)     ^ H(ti) == xi0 ^ H(0 ^ ti)     ^ H(ti) == xi0
+    xi1 ^ H((r(i) & s) ^ ti ^ s) ^ H(ti) == xi1 ^ H(0 ^ ti ^ s) ^ H(ti) == ???
+
+But if r(i) == 1 then
+
+    xi0 ^ H((r(i) & s) ^ ti)     ^ H(ti) == xi0 ^ H(s ^ ti)     ^ H(ti) == ???
+    xi1 ^ H((r(i) & s) ^ ti ^ s) ^ H(ti) == xi1 ^ H(s ^ ti ^ s) ^ H(ti) == xi1
+
+MODIFICATION so that R can choose xi0(j) or xi1(j) dynamically.
+
+Same as above except that R chooses r randomly, and in the ith
+transfer, before S sends the pair of values, R decides which one it
+wants: c
+and R sends S (r(i) ^ c)
+
+Now if 0 == (r(i) ^ c) then for all columns j S sends both
+
+    xi0(j) ^ (r(i) & s(j)) ^ t(i,j)
+    xi1(j) ^ (r(i) & s(j)) ^ t(i,j) ^ s(j)
+
+as before, and again as before R calculates
+
+    xi0(j) ^ (r(i) & s(j)) ^ t(i,j)        ^ t(i,j) == xi0(j) ^ (r(i) & s(j))
+    xi1(j) ^ (r(i) & s(j)) ^ t(i,j) ^ s(j) ^ t(i,j) == xi1(j) ^ (r(i) & s(j)) ^ s(j)
+
+Now if r(i) == 0 then the first  quantity is xi0(j), the second is xi1(j) ^ s(j) and R does not know s(j)
+But if r(i) == 1 then the second quantity is xi1(j), the first  is xi0(j) ^ s(j) and R does not know s(j)
+Since 0 == (r(i) ^ c) either r(i) == 0 & c == 0 and we need the first  quantity,
+                          or r(i) == 1 & c == 1 and we need the second quantity.
+So we can choose according to r(i).
+
+
+But if 1 == (r(i) ^ c) then S sends both
+
+    xi1(j) ^ (r(i) & s(j)) ^ t(i,j)
+    xi0(j) ^ (r(i) & s(j)) ^ t(i,j) ^ s(j)
+
+(swapping xi0(j) and xi1(j).)  Then R can calculate
+
+    xi1(j) ^ (r(i) & s(j)) ^ t(i,j)        ^ t(i,j) == xi1(j) ^ (r(i) & s(j))
+    xi0(j) ^ (r(i) & s(j)) ^ t(i,j) ^ s(j) ^ t(i,j) == xi0(j) ^ (r(i) & s(j)) ^ s(j)
+
+Now if r(i) == 0 then the first  quantity is xi1(j), the second is xi0(j) ^ s(j) and R does not know s(j)
+And if r(i) == 1 then the second quantity is xi0(j), the first  is xi1(j) ^ s(j) and R does not know s(j)
+Since 1 == (r(i) ^ c) either r(i) == 0 & c == 1 and we need the first  quantity,
+                          or r(i) == 1 & c == 0 and we need the second quantity.
+So we can choose according to r(i).
