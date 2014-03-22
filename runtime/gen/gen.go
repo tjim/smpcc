@@ -1,7 +1,7 @@
 package gen
 
 import (
-	"base"
+	"github.com/tjim/smpcc/runtime/base"
 	"fmt"
 )
 

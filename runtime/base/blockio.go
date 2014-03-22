@@ -3,7 +3,7 @@ package base
 import (
 	//	"log"
 	"math/big"
-	"ot"
+	"github.com/tjim/smpcc/runtime/ot"
 )
 
 type Genio interface {

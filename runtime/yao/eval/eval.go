@@ -1,10 +1,10 @@
 package eval
 
-import "base"
-import "yao/gen"
+import "github.com/tjim/smpcc/runtime/base"
+import "github.com/tjim/smpcc/runtime/yao/gen"
 import "fmt"
 import "math"
-import "ot"
+import "github.com/tjim/smpcc/runtime/ot"
 import "math/rand"
 
 /* YaoState implements the EvalVM interface */

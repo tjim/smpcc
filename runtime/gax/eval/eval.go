@@ -1,13 +1,13 @@
 package eval
 
 import (
-	"base"
+	"github.com/tjim/smpcc/runtime/base"
 )
 
-import "gax/gen"
+import "github.com/tjim/smpcc/runtime/gax/gen"
 import "fmt"
 import "math"
-import "ot"
+import "github.com/tjim/smpcc/runtime/ot"
 import "math/rand"
 
 type ConcurrentId int64

@@ -10,7 +10,7 @@ package ot
 // Modified with preprocessing step
 
 import (
-	"bit"
+	"github.com/tjim/smpcc/runtime/bit"
 	"crypto/rand"
 	"fmt"
 	"io"

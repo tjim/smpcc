@@ -1,6 +1,6 @@
 package eval
 
-import "base"
+import "github.com/tjim/smpcc/runtime/base"
 
 type EvalVM interface {
 	Add(a, b []base.Key) []base.Key

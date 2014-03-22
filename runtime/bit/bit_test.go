@@ -1,7 +1,7 @@
 package bit_test
 
 import (
-	"bit"
+	"github.com/tjim/smpcc/runtime/bit"
 	"testing"
 )
 

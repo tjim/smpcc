@@ -1,13 +1,13 @@
 package gen
 
 import (
-	"base"
+	"github.com/tjim/smpcc/runtime/base"
 	"bytes"
 	"crypto/aes"
 	"fmt"
 	"math"
 	"math/rand"
-	"ot"
+	"github.com/tjim/smpcc/runtime/ot"
 )
 
 var (
