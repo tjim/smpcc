@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"io"
 	//	"log"
-	"code.google.com/p/go.crypto/sha3"
+	"bitbucket.org/ede/sha3"
 )
 
 type ExtendSender struct {
