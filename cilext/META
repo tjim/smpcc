@@ -1,0 +1,4 @@
+version = "1.0"
+description = "Flatten function calls"
+archive(byte,plugin) = "flattener.cma"
+archive(native,plugin) = "flattener.cmxs"

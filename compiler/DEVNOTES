@@ -1,0 +1,24 @@
+The compiler front end is written in ocaml.  The LLVM ocaml bindings
+are incomplete, so I include some C and C++ code to access some LLVM
+functionalities.
+
+The C code is in bindings.c.
+
+The C++ code is in llvmfixup.cpp.
+
+To write other extensions you place the C or C++ in the appropriate
+file, and then you have to declare it in ocaml.  See for example in oli.ml
+
+    external getNumElements : Llvm.llvalue -> int = "getNumElements"
+
+with the corresponding C++ code in llvmfixup.cpp.
+
+LLVM usage (useful for debugging):
+
+* Compile a C file to LLVM assembly (.s)
+
+    clang -S -emit-llvm -O1 foo.c
+
+* Compile a C file to LLVM bytecode (.o)
+
+    clang -c -emit-llvm -O1 foo.c

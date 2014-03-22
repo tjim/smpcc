@@ -1,0 +1,49 @@
+Secure multi-party computation compiler
+
+Build:
+
+    make; make install
+
+Usage:
+
+* Compile foo.c to circuit:
+
+    smpcc foo.c
+
+This produces files
+
+    foo.cil.c, foo_eval.go, foo_gen.go, foo_main.go
+
+The file foo.cil.c is the flattener output, it is useful for debugging.
+
+The go files implement the circuit, using channel io (everything runs
+in one process by default; distributed runs are possible but harder to
+debug during compiler development).
+
+You can run the go program with
+
+    go run foo_*.go
+
+* Print (block) free variables
+
+    smpcc -fv foo.c
+
+* Print assembly, for bug checking, see clang -S below
+
+    smpcc -pr foo.c
+
+* Compile but stop after load-store elimination:
+
+    smpcc -load-store foo.c
+
+* Compile but stop after phi elimination:
+
+    smpcc -phi foo.c
+
+* Compile but stop after branch elimination:
+
+    smpcc -branch foo.c
+
+* See the delta between compiler stages:
+
+    smpcc -branch foo.c -delta  ### shows the changes introduced by branch elimination
