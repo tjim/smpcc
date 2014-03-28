@@ -6,6 +6,9 @@ LIBS=llvm.cmxa llvm_bitreader.cmxa unix.cmxa str.cmxa
 smpcc: oli.cmx state.cmx options.cmx gobe.cmx main.cmx llvmfixup.o bindings.o
 	ocamlopt -cc 'g++ -Wno-write-strings' -cclib -rdynamic $(LIBS) $^ -o $@
 
+parse: llparse.cmx lllex.cmx
+	ocamlopt $^ -o $@
+
 clean:
 	$(RM) *.cmx *.cmi *.o
 
@@ -15,8 +18,17 @@ install: smpcc
 uninstall:
 	$(RM) $(BIN)/$<
 
+%.cmi: %.mli
+	ocamlc -c $<
+
 %.cmx: %.ml
 	ocamlopt -c $< -o $@
+
+%.ml: %.mll
+	ocamllex $< -o $@
+
+%.ml: %.mly
+	ocamlyacc $<
 
 include .depend
 .depend:
