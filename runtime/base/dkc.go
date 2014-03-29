@@ -1,17 +1,26 @@
 package base
 
-import
-// "bytes"
-// "encoding/binary"
-
-"math/big"
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"math/big"
+)
 
 var FIXED_KEY Key = []byte{83, 36, 191, 126, 172, 151, 226, 234, 140, 225, 71, 219, 216, 96, 130, 209, 17,
 	13, 67, 12, 74, 207, 217, 7, 20, 13, 151, 20, 179, 221, 190, 245}
 
+var aesprf cipher.Block
+
 type DKC interface {
 	E(A, B, T, X Key) Key
 	D(A, B, T, P Key) Key
+}
+
+func init() {
+	aesprf, err := aes.NewCipher(FIXED_KEY)
+	if err != nil {
+		panic(err)
+	}
 }
 
 //--- Ga
@@ -19,21 +28,27 @@ type DKC interface {
 func GaDKC_E(A, B, T, X Key) Key {
 	K := XorKey(A, B)
 	K = XorKey(K, T)
-	rho := XorKey(AESEval(FIXED_KEY, K), K)
+	ciphertext := make([]byte, aes.BlockSize)
+	aesprf.Encrypt(ciphertext, K)
+
+	rho := XorKey(ciphertext, K)
 	return XorKey(rho, X)
 }
 
 func GaDKC_D(A, B, T, P Key) Key {
 	K := XorKey(A, B)
 	K = XorKey(K, T)
-	rho := XorKey(AESEval(FIXED_KEY, K), K)
+	ciphertext := make([]byte, aes.BlockSize)
+	aesprf.Encrypt(ciphertext, K)
+
+	rho := XorKey(ciphertext, K)
 	return XorKey(rho, P)
 }
 
 //--- GaX
 
 func GaXDKC_E(A, B, T, X Key) Key {
-
+	fmt.Println("hello")
 	if len(A) != 16 || len(B) != 16 {
 		panic("Doubling approach won't work")
 	}
@@ -52,7 +67,11 @@ func GaXDKC_E(A, B, T, X Key) Key {
 
 	K := XorKey(A2, B4)
 	K = XorKey(K, T)
-	rho := XorKey(AESEval(FIXED_KEY, K), K)
+
+	ciphertext := make([]byte, aes.BlockSize)
+	aesprf.Encrypt(ciphertext, K)
+
+	rho := XorKey(ciphertext, K)
 	return XorKey(rho, X)
 }
 
@@ -74,7 +93,11 @@ func GaXDKC_D(A, B, T, P Key) Key {
 
 	K := XorKey(A2, B4)
 	K = XorKey(K, T)
-	rho := XorKey(AESEval(FIXED_KEY, K), K)
+
+	ciphertext := make([]byte, aes.BlockSize)
+	aesprf.Encrypt(ciphertext, K)
+
+	rho := XorKey(ciphertext, K)
 	return XorKey(rho, P)
 }
 
