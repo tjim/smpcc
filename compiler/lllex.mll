@@ -294,7 +294,7 @@ parse eof                                                    { Eof }
 {
 let lexbuf = Lexing.from_channel stdin;;
 try
-  main token lexbuf;
+  ignore(main token lexbuf);
   let p = Lexing.lexeme_start_p lexbuf in
   Printf.printf
     "Success!  Final lexeme at line %d character %d, = %s\n"

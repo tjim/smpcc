@@ -249,28 +249,33 @@
 %token Kw_insertvalue
 %token Kw_landingpad
 %start main
-%type <unit> main
+%type <unit list> main
 %%
-main: Eof {()}
-| declare main {$1}
-| define  main {$1}
-| Kw_module Kw_asm StringConstant main {()}
-| Kw_target Kw_triple Equal StringConstant main {()}
-| Kw_target Kw_datalayout Equal StringConstant main {()}
-| Kw_deplibs Equal Lsquare stringlist Rsquare main {()}
-| LocalVarID Equal Kw_type Kw_opaque main {()}
-| LocalVarID Equal Kw_type typ main {()}
-| LocalVar Equal Kw_type Kw_opaque main {()}
-| LocalVar Equal Kw_type typ main {()}
-| global_def external_linkage opt_visibility opt_dll_storageclass opt_ThreadLocal opt_AddrSpace opt_UnnamedAddr opt_ExternallyInitialized constant_or_global typ trailing_attributes main {()}
-| global_def non_external_linkage opt_visibility opt_dll_storageclass opt_ThreadLocal opt_AddrSpace opt_UnnamedAddr opt_ExternallyInitialized constant_or_global typ value trailing_attributes main {()}
-| global_def external_linkage opt_visibility Kw_alias opt_linkage aliasee main {()}
-| global_def non_external_linkage opt_visibility Kw_alias opt_linkage aliasee main {()}
-| Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace main {()}
-| MetadataVar Equal Exclaim Lbrace mdlist Rbrace main {()}
-| Kw_attributes AttrGrpID Equal Lbrace attribute_group Rbrace main {()}
+main:
+| Eof { [] }
+| toplevel main { $1::$2 }
+;
+toplevel:
+| declare {$1}
+| define  {$1}
+| Kw_module Kw_asm StringConstant {()}
+| Kw_target Kw_triple Equal StringConstant {()}
+| Kw_target Kw_datalayout Equal StringConstant {()}
+| Kw_deplibs Equal Lsquare stringlist Rsquare {()}
+| LocalVarID Equal Kw_type Kw_opaque {()}
+| LocalVarID Equal Kw_type typ {()}
+| LocalVar Equal Kw_type Kw_opaque {()}
+| LocalVar Equal Kw_type typ {()}
+| global_def external_linkage opt_visibility opt_dll_storageclass opt_thread_local opt_addrspace opt_unnamed_addr opt_externally_initialized constant_or_global typ trailing_attributes {()}
+| global_def non_external_linkage opt_visibility opt_dll_storageclass opt_thread_local opt_addrspace opt_unnamed_addr opt_externally_initialized constant_or_global typ value trailing_attributes {()}
+| global_def external_linkage opt_visibility Kw_alias opt_linkage aliasee {()}
+| global_def non_external_linkage opt_visibility Kw_alias opt_linkage aliasee {()}
+| Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace {()}
+| MetadataVar Equal Exclaim Lbrace mdlist Rbrace {()}
+| Kw_attributes AttrGrpID Equal Lbrace attribute_group Rbrace {()}
 ;
 global_def:
+| /* empty */ {()}
 | GlobalID Equal {()}
 | GlobalVar Equal {()}
 ;
@@ -280,39 +285,39 @@ aliasee:
 | type_value {()}
 ;
 stringlist:
-| /* empty */ {()}
-| StringConstant stringlist {()}
+| /* empty */ { [] }
+| StringConstant stringlist { $1::$2 }
 ;
 mdlist:
-| /* empty */ {()}
-| Exclaim APInt mdlist {()}
+| /* empty */ { [] }
+| Exclaim APInt mdlist { $2::$3 }
 ;
 mdnodevector:
 | Kw_null {()}
+| Kw_null mdnodevector {()}
 | type_value {()}
-| mdnodevector Kw_null {()}
-| mdnodevector type_value {()}
+| type_value mdnodevector {()}
 ;
 constant_or_global:
-| Kw_constant {()}
-| Kw_global {()}
+| Kw_constant { true }
+| Kw_global { false }
 ;
-opt_ThreadLocal:
+opt_thread_local:
 | /* empty */ {()}
 | Kw_thread_local {()}
 | Kw_thread_local Lparen Kw_localdynamic Rparen {()}
 | Kw_thread_local Lparen Kw_initialexec Rparen {()}
 | Kw_thread_local Lparen Kw_localexec Rparen {()}
 ;
-opt_AddrSpace:
+opt_addrspace:
 | /* empty */ {()}
 | Kw_addrspace Lparen APInt Rparen {()}
 ;
-opt_UnnamedAddr:
+opt_unnamed_addr:
 | /* empty */ {()}
 | Kw_unnamed_addr {()}
 ;
-opt_ExternallyInitialized:
+opt_externally_initialized:
 | /* empty */ {()}
 | Kw_externally_initialized {()}
 ;
@@ -321,15 +326,15 @@ trailing_attributes:
 | Comma Kw_section StringConstant trailing_attributes {()}
 | Comma Kw_align APInt trailing_attributes {()}
 declare:
-| Kw_declare functionHeader {$2}
+| Kw_declare function_header {$2}
 ;
 define:
-| Kw_define functionHeader functionBody {()}
+| Kw_define function_header function_body {()}
 ;
-functionHeader:
-| opt_linkage opt_visibility opt_dll_storageclass opt_CallingConv opt_ReturnAttrs
- typ globalName argumentList opt_UnnamedAddr fnAttributeValuePairs optSection
- opt_Align optGC opt_Prefix
+function_header:
+| opt_linkage opt_visibility opt_dll_storageclass opt_callingconv opt_return_attrs
+ typ global_name argument_list opt_unnamed_addr fnAttributeValuePairs opt_section
+ opt_align opt_gc opt_prefix
  {()}
 ;
 opt_dll_storageclass:
@@ -340,20 +345,6 @@ opt_dll_storageclass:
 opt_linkage:
 | external_linkage {()}
 | non_external_linkage {()}
-/*
-| {()}
-| Kw_private  {()}
-| Kw_internal  {()}
-| Kw_weak  {()}
-| Kw_weak_odr  {()}
-| Kw_linkonce  {()}
-| Kw_linkonce_odr  {()}
-| Kw_available_externally  {()}
-| Kw_appending  {()}
-| Kw_common  {()}
-| Kw_extern_weak  {()}
-| Kw_external  {()}
-*/
 ;
 external_linkage:
 | Kw_extern_weak  {()}
@@ -377,7 +368,7 @@ opt_visibility:
 | Kw_hidden {()}
 | Kw_protected {()}
 ;
-opt_CallingConv:
+opt_callingconv:
 | /* empty */ {()}
 | Kw_ccc {()}
 | Kw_fastcc {()}
@@ -403,9 +394,9 @@ opt_CallingConv:
 | Kw_preserve_allcc {()}
 | Kw_cc {()}
 ;
-opt_ReturnAttrs:
+opt_return_attrs:
 | /* empty */ {()}
-| attr opt_ReturnAttrs {
+| attr opt_return_attrs {
   match $1 with
 | Kw_inreg  -> ()
 | Kw_noalias -> ()
@@ -477,91 +468,81 @@ attr:
 | Kw_sanitize_address {Kw_sanitize_address}
     ;
 typ:
-| Kw_void {()}
-| non_void_type {()}
+| Kw_void { () }
+| non_void_type { $1 }
 non_void_type:
 | Type {()}
 | LocalVar {()}
 | LocalVarID {()}
-/*
-| structBody {()}
-*/
 | Lbrace Rbrace {()}
 | Less Lbrace Rbrace Greater {()}
-| Lbrace typeList Rbrace {()}
-| Less Lbrace typeList Rbrace Greater {()}
+| Lbrace type_list Rbrace {()}
+| Less Lbrace type_list Rbrace Greater {()}
 | Lsquare APInt Kw_x typ Rsquare {()}
 | Less APInt Kw_x typ Greater {()}
 | typ Star {()}
 | typ Kw_addrspace Lparen APInt Rparen {()}
-| typ argumentList {()}
+| typ argument_list {()}
 ;
-/*
-structBody:
-| Lbrace typeList Rbrace {()}
-| Less Lbrace typeList Rbrace Greater {()}
-*/
-;
-typeList:
-/* | empty     {()}*/
-| typ {()}
-| typ Comma typeList {()}
-globalName:
+type_list:
+| typ { [$1] }
+| typ Comma type_list { $1::$3 }
+global_name:
 | GlobalID {()}
 | GlobalVar {()}
-    ;
-argumentList:
-Lparen argTypeList Rparen {$2}
 ;
-argTypeList:
+argument_list:
+Lparen arg_type_list Rparen {$2}
+;
+arg_type_list:
 | /* empty */    {()}
 | DotDotDot {()}
-| argType {()}
-| argType Comma argTypeList {()}
+| arg_type {()}
+| arg_type Comma arg_type_list {()}
 ;
-argType:
+arg_type:
 | typ {()}
 | typ LocalVar {()}
 ;
-optSection:
+opt_section:
 | /* empty */    {()}
 | Kw_section StringConstant {()}
 ;
-opt_Align:
+opt_align:
 | /* empty */    {()}
 | Kw_align APInt {()}
     ;
 opt_inbounds:
-| /* empty */    {()}
-| Kw_inbounds {()}
+| /* empty */    { false }
+| Kw_inbounds { true }
 ;
 opt_tail:
-| /* empty */    {()}
-| Kw_tail {()}
+| /* empty */    { false }
+| Kw_tail { true }
 ;
 opt_cleanup:
-| /* empty */    {()}
-| Kw_cleanup {()}
+| /* empty */    { false }
+| Kw_cleanup { true }
 ;
 opt_comma_align:
 | /* empty */    {()}
 | Comma Kw_align APInt {()}
     ;
-optGC:
+opt_gc:
 | /* empty */    {()}
 | Kw_gc StringConstant {()}
     ;
-opt_Prefix:
+opt_prefix:
 | /* empty */    {()}
 | Kw_prefix typ value {()}
 ;
 opt_atomic:
-| /* empty */    {()}
-| Kw_atomic    {()}
+| /* empty */    { false }
+| Kw_atomic    { true }
 ;
 opt_volatile:
-| /* empty */    {()}
-| Kw_volatile    {()}
+| /* empty */    { false }
+| Kw_volatile    { true }
 ;
 value:
 | GlobalID {()}
@@ -582,7 +563,7 @@ value:
 | Less type_value_list Greater {()}
 | Lsquare type_value_list Rsquare {()}
 | Kw_c StringConstant {()}
-| Kw_asm optSideeffect optAlignStack optIntelDialect StringConstant Comma StringConstant {()}
+| Kw_asm opt_sideeffect opt_alignstack opt_inteldialect StringConstant Comma StringConstant {()}
 | Kw_blockaddress Lparen value Comma value Rparen {()}
 | Kw_trunc         Lparen type_value Kw_to typ Rparen {()}
 | Kw_zext          Lparen type_value Kw_to typ Rparen {()}
@@ -597,10 +578,10 @@ value:
 | Kw_fptosi        Lparen type_value Kw_to typ Rparen {()}
 | Kw_inttoptr      Lparen type_value Kw_to typ Rparen {()}
 | Kw_ptrtoint      Lparen type_value Kw_to typ Rparen {()}
-| Kw_extractvalue Lparen type_value indexList Rparen {()}
-| Kw_insertvalue Lparen type_value Comma type_value indexList Rparen {()}
-| Kw_icmp cmpPredicate Lparen type_value Comma type_value Rparen {()}
-| Kw_fcmp cmpPredicate Lparen type_value Comma type_value Rparen {()}
+| Kw_extractvalue Lparen type_value index_list Rparen {()}
+| Kw_insertvalue Lparen type_value Comma type_value index_list Rparen {()}
+| Kw_icmp icmp_predicate Lparen type_value Comma type_value Rparen {()}
+| Kw_fcmp fcmp_predicate Lparen type_value Comma type_value Rparen {()}
 
 | Kw_add opt_kw_nuw opt_nsw_nuw Lparen type_value Comma type_value Rparen {()}
 | Kw_sub opt_kw_nuw opt_nsw_nuw Lparen type_value Comma type_value Rparen {()}
@@ -630,82 +611,50 @@ value:
 | Kw_extractelement                Lparen type_value_list Rparen {()}
 | Kw_select                        Lparen type_value_list Rparen {()}
 ;
-optSideeffect:
-| /* empty */ {()}
-| Kw_sideeffect {()}
+opt_sideeffect:
+| /* empty */ { false }
+| Kw_sideeffect { true }
 ;
-optAlignStack:
-| /* empty */ {()}
-| Kw_alignstack {()}
+opt_alignstack:
+| /* empty */ { false }
+| Kw_alignstack { true }
 ;
-optIntelDialect:
-| /* empty */ {()}
-| Kw_inteldialect {()}
+opt_inteldialect:
+| /* empty */ { false }
+| Kw_inteldialect { true }
 ;
 opt_kw_inbounds:
-| /* empty */ {()}
-| Kw_inbounds {()}
+| /* empty */ { false }
+| Kw_inbounds { true }
 ;
 opt_kw_nuw:
-| /* empty */ {()}
-| Kw_nuw {()}
+| /* empty */ { false }
+| Kw_nuw { true }
 opt_exact:
-| /* empty */ {()}
-| Kw_exact {()}
+| /* empty */ { false }
+| Kw_exact { true }
 ;
 opt_nsw_nuw:
 | /* empty */ {()}
 | Kw_nsw opt_kw_nuw {()}
 ;
-metadataValue: {()};
+metadataValue:
+| APInt    {()}
+| StringConstant    {()}
+| Lbrace mdnodevector Rbrace    {()}
+;
 type_value_LIST:
-| type_value {()}
-| type_value Comma type_value_LIST {()}
+| type_value { [$1] }
+| type_value Comma type_value_LIST { $1::$3 }
 ;
 type_value_list:
-| /* empty */ {()}
-| type_value {()}
-| type_value Comma type_value_list {()}
+| /* empty */ { [] }
+| type_value { [$1] }
+| type_value Comma type_value_list { $1::$3 }
 ;
-indexList: {()};
-cmpPredicate: {()};
-functionBody: 
-| Lbrace basicBlockList Rbrace {()}
-;
-basicBlockList:
-| basicBlock {()}
-| basicBlock basicBlockList {()}
-;
-basicBlock:
-| opt_labelstr instructionList {()}
-;  
-instructionList:
-| terminator_instruction {()}
-| instruction instructionList {()}
-;
-opt_labelstr:
-| /* empty */ {()}
-| LabelStr {()}
-;
-local:
-| LocalVarID Equal {()}
-| LocalVar Equal {()}
-;
-opt_local:
-| /* empty */ {()}
-| local {()}
-;
-arithmetic:
-| type_value Comma value {()}
-;
-logical:
-| type_value Comma value {()}
-;
-cast:
-| type_value Kw_to typ {()}
-;
-compare:
-| type_value Comma value {()}
+index_list:
+| Comma APInt    { [$2] }
+| Comma APInt index_list    { $2::$3 }
 ;
 fcmp_predicate:
 | Kw_oeq {()}
@@ -736,6 +685,44 @@ icmp_predicate:
 | Kw_ugt {()}
 | Kw_ule {()}
 | Kw_uge {()}
+;
+function_body: 
+| Lbrace basicblock_list Rbrace { $2 }
+;
+basicblock_list:
+| basicblock { [$1] }
+| basicblock basicblock_list { $1::$2 }
+;
+basicblock:
+| opt_labelstr instruction_list { ($1, $2) }
+;  
+instruction_list:
+| terminator_instruction { [$1] }
+| instruction instruction_list { $1::$2 }
+;
+opt_labelstr:
+| /* empty */ { None }
+| LabelStr { Some $1 }
+;
+local:
+| LocalVarID Equal {()}
+| LocalVar Equal {()}
+;
+opt_local:
+| /* empty */ { None }
+| local { Some $1 }
+;
+arithmetic:
+| type_value Comma value {()}
+;
+logical:
+| type_value Comma value {()}
+;
+cast:
+| type_value Kw_to typ {()}
+;
+compare:
+| type_value Comma value {()}
 ;
 instruction:
 | local Kw_add opt_kw_nuw opt_nsw_nuw arithmetic {()}
@@ -779,15 +766,15 @@ instruction:
 | local Kw_select type_value_LIST {()}
 | local Kw_phi typ phi_list {()}
 | local Kw_landingpad typ Kw_personality type_value opt_cleanup landingpad_list {()}
-| opt_local opt_tail Kw_call opt_CallingConv opt_ReturnAttrs typ value parameterList call_attributes {()}
+| opt_local opt_tail Kw_call opt_callingconv opt_return_attrs typ value parameterList call_attributes {()}
 | local Kw_alloca alloc {()}
 | local Kw_load  opt_atomic opt_volatile type_value scopeandordering opt_comma_align {()}
 | Kw_store opt_atomic opt_volatile type_value Comma type_value scopeandordering opt_comma_align {()}
 | Kw_cmpxchg opt_volatile type_value Comma type_value Comma type_value opt_singlethread ordering ordering {()}
 | Kw_atomicrmw opt_volatile binop type_value Comma type_value opt_singlethread ordering {()}
 | Kw_fence opt_singlethread ordering {()}
-| local Kw_extractvalue type_value indexList {()}
-| local Kw_insertvalue type_value Comma type_value indexList {()}
+| local Kw_extractvalue type_value index_list {()}
+| local Kw_insertvalue type_value Comma type_value index_list {()}
 ;
 binop:
 | Kw_xchg {()}
@@ -821,8 +808,8 @@ ordering:
 | Kw_seq_cst {()}
 ;
 opt_singlethread:
-| /* empty */ {()}
-| Kw_singlethread {()}
+| /* empty */ { false }
+| Kw_singlethread { true }
 scopeandordering:
 | /* empty */ {()}
 | Kw_singlethread ordering {()}
@@ -853,7 +840,7 @@ terminator_instruction:
 | Kw_indirectbr type_value Comma Lsquare type_value_LIST Rsquare {()}
 | Kw_resume type_value {()}
 | Kw_switch type_value Comma type_value Lsquare jumpTable Rsquare {()}
-| local Kw_invoke opt_CallingConv opt_ReturnAttrs typ value parameterList fnAttributeValuePairs Kw_to type_value Kw_unwind type_value {()}
+| local Kw_invoke opt_callingconv opt_return_attrs typ value parameterList fnAttributeValuePairs Kw_to type_value Kw_unwind type_value {()}
 ;
 call_attributes:
 | /* empty */ {()}
@@ -897,6 +884,7 @@ fnAttributeValuePairs:
 ;
 attribute_group:
 | /* empty */ {()}
+| StringConstant attribute_group {()}
 | StringConstant Equal StringConstant attribute_group {()}
 | Kw_align Equal APSint attribute_group {()}
 | Kw_alignstack Equal APSint attribute_group {()}
@@ -928,17 +916,17 @@ attribute_group:
 | Kw_uwtable attribute_group {()}
 ;
 parameterList:
-| Lparen argList Rparen {()}
+| Lparen argList Rparen { $2 }
 ;
 argList:
-| /* empty */ {()}
-| arg {()}
-| arg Comma argList {()}
+| /* empty */ { []}
+| arg { [$1] }
+| arg Comma argList { $1::$3 }
 ;
 arg:
-| typ opt_ParamAttrs value {()}
+| typ opt_param_attrs value {()}
 ;
-opt_ParamAttrs:
+opt_param_attrs:
 | /* empty */ {()}
 | Kw_align APSint {()}
 | Kw_byval {()}
@@ -955,8 +943,8 @@ opt_ParamAttrs:
 | Kw_zeroext {()}
 ;
 jumpTable:
-| /* empty */ {()}
-| type_value Comma type_value jumpTable {()}
+| /* empty */ { [] }
+| type_value Comma type_value jumpTable { ($1,$3)::$4 }
 ;
 type_value:
 | typ value {()}
