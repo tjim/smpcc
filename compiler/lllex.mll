@@ -295,12 +295,7 @@ parse eof                                                    { Eof }
 let lexbuf = Lexing.from_channel stdin;;
 try
   ignore(main token lexbuf);
-  let p = Lexing.lexeme_start_p lexbuf in
-  Printf.printf
-    "Success!  Final lexeme at line %d character %d, = %s\n"
-    p.Lexing.pos_lnum
-    (p.Lexing.pos_cnum - p.Lexing.pos_bol)
-    (Lexing.lexeme lexbuf)
+  Printf.eprintf "Success!\n"
 with Parsing.Parse_error ->
   let p = Lexing.lexeme_start_p lexbuf in
   Printf.eprintf "Parse error at line %d character %d, the lexeme is %s\n"
