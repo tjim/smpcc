@@ -657,10 +657,10 @@ basicBlockList:
 | basicBlock basicBlockList {()}
 ;
 basicBlock:
-| opt_labelstr instructionList terminator_instruction {()}
+| opt_labelstr instructionList {()}
 ;  
 instructionList:
-| /* empty */ {()}
+| terminator_instruction {()}
 | instruction instructionList {()}
 ;
 opt_labelstr:
