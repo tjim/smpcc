@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"math/big"
+	"fmt"
 )
 
 var FIXED_KEY Key = []byte{83, 36, 191, 126, 172, 151, 226, 234, 140, 225, 71, 219, 216, 96, 130, 209, 17,
@@ -17,10 +18,11 @@ type DKC interface {
 }
 
 func init() {
-	aesprf, err := aes.NewCipher(FIXED_KEY)
+	a, err := aes.NewCipher(FIXED_KEY)
 	if err != nil {
 		panic(err)
 	}
+	aesprf = a
 }
 
 //--- Ga
