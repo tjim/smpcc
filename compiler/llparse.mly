@@ -262,13 +262,17 @@ main: Eof {()}
 | LocalVarID Equal Kw_type typ main {()}
 | LocalVar Equal Kw_type Kw_opaque main {()}
 | LocalVar Equal Kw_type typ main {()}
-| GlobalID Equal opt_linkage opt_visibility opt_dll_storageclass global main {()}
-| GlobalID Equal opt_visibility Kw_alias opt_linkage aliasee main {()}
-| GlobalVar Equal opt_linkage opt_visibility opt_dll_storageclass global main {()}
-| GlobalVar Equal opt_visibility Kw_alias opt_linkage aliasee main {()}
+| global_def external_linkage opt_visibility opt_dll_storageclass opt_ThreadLocal opt_AddrSpace opt_UnnamedAddr opt_ExternallyInitialized constant_or_global typ trailing_attributes main {()}
+| global_def non_external_linkage opt_visibility opt_dll_storageclass opt_ThreadLocal opt_AddrSpace opt_UnnamedAddr opt_ExternallyInitialized constant_or_global typ value trailing_attributes main {()}
+| global_def external_linkage opt_visibility Kw_alias opt_linkage aliasee main {()}
+| global_def non_external_linkage opt_visibility Kw_alias opt_linkage aliasee main {()}
 | Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace main {()}
 | MetadataVar Equal Exclaim Lbrace mdlist Rbrace main {()}
 | Kw_attributes AttrGrpID Equal Lbrace attribute_group Rbrace main {()}
+;
+global_def:
+| GlobalID Equal {()}
+| GlobalVar Equal {()}
 ;
 aliasee:
 | Kw_bitcast       Lparen type_value Kw_to typ Rparen {()}
@@ -289,9 +293,9 @@ mdnodevector:
 | mdnodevector Kw_null {()}
 | mdnodevector type_value {()}
 ;
-global:
-| opt_ThreadLocal opt_AddrSpace opt_UnnamedAddr opt_ExternallyInitialized Kw_constant typ opt_value trailing_attributes {()}
-| opt_ThreadLocal opt_AddrSpace opt_UnnamedAddr opt_ExternallyInitialized Kw_global typ opt_value trailing_attributes {()}
+constant_or_global:
+| Kw_constant {()}
+| Kw_global {()}
 ;
 opt_ThreadLocal:
 | /* empty */ {()}
@@ -334,7 +338,10 @@ opt_dll_storageclass:
 | Kw_dllexport {()}
 ;
 opt_linkage:
-| /* empty */ {()}
+| external_linkage {()}
+| non_external_linkage {()}
+/*
+| {()}
 | Kw_private  {()}
 | Kw_internal  {()}
 | Kw_weak  {()}
@@ -346,6 +353,23 @@ opt_linkage:
 | Kw_common  {()}
 | Kw_extern_weak  {()}
 | Kw_external  {()}
+*/
+;
+external_linkage:
+| Kw_extern_weak  {()}
+| Kw_external  {()}
+;
+non_external_linkage:
+| /* empty */ {()}
+| Kw_private  {()}
+| Kw_internal  {()}
+| Kw_weak  {()}
+| Kw_weak_odr  {()}
+| Kw_linkonce  {()}
+| Kw_linkonce_odr  {()}
+| Kw_available_externally  {()}
+| Kw_appending  {()}
+| Kw_common  {()}
 ;
 opt_visibility:
 | /* empty */ {()}
@@ -530,10 +554,6 @@ optGC:
 opt_Prefix:
 | /* empty */    {()}
 | Kw_prefix typ value {()}
-;
-opt_value:
-| /* empty */    {()}
-| value    {()}
 ;
 opt_atomic:
 | /* empty */    {()}
