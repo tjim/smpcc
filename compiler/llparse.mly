@@ -262,17 +262,18 @@ main: Eof {()}
 | LocalVarID Equal Kw_type typ main {()}
 | LocalVar Equal Kw_type Kw_opaque main {()}
 | LocalVar Equal Kw_type typ main {()}
-| GlobalID Equal optionalLinkage optionalVisibility optionalDLLStorageClass global main {()}
-| GlobalID Equal optionalVisibility Kw_alias optionalLinkage aliasee main {()}
-| GlobalVar Equal optionalLinkage optionalVisibility optionalDLLStorageClass global main {()}
-| GlobalVar Equal optionalVisibility Kw_alias optionalLinkage aliasee main {()}
+| GlobalID Equal opt_linkage opt_visibility opt_dll_storageclass global main {()}
+| GlobalID Equal opt_visibility Kw_alias opt_linkage aliasee main {()}
+| GlobalVar Equal opt_linkage opt_visibility opt_dll_storageclass global main {()}
+| GlobalVar Equal opt_visibility Kw_alias opt_linkage aliasee main {()}
 | Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace main {()}
 | MetadataVar Equal Exclaim Lbrace mdlist Rbrace main {()}
+| Kw_attributes AttrGrpID Equal Lbrace attribute_group Rbrace main {()}
 ;
 aliasee:
-| Kw_bitcast       Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_getelementptr opt_kw_inbounds Lparen globalValueVector Rparen {()}
-| globalTypeAndValue {()}
+| Kw_bitcast       Lparen type_value Kw_to typ Rparen {()}
+| Kw_getelementptr opt_kw_inbounds Lparen type_value_list Rparen {()}
+| type_value {()}
 ;
 stringlist:
 | /* empty */ {()}
@@ -284,30 +285,30 @@ mdlist:
 ;
 mdnodevector:
 | Kw_null {()}
-| typeAndValue {()}
+| type_value {()}
 | mdnodevector Kw_null {()}
-| mdnodevector typeAndValue {()}
+| mdnodevector type_value {()}
 ;
 global:
-| optionalThreadLocal optionalAddrSpace optionalUnnamedAddr optionalExternallyInitialized Kw_constant typ opt_globalValue trailing_attributes {()}
-| optionalThreadLocal optionalAddrSpace optionalUnnamedAddr optionalExternallyInitialized Kw_global typ opt_globalValue trailing_attributes {()}
+| opt_ThreadLocal opt_AddrSpace opt_UnnamedAddr opt_ExternallyInitialized Kw_constant typ opt_value trailing_attributes {()}
+| opt_ThreadLocal opt_AddrSpace opt_UnnamedAddr opt_ExternallyInitialized Kw_global typ opt_value trailing_attributes {()}
 ;
-optionalThreadLocal:
+opt_ThreadLocal:
 | /* empty */ {()}
 | Kw_thread_local {()}
 | Kw_thread_local Lparen Kw_localdynamic Rparen {()}
 | Kw_thread_local Lparen Kw_initialexec Rparen {()}
 | Kw_thread_local Lparen Kw_localexec Rparen {()}
 ;
-optionalAddrSpace:
+opt_AddrSpace:
 | /* empty */ {()}
 | Kw_addrspace Lparen APInt Rparen {()}
 ;
-optionalUnnamedAddr:
+opt_UnnamedAddr:
 | /* empty */ {()}
 | Kw_unnamed_addr {()}
 ;
-optionalExternallyInitialized:
+opt_ExternallyInitialized:
 | /* empty */ {()}
 | Kw_externally_initialized {()}
 ;
@@ -322,17 +323,17 @@ define:
 | Kw_define functionHeader functionBody {()}
 ;
 functionHeader:
- optionalLinkage optionalVisibility optionalDLLStorageClass optionalCallingConv optionalReturnAttrs
- typ globalName argumentList optionalUnnamedAddr fnAttributeValuePairs optSection
- optionalAlign optGC optionalPrefix
+| opt_linkage opt_visibility opt_dll_storageclass opt_CallingConv opt_ReturnAttrs
+ typ globalName argumentList opt_UnnamedAddr fnAttributeValuePairs optSection
+ opt_Align optGC opt_Prefix
  {()}
 ;
-optionalDLLStorageClass:
+opt_dll_storageclass:
 | /* empty */ {()}
 | Kw_dllimport {()}
 | Kw_dllexport {()}
 ;
-optionalLinkage:
+opt_linkage:
 | /* empty */ {()}
 | Kw_private  {()}
 | Kw_internal  {()}
@@ -346,13 +347,13 @@ optionalLinkage:
 | Kw_extern_weak  {()}
 | Kw_external  {()}
 ;
-optionalVisibility:
+opt_visibility:
 | /* empty */ {()}
 | Kw_default {()}
 | Kw_hidden {()}
 | Kw_protected {()}
 ;
-optionalCallingConv:
+opt_CallingConv:
 | /* empty */ {()}
 | Kw_ccc {()}
 | Kw_fastcc {()}
@@ -378,9 +379,9 @@ optionalCallingConv:
 | Kw_preserve_allcc {()}
 | Kw_cc {()}
 ;
-optionalReturnAttrs:
+opt_ReturnAttrs:
 | /* empty */ {()}
-| attr optionalReturnAttrs {
+| attr opt_ReturnAttrs {
   match $1 with
 | Kw_inreg  -> ()
 | Kw_noalias -> ()
@@ -458,7 +459,13 @@ non_void_type:
 | Type {()}
 | LocalVar {()}
 | LocalVarID {()}
+/*
 | structBody {()}
+*/
+| Lbrace Rbrace {()}
+| Less Lbrace Rbrace Greater {()}
+| Lbrace typeList Rbrace {()}
+| Less Lbrace typeList Rbrace Greater {()}
 | Lsquare APInt Kw_x typ Rsquare {()}
 | Less APInt Kw_x typ Greater {()}
 | typ Star {()}
@@ -466,19 +473,13 @@ non_void_type:
 | typ argumentList {()}
 ;
 /*
-typeSuffix:
-| {()}
-| Star typeSuffix {()}
-| Kw_addrspace Lparen APSint Rparen typeSuffix {()}
-| argumentList typeSuffix {()}
-;
-*/
 structBody:
 | Lbrace typeList Rbrace {()}
 | Less Lbrace typeList Rbrace Greater {()}
+*/
 ;
 typeList:
-| /* empty */    {()}
+/* | empty     {()}*/
 | typ {()}
 | typ Comma typeList {()}
 globalName:
@@ -502,7 +503,7 @@ optSection:
 | /* empty */    {()}
 | Kw_section StringConstant {()}
 ;
-optionalAlign:
+opt_Align:
 | /* empty */    {()}
 | Kw_align APInt {()}
     ;
@@ -526,16 +527,13 @@ optGC:
 | /* empty */    {()}
 | Kw_gc StringConstant {()}
     ;
-optionalPrefix:
+opt_Prefix:
 | /* empty */    {()}
-| Kw_prefix typ globalValue {()}
+| Kw_prefix typ value {()}
 ;
-globalValue:
-| valID {()}
-;
-opt_globalValue:
+opt_value:
 | /* empty */    {()}
-| globalValue    {()}
+| value    {()}
 ;
 opt_atomic:
 | /* empty */    {()}
@@ -545,7 +543,7 @@ opt_volatile:
 | /* empty */    {()}
 | Kw_volatile    {()}
 ;
-valID:
+value:
 | GlobalID {()}
 | GlobalVar {()}
 | LocalVarID {()}
@@ -558,58 +556,59 @@ valID:
 | Kw_null {()}
 | Kw_undef {()}
 | Kw_zeroinitializer {()}
-| Lbrace globalValueVector Rbrace {()}
-| Less Lbrace globalValueVector Rbrace Greater {()}
-| Less globalValueVector Greater {()}
-| Lsquare globalValueVector Rsquare {()}
+| Lbrace type_value_list Rbrace {()}
+| Less Lbrace Rbrace Greater {()}
+| Less Lbrace type_value_LIST Rbrace Greater {()}
+| Less type_value_list Greater {()}
+| Lsquare type_value_list Rsquare {()}
 | Kw_c StringConstant {()}
 | Kw_asm optSideeffect optAlignStack optIntelDialect StringConstant Comma StringConstant {()}
-| Kw_blockaddress Lparen valID Comma valID Rparen {()}
-| Kw_trunc         Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_zext          Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_sext          Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_fptrunc       Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_fpext         Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_bitcast       Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_addrspacecast Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_uitofp        Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_sitofp        Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_fptoui        Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_fptosi        Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_inttoptr      Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_ptrtoint      Lparen globalTypeAndValue Kw_to typ Rparen {()}
-| Kw_extractvalue Lparen globalTypeAndValue indexList Rparen {()}
-| Kw_insertvalue Lparen globalTypeAndValue Comma globalTypeAndValue indexList Rparen {()}
-| Kw_icmp cmpPredicate Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_fcmp cmpPredicate Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
+| Kw_blockaddress Lparen value Comma value Rparen {()}
+| Kw_trunc         Lparen type_value Kw_to typ Rparen {()}
+| Kw_zext          Lparen type_value Kw_to typ Rparen {()}
+| Kw_sext          Lparen type_value Kw_to typ Rparen {()}
+| Kw_fptrunc       Lparen type_value Kw_to typ Rparen {()}
+| Kw_fpext         Lparen type_value Kw_to typ Rparen {()}
+| Kw_bitcast       Lparen type_value Kw_to typ Rparen {()}
+| Kw_addrspacecast Lparen type_value Kw_to typ Rparen {()}
+| Kw_uitofp        Lparen type_value Kw_to typ Rparen {()}
+| Kw_sitofp        Lparen type_value Kw_to typ Rparen {()}
+| Kw_fptoui        Lparen type_value Kw_to typ Rparen {()}
+| Kw_fptosi        Lparen type_value Kw_to typ Rparen {()}
+| Kw_inttoptr      Lparen type_value Kw_to typ Rparen {()}
+| Kw_ptrtoint      Lparen type_value Kw_to typ Rparen {()}
+| Kw_extractvalue Lparen type_value indexList Rparen {()}
+| Kw_insertvalue Lparen type_value Comma type_value indexList Rparen {()}
+| Kw_icmp cmpPredicate Lparen type_value Comma type_value Rparen {()}
+| Kw_fcmp cmpPredicate Lparen type_value Comma type_value Rparen {()}
 
-| Kw_add opt_kw_nuw opt_nsw_nuw Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_sub opt_kw_nuw opt_nsw_nuw Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_mul opt_kw_nuw opt_nsw_nuw Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_shl opt_kw_nuw opt_nsw_nuw Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
+| Kw_add opt_kw_nuw opt_nsw_nuw Lparen type_value Comma type_value Rparen {()}
+| Kw_sub opt_kw_nuw opt_nsw_nuw Lparen type_value Comma type_value Rparen {()}
+| Kw_mul opt_kw_nuw opt_nsw_nuw Lparen type_value Comma type_value Rparen {()}
+| Kw_shl opt_kw_nuw opt_nsw_nuw Lparen type_value Comma type_value Rparen {()}
 
-| Kw_sdiv opt_exact             Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_udiv opt_exact             Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_lshr opt_exact             Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_ashr opt_exact             Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
+| Kw_sdiv opt_exact             Lparen type_value Comma type_value Rparen {()}
+| Kw_udiv opt_exact             Lparen type_value Comma type_value Rparen {()}
+| Kw_lshr opt_exact             Lparen type_value Comma type_value Rparen {()}
+| Kw_ashr opt_exact             Lparen type_value Comma type_value Rparen {()}
 
-| Kw_fadd                       Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_fsub                       Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_fmul                       Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_fdiv                       Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_urem                       Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_srem                       Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_frem                       Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
+| Kw_fadd                       Lparen type_value Comma type_value Rparen {()}
+| Kw_fsub                       Lparen type_value Comma type_value Rparen {()}
+| Kw_fmul                       Lparen type_value Comma type_value Rparen {()}
+| Kw_fdiv                       Lparen type_value Comma type_value Rparen {()}
+| Kw_urem                       Lparen type_value Comma type_value Rparen {()}
+| Kw_srem                       Lparen type_value Comma type_value Rparen {()}
+| Kw_frem                       Lparen type_value Comma type_value Rparen {()}
 
-| Kw_and Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_or  Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
-| Kw_xor Lparen globalTypeAndValue Comma globalTypeAndValue Rparen {()}
+| Kw_and Lparen type_value Comma type_value Rparen {()}
+| Kw_or  Lparen type_value Comma type_value Rparen {()}
+| Kw_xor Lparen type_value Comma type_value Rparen {()}
 
-| Kw_getelementptr opt_kw_inbounds Lparen globalValueVector Rparen {()}
-| Kw_shufflevector                 Lparen globalValueVector Rparen {()}
-| Kw_insertelement                 Lparen globalValueVector Rparen {()}
-| Kw_extractelement                Lparen globalValueVector Rparen {()}
-| Kw_select                        Lparen globalValueVector Rparen {()}
+| Kw_getelementptr opt_kw_inbounds Lparen type_value_list Rparen {()}
+| Kw_shufflevector                 Lparen type_value_list Rparen {()}
+| Kw_insertelement                 Lparen type_value_list Rparen {()}
+| Kw_extractelement                Lparen type_value_list Rparen {()}
+| Kw_select                        Lparen type_value_list Rparen {()}
 ;
 optSideeffect:
 | /* empty */ {()}
@@ -639,13 +638,14 @@ opt_nsw_nuw:
 | Kw_nsw opt_kw_nuw {()}
 ;
 metadataValue: {()};
-globalValueVector:
-| /* empty */ {()}
-| globalTypeAndValue {()}
-| globalTypeAndValue Comma globalValueVector {()}
+type_value_LIST:
+| type_value {()}
+| type_value Comma type_value_LIST {()}
 ;
-globalTypeAndValue:
-| typ globalValue {()}
+type_value_list:
+| /* empty */ {()}
+| type_value {()}
+| type_value Comma type_value_list {()}
 ;
 indexList: {()};
 cmpPredicate: {()};
@@ -657,32 +657,35 @@ basicBlockList:
 | basicBlock basicBlockList {()}
 ;
 basicBlock:
-| opt_labelstr instructionList opt_local termInst {()}
+| opt_labelstr instructionList terminator_instruction {()}
 ;  
 instructionList:
 | /* empty */ {()}
-| opt_local instruction instructionList {()}
+| instruction instructionList {()}
 ;
 opt_labelstr:
 | /* empty */ {()}
 | LabelStr {()}
 ;
-opt_local:
-| /* empty */ {()}
+local:
 | LocalVarID Equal {()}
 | LocalVar Equal {()}
 ;
+opt_local:
+| /* empty */ {()}
+| local {()}
+;
 arithmetic:
-| typeAndValue Comma value {()}
+| type_value Comma value {()}
 ;
 logical:
-| typeAndValue Comma value {()}
+| type_value Comma value {()}
 ;
 cast:
-| typeAndValue Kw_to typ {()}
+| type_value Kw_to typ {()}
 ;
 compare:
-| typeAndValue Comma value {()}
+| type_value Comma value {()}
 ;
 fcmp_predicate:
 | Kw_oeq {()}
@@ -715,56 +718,56 @@ icmp_predicate:
 | Kw_uge {()}
 ;
 instruction:
-| Kw_add opt_kw_nuw opt_nsw_nuw arithmetic {()}
-| Kw_sub opt_kw_nuw opt_nsw_nuw arithmetic {()}
-| Kw_mul opt_kw_nuw opt_nsw_nuw arithmetic {()}
-| Kw_shl opt_kw_nuw opt_nsw_nuw arithmetic {()}
-| Kw_fadd fastmathflags arithmetic {()}
-| Kw_fsub fastmathflags arithmetic {()}
-| Kw_fmul fastmathflags arithmetic {()}
-| Kw_fdiv fastmathflags arithmetic {()}
-| Kw_frem fastmathflags arithmetic {()}
-| Kw_sdiv opt_exact arithmetic {()}
-| Kw_udiv opt_exact arithmetic {()}
-| Kw_lshr opt_exact arithmetic {()}
-| Kw_ashr opt_exact arithmetic {()}
-| Kw_urem arithmetic {()}
-| Kw_srem arithmetic {()}
-| Kw_and logical {()}
-| Kw_or logical {()}
-| Kw_xor logical {()}
-| Kw_icmp icmp_predicate compare {()}
-| Kw_fcmp fcmp_predicate compare {()}
-| Kw_trunc cast {()}
-| Kw_zext cast {()}
-| Kw_sext cast {()}
-| Kw_fptrunc cast {()}
-| Kw_fpext cast {()}
-| Kw_bitcast cast {()}
-| Kw_addrspacecast cast {()}
-| Kw_uitofp cast {()}
-| Kw_sitofp cast {()}
-| Kw_fptoui cast {()}
-| Kw_fptosi cast {()}
-| Kw_inttoptr cast {()}
-| Kw_ptrtoint cast {()}
-| Kw_va_arg typeAndValue Comma typ {()}
-| Kw_getelementptr opt_inbounds typeAndValueList {()}
-| Kw_extractelement typeAndValueList {()}
-| Kw_insertelement typeAndValueList {()}
-| Kw_shufflevector typeAndValueList {()}
-| Kw_select typeAndValueList {()}
-| Kw_phi typ phi_list {()}
-| Kw_landingpad typ Kw_personality typeAndValue opt_cleanup landingpad_list {()}
-| opt_tail Kw_call optionalCallingConv optionalReturnAttrs typ valID parameterList fnAttributeValuePairs {()}
-| Kw_alloca alloc {()}
-| Kw_load  opt_atomic opt_volatile typeAndValue scopeandordering opt_comma_align {()}
-| Kw_store opt_atomic opt_volatile typeAndValue Comma typeAndValue scopeandordering opt_comma_align {()}
-| Kw_cmpxchg opt_volatile typeAndValue Comma typeAndValue Comma typeAndValue scopeandordering ordering {()}
-| Kw_atomicrmw opt_volatile binop typeAndValue Comma typeAndValue scopeandordering {()}
-| Kw_fence scopeandordering {()}
-| Kw_extractvalue typeAndValue indexList {()}
-| Kw_insertvalue typeAndValue Comma typeAndValue indexList {()}
+| local Kw_add opt_kw_nuw opt_nsw_nuw arithmetic {()}
+| local Kw_sub opt_kw_nuw opt_nsw_nuw arithmetic {()}
+| local Kw_mul opt_kw_nuw opt_nsw_nuw arithmetic {()}
+| local Kw_shl opt_kw_nuw opt_nsw_nuw arithmetic {()}
+| local Kw_fadd fastmathflags arithmetic {()}
+| local Kw_fsub fastmathflags arithmetic {()}
+| local Kw_fmul fastmathflags arithmetic {()}
+| local Kw_fdiv fastmathflags arithmetic {()}
+| local Kw_frem fastmathflags arithmetic {()}
+| local Kw_sdiv opt_exact arithmetic {()}
+| local Kw_udiv opt_exact arithmetic {()}
+| local Kw_lshr opt_exact arithmetic {()}
+| local Kw_ashr opt_exact arithmetic {()}
+| local Kw_urem arithmetic {()}
+| local Kw_srem arithmetic {()}
+| local Kw_and logical {()}
+| local Kw_or logical {()}
+| local Kw_xor logical {()}
+| local Kw_icmp icmp_predicate compare {()}
+| local Kw_fcmp fcmp_predicate compare {()}
+| local Kw_trunc cast {()}
+| local Kw_zext cast {()}
+| local Kw_sext cast {()}
+| local Kw_fptrunc cast {()}
+| local Kw_fpext cast {()}
+| local Kw_bitcast cast {()}
+| local Kw_addrspacecast cast {()}
+| local Kw_uitofp cast {()}
+| local Kw_sitofp cast {()}
+| local Kw_fptoui cast {()}
+| local Kw_fptosi cast {()}
+| local Kw_inttoptr cast {()}
+| local Kw_ptrtoint cast {()}
+| local Kw_va_arg type_value Comma typ {()}
+| local Kw_getelementptr opt_inbounds type_value_LIST {()}
+| local Kw_extractelement type_value_LIST {()}
+| local Kw_insertelement type_value_LIST {()}
+| local Kw_shufflevector type_value_LIST {()}
+| local Kw_select type_value_LIST {()}
+| local Kw_phi typ phi_list {()}
+| local Kw_landingpad typ Kw_personality type_value opt_cleanup landingpad_list {()}
+| opt_local opt_tail Kw_call opt_CallingConv opt_ReturnAttrs typ value parameterList call_attributes {()}
+| local Kw_alloca alloc {()}
+| local Kw_load  opt_atomic opt_volatile type_value scopeandordering opt_comma_align {()}
+| Kw_store opt_atomic opt_volatile type_value Comma type_value scopeandordering opt_comma_align {()}
+| Kw_cmpxchg opt_volatile type_value Comma type_value Comma type_value opt_singlethread ordering ordering {()}
+| Kw_atomicrmw opt_volatile binop type_value Comma type_value opt_singlethread ordering {()}
+| Kw_fence opt_singlethread ordering {()}
+| local Kw_extractvalue type_value indexList {()}
+| local Kw_insertvalue type_value Comma type_value indexList {()}
 ;
 binop:
 | Kw_xchg {()}
@@ -784,10 +787,10 @@ phi_list:
 | phi_list Comma Lsquare value Comma value Rsquare {()}
 ;
 landingpad_list:
-| Kw_catch typeAndValue {()}
-| Kw_filter typeAndValue {()}
-| landingpad_list Kw_catch typeAndValue {()}
-| landingpad_list Kw_filter typeAndValue {()}
+| Kw_catch type_value {()}
+| Kw_filter type_value {()}
+| landingpad_list Kw_catch type_value {()}
+| landingpad_list Kw_filter type_value {()}
 ;
 ordering:
 | Kw_unordered {()}
@@ -797,18 +800,21 @@ ordering:
 | Kw_acq_rel {()}
 | Kw_seq_cst {()}
 ;
+opt_singlethread:
+| /* empty */ {()}
+| Kw_singlethread {()}
 scopeandordering:
 | /* empty */ {()}
 | Kw_singlethread ordering {()}
 | ordering {()}
 ;
 alloc:
-| Kw_inalloca typ Comma typeAndValue Comma Kw_align APInt {()}
-| Kw_inalloca typ Comma typeAndValue {()}
+| Kw_inalloca typ Comma type_value Comma Kw_align APInt {()}
+| Kw_inalloca typ Comma type_value {()}
 | Kw_inalloca typ Comma Kw_align APInt {()}
 | Kw_inalloca typ {()}
-| typ Comma typeAndValue Comma Kw_align APInt {()}
-| typ Comma typeAndValue {()}
+| typ Comma type_value Comma Kw_align APInt {()}
+| typ Comma type_value {()}
 | typ Comma Kw_align APInt {()}
 | typ {()}
 fastmathflags:
@@ -818,23 +824,29 @@ fastmathflags:
 | Kw_nsz {()}
 | Kw_arcp {()}
 ;
-termInst:
+terminator_instruction:
 | Kw_unreachable {()}
 | Kw_ret Kw_void {()} /* we need to distinguish void from all other types else we have a dependent grammar */
 | Kw_ret non_void_type value {()} 
-| Kw_br typeAndValue {()}
-| Kw_br typeAndValue Comma typeAndValue Comma typeAndValue {()}
-| Kw_indirectbr typeAndValue Comma Lsquare destList Rsquare {()}
-| Kw_resume typeAndValue {()}
-| Kw_switch typeAndValue Comma typeAndValue Lsquare jumpTable Rsquare {()}
-| Kw_invoke optionalCallingConv optionalReturnAttrs typ valID parameterList fnAttributeValuePairs Kw_to typeAndBasicBlock Kw_unwind typeAndBasicBlock {()}
+| Kw_br type_value {()}
+| Kw_br type_value Comma type_value Comma type_value {()}
+| Kw_indirectbr type_value Comma Lsquare type_value_LIST Rsquare {()}
+| Kw_resume type_value {()}
+| Kw_switch type_value Comma type_value Lsquare jumpTable Rsquare {()}
+| local Kw_invoke opt_CallingConv opt_ReturnAttrs typ value parameterList fnAttributeValuePairs Kw_to type_value Kw_unwind type_value {()}
+;
+call_attributes:
+| /* empty */ {()}
+| Kw_noreturn call_attributes {()}
+| Kw_nounwind call_attributes {()}
+| Kw_readnone call_attributes {()}
+| Kw_readonly call_attributes {()}
 ;
 fnAttributeValuePairs:
 | /* empty */ {()}
 | AttrGrpID fnAttributeValuePairs {()}
 | StringConstant Equal StringConstant fnAttributeValuePairs {()}
-| Kw_align Equal APSint fnAttributeValuePairs {()}
-| Kw_alignstack Equal APSint fnAttributeValuePairs {()}
+/*| Kw_align APInt fnAttributeValuePairs {()} not needed since always printed after section, if we use this it causes 31 shift/reduce conflicts */
 | Kw_alignstack Equal Lparen APSint Rparen fnAttributeValuePairs {()}
 | Kw_alwaysinline fnAttributeValuePairs {()}
 | Kw_builtin fnAttributeValuePairs {()}
@@ -862,16 +874,38 @@ fnAttributeValuePairs:
 | Kw_sanitize_thread fnAttributeValuePairs {()}
 | Kw_sanitize_memory fnAttributeValuePairs {()}
 | Kw_uwtable fnAttributeValuePairs {()}
-| Kw_inreg{failwith "invalid use of attribute on a function"}
-| Kw_signext{failwith "invalid use of attribute on a function"}
-| Kw_zeroext {failwith "invalid use of attribute on a function"}
-| Kw_byval {failwith "invalid use of parameter-only attribute on a function"}
-| Kw_inalloca {failwith "invalid use of parameter-only attribute on a function"}
-| Kw_nest {failwith "invalid use of parameter-only attribute on a function"}
-| Kw_noalias {failwith "invalid use of parameter-only attribute on a function"}
-| Kw_nocapture {failwith "invalid use of parameter-only attribute on a function"}
-| Kw_returned {failwith "invalid use of parameter-only attribute on a function"}
-| Kw_sret {failwith "invalid use of parameter-only attribute on a function"}
+;
+attribute_group:
+| /* empty */ {()}
+| StringConstant Equal StringConstant attribute_group {()}
+| Kw_align Equal APSint attribute_group {()}
+| Kw_alignstack Equal APSint attribute_group {()}
+| Kw_alwaysinline attribute_group {()}
+| Kw_builtin attribute_group {()}
+| Kw_cold attribute_group {()}
+| Kw_inlinehint attribute_group {()}
+| Kw_minsize attribute_group {()}
+| Kw_naked attribute_group {()}
+| Kw_nobuiltin attribute_group {()}
+| Kw_noduplicate attribute_group {()}
+| Kw_noimplicitfloat attribute_group {()}
+| Kw_noinline attribute_group {()}
+| Kw_nonlazybind attribute_group {()}
+| Kw_noredzone attribute_group {()}
+| Kw_noreturn attribute_group {()}
+| Kw_nounwind attribute_group {()}
+| Kw_optnone attribute_group {()}
+| Kw_optsize attribute_group {()}
+| Kw_readnone attribute_group {()}
+| Kw_readonly attribute_group {()}
+| Kw_returns_twice attribute_group {()}
+| Kw_ssp attribute_group {()}
+| Kw_sspreq attribute_group {()}
+| Kw_sspstrong attribute_group {()}
+| Kw_sanitize_address attribute_group {()}
+| Kw_sanitize_thread attribute_group {()}
+| Kw_sanitize_memory attribute_group {()}
+| Kw_uwtable attribute_group {()}
 ;
 parameterList:
 | Lparen argList Rparen {()}
@@ -882,9 +916,9 @@ argList:
 | arg Comma argList {()}
 ;
 arg:
-| typ optionalParamAttrs value {()}
+| typ opt_ParamAttrs value {()}
 ;
-optionalParamAttrs:
+opt_ParamAttrs:
 | /* empty */ {()}
 | Kw_align APSint {()}
 | Kw_byval {()}
@@ -899,49 +933,11 @@ optionalParamAttrs:
 | Kw_signext {()}
 | Kw_sret {()}
 | Kw_zeroext {()}
-| Kw_alignstack       {failwith "invalid use of function-only attribute"}               
-| Kw_alwaysinline     {failwith "invalid use of function-only attribute"}
-| Kw_builtin          {failwith "invalid use of function-only attribute"}
-| Kw_inlinehint       {failwith "invalid use of function-only attribute"}
-| Kw_minsize          {failwith "invalid use of function-only attribute"}
-| Kw_naked            {failwith "invalid use of function-only attribute"}
-| Kw_nobuiltin        {failwith "invalid use of function-only attribute"}
-| Kw_noduplicate      {failwith "invalid use of function-only attribute"}
-| Kw_noimplicitfloat  {failwith "invalid use of function-only attribute"}
-| Kw_noinline         {failwith "invalid use of function-only attribute"}
-| Kw_nonlazybind      {failwith "invalid use of function-only attribute"}
-| Kw_noredzone        {failwith "invalid use of function-only attribute"}
-| Kw_noreturn         {failwith "invalid use of function-only attribute"}
-| Kw_nounwind         {failwith "invalid use of function-only attribute"}
-| Kw_optnone          {failwith "invalid use of function-only attribute"}
-| Kw_optsize          {failwith "invalid use of function-only attribute"}
-| Kw_returns_twice    {failwith "invalid use of function-only attribute"}
-| Kw_sanitize_address {failwith "invalid use of function-only attribute"}
-| Kw_sanitize_memory  {failwith "invalid use of function-only attribute"}
-| Kw_sanitize_thread  {failwith "invalid use of function-only attribute"}
-| Kw_ssp              {failwith "invalid use of function-only attribute"}
-| Kw_sspreq           {failwith "invalid use of function-only attribute"}
-| Kw_sspstrong        {failwith "invalid use of function-only attribute"}
-| Kw_uwtable          {failwith "invalid use of function-only attribute"}
 ;
 jumpTable:
 | /* empty */ {()}
-| typeAndValue Comma typeAndBasicBlock jumpTable {()}
+| type_value Comma type_value jumpTable {()}
 ;
-destList:
-| typeAndBasicBlock {()}
-| typeAndBasicBlock Comma destList {()}
-;
-typeAndBasicBlock:
-| typeAndValue {()}
-;
-typeAndValue:
+type_value:
 | typ value {()}
-;
-typeAndValueList:
-| typeAndValue {()}
-| typeAndValue Comma typeAndValueList {()}
-;
-value:
-| valID {()}
 ;
