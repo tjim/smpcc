@@ -14,7 +14,7 @@ packages:
     mkdir gowork
     cd gowork
     export GOPATH=`pwd`:$GOPATH
-    go get github.com/tjim/smpcc/base
+    go get github.com/tjim/smpcc/runtime/base
 
 To build the compiler itself you'll need ocaml and clang.  Their setup
 is a little complicated, so we recommend that you install them using
