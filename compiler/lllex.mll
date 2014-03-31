@@ -169,15 +169,15 @@ let _ =
      "catch"                  ,Kw_catch;
      "filter"                 ,Kw_filter;
      "void"                   ,Kw_void;
-     "half"                   ,Type(Half);
-     "float"                  ,Type(Float);
-     "double"                 ,Type(Double);
-     "x86_fp80"               ,Type(X86_fp80);
-     "fp128"                  ,Type(Fp128);
-     "ppc_fp128"              ,Type(Ppc_fp128);
-     "label"                  ,Type(Label);
-     "metadata"               ,Type(Metadata);
-     "x86_mmx"                ,Type(X86_mmx);
+     "half"                   ,Kw_half;
+     "float"                  ,Kw_float;
+     "double"                 ,Kw_double;
+     "x86_fp80"               ,Kw_x86_fp80;
+     "fp128"                  ,Kw_fp128;
+     "ppc_fp128"              ,Kw_ppc_fp128;
+     "label"                  ,Kw_label;
+     "metadata"               ,Kw_metadata;
+     "x86_mmx"                ,Kw_x86_mmx;
      "add"                    ,Kw_add;
      "fadd"                   ,Kw_fadd;
      "sub"                    ,Kw_sub;
@@ -266,7 +266,7 @@ parse eof                                                    { Eof }
 | dquote notdquote* dquote                                   { StringConstant(Lexing.lexeme lexbuf) }
 | idchar+ ':'                                                { LabelStr(Lexing.lexeme lexbuf) }
 | "..."                                                      { DotDotDot }
-| 'i' (digit+ as numbits)                                    { Type(Integer(int_of_string numbits)) }
+| 'i' (digit+ as numbits)                                    { I(int_of_string numbits) }
 | ['u' 's'] "0x" hexdigit+                                   { APSint(Lexing.lexeme lexbuf) }
 | "cc"                                                       { Kw_cc }
 | ['_' 'a'-'z' 'A'-'Z'] idchar*                              { keyword(Lexing.lexeme lexbuf) }

@@ -9,10 +9,11 @@ type oType =
   | Ppc_fp128
   | Label
   | Metadata
+  | Varty of string
   (* Missing X86_MMXTyID:   OS << "x86_mmx" ????? *)
   | Integer    of int                               (* bitwidth *)
   | FunctionTy of oType * oType list * bool         (* return type, param types, is_var_arg *)
-  | Struct     of string option                     (* name *) (* TODO: missing isLiteral *)
+  | Struct     of bool * oType list                 (* packed, fields *) (* TODO: name *) (* TODO: missing isLiteral *)
   | Array      of int * oType                       (* array length, element type *)
-  | Pointer    of int * oType                       (* address space, element type *)
+  | Pointer    of oType * int option                (* element type, address space *)
   | Vector     of int * oType                       (* array length, element type *)

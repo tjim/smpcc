@@ -26,9 +26,18 @@
 %token Rsquare
 %token Star
 %token <string> StringConstant
-%token <Util.oType> Type
 %token Error
 %token Kw_void
+%token <int> I
+%token Kw_half
+%token Kw_float
+%token Kw_double
+%token Kw_x86_fp80
+%token Kw_fp128
+%token Kw_ppc_fp128
+%token Kw_label
+%token Kw_metadata
+%token Kw_x86_mmx
 %token Kw_true
 %token Kw_false
 %token Kw_declare
@@ -318,21 +327,29 @@ function_header:
  {()}
 ;
 typ:
-| Kw_void { () }
+| Kw_void { Util.Void }
 | non_void_type { $1 }
 non_void_type:
-| Type {()}
-| LocalVar {()}
-| LocalVarID {()}
-| Lbrace Rbrace {()}
-| Less Lbrace Rbrace Greater {()}
-| Lbrace type_list Rbrace {()}
-| Less Lbrace type_list Rbrace Greater {()}
-| Lsquare APInt Kw_x typ Rsquare {()}
-| Less APInt Kw_x typ Greater {()}
-| typ Star {()}
-| typ Kw_addrspace Lparen APInt Rparen {()}
-| typ argument_list {()}
+| I { Util.Integer $1 }
+| Kw_half { Util.Half }
+| Kw_float { Util.Float }
+| Kw_double { Util.Double }
+| Kw_x86_fp80 { Util.X86_fp80 }
+| Kw_fp128 { Util.Fp128 }
+| Kw_ppc_fp128 { Util.Ppc_fp128 }
+| Kw_label { Util.Label }
+| Kw_metadata { Util.Metadata }
+| Kw_x86_mmx { Util.X86_mmx }
+| LocalVar { Util.Varty $1 }
+| LocalVarID { Util.Varty $1 }
+| Lbrace Rbrace { Util.Struct(false, []) }
+| Less Lbrace Rbrace Greater { Util.Struct(true, []) }
+| Lbrace type_list Rbrace { Util.Struct(false, $2) }
+| Less Lbrace type_list Rbrace Greater { Util.Struct(true, $3) }
+| Lsquare APInt Kw_x typ Rsquare { Util.Array(int_of_string $2, $4) }
+| Less APInt Kw_x typ Greater { Util.Vector(int_of_string $2, $4) }
+| typ opt_addrspace Star { Util.Pointer($1, $2) }
+| typ argument_list { Util.FunctionTy($1, fst $2, snd $2) }
 ;
 type_list:
 | typ { [$1] }
@@ -345,14 +362,14 @@ argument_list:
 Lparen arg_type_list Rparen {$2}
 ;
 arg_type_list:
-| /* empty */    {()}
-| DotDotDot {()}
-| arg_type {()}
-| arg_type Comma arg_type_list {()}
+| /* empty */    { ([], false) }
+| DotDotDot { ([], true)}
+| arg_type { ([$1], false) }
+| arg_type Comma arg_type_list { ($1::(fst $3), snd $3) }
 ;
 arg_type:
-| typ {()}
-| typ LocalVar {()}
+| typ { $1 }
+| typ LocalVar { $1 }
 ;
 opt_section:
 | /* empty */    {()}
@@ -803,8 +820,8 @@ opt_thread_local:
 | Kw_thread_local Lparen Kw_localexec Rparen {()}
 ;
 opt_addrspace:
-| /* empty */ {()}
-| Kw_addrspace Lparen APInt Rparen {()}
+| /* empty */ { None }
+| Kw_addrspace Lparen APInt Rparen { Some (int_of_string $3) }
 ;
 opt_unnamed_addr:
 | /* empty */ {()}
