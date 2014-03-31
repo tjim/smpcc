@@ -1,0 +1,17 @@
+gobe.cmo : state.cmx options.cmx oli.cmx
+gobe.cmx : state.cmx options.cmx oli.cmx
+lllex.cmo : util.cmx llparse.cmi
+lllex.cmx : util.cmx llparse.cmx
+llparse.cmo : util.cmx llparse.cmi
+llparse.cmx : util.cmx llparse.cmi
+main.cmo : state.cmx options.cmx oli.cmx gobe.cmx
+main.cmx : state.cmx options.cmx oli.cmx gobe.cmx
+oli.cmo :
+oli.cmx :
+options.cmo :
+options.cmx :
+state.cmo : oli.cmx
+state.cmx : oli.cmx
+util.cmo :
+util.cmx :
+llparse.cmi :

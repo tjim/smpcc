@@ -31,5 +31,5 @@ uninstall:
 	ocamlyacc $<
 
 include .depend
-.depend:
+.depend: lllex.ml llparse.ml llparse.mli
 	ocamldep -native *.ml *.mli > $@
