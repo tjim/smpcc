@@ -256,12 +256,12 @@ parse eof                                                    { Eof }
 | ';' [^'\n''\r']*                                           { token lexbuf }
 | plusminus? digit+ '.' digit* (['e''E'] plusminus? digit+)? { APFloat(Lexing.lexeme lexbuf) }
 | plusminus? digit+                                          { APInt(Lexing.lexeme lexbuf) }
-| '@' dquote notdquote* dquote                               { GlobalVar(Lexing.lexeme lexbuf) }
-| '@' idchar0 idchar*                                        { GlobalVar(Lexing.lexeme lexbuf) }
-| '@' digit+                                                 { GlobalID(Lexing.lexeme lexbuf) }
-| '%' dquote notdquote* dquote                               { LocalVar(Lexing.lexeme lexbuf) }
-| '%' idchar0 idchar*                                        { LocalVar(Lexing.lexeme lexbuf) }
-| '%' digit+                                                 { LocalVarID(Lexing.lexeme lexbuf) }
+| '@' (dquote notdquote* dquote as x)                        { GlobalVar x }
+| '@' (idchar0 idchar* as x)                                 { GlobalVar x }
+| '@' (digit+ as x)                                          { GlobalID (int_of_string x) }
+| '%' (dquote notdquote* dquote as x)                        { LocalVar x }
+| '%' (idchar0 idchar* as x)                                 { LocalVar x }
+| '%' (digit+ as x)                                          { LocalVarID(int_of_string x) }
 | dquote notdquote+ dquote ':'                               { LabelStr(Lexing.lexeme lexbuf) }
 | dquote notdquote* dquote                                   { StringConstant(Lexing.lexeme lexbuf) }
 | idchar+ ':'                                                { LabelStr(Lexing.lexeme lexbuf) }
@@ -292,7 +292,11 @@ parse eof                                                    { Eof }
 | _                                                          { Error }
 
 {
-let lexbuf = Lexing.from_channel stdin;;
+let lexbuf =
+  if Array.length Sys.argv > 1 then
+    Lexing.from_channel (open_in Sys.argv.(1))
+  else
+    Lexing.from_channel stdin;;
 try
   ignore(main token lexbuf);
   Printf.eprintf "Success!\n"
