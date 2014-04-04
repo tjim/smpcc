@@ -10,10 +10,10 @@
 %token Eof
 %token Equal
 %token Exclaim
-%token <string> GlobalVar
-%token <int> GlobalID
-%token <string> LocalVar
-%token <int> LocalVarID
+%token <Util.variable> GlobalVar
+%token <Util.variable> GlobalID
+%token <Util.variable> LocalVar
+%token <Util.variable> LocalVarID
 %token Greater
 %token <string> LabelStr
 %token Lbrace
@@ -288,8 +288,8 @@ toplevel:
 | Kw_attributes AttrGrpID Equal Lbrace group_attributes Rbrace                {()}
 ;
 global_eq: /* may want to allow empty here (per llvm parser) but haven't seen it yet and it causes grammar conflicts */
-| GlobalID Equal  { Util.ID(true, $1) }
-| GlobalVar Equal { Util.VAR(true, $1) }
+| GlobalID Equal  { $1 }
+| GlobalVar Equal { $1 }
 ;
 aliasee:
 | Kw_bitcast       Lparen type_value Kw_to typ Rparen         {()}
@@ -345,8 +345,8 @@ non_void_type:
 | Kw_label                             { Util.Label }
 | Kw_metadata                          { Util.Metadata }
 | Kw_x86_mmx                           { Util.X86_mmx }
-| LocalVar                             { Util.Varty(Util.VAR(false, $1)) }
-| LocalVarID                           { Util.Varty(Util.ID(false, $1)) }
+| LocalVar                             { Util.Varty($1) }
+| LocalVarID                           { Util.Varty($1) }
 | Lbrace Rbrace                        { Util.Struct(false, []) }
 | Less Lbrace Rbrace Greater           { Util.Struct(true, []) }
 | Lbrace type_list Rbrace              { Util.Struct(false, $2) }
@@ -361,8 +361,8 @@ type_list:
 | typ Comma type_list { $1::$3 }
 ;
 global_name:
-| GlobalID  { Util.ID(true, $1) }
-| GlobalVar { Util.VAR(true, $1) }
+| GlobalID  { $1 }
+| GlobalVar { $1 }
 ;
 argument_list:
 Lparen arg_type_list Rparen {$2}
@@ -551,8 +551,8 @@ opt_labelstr:
 | LabelStr    { Some $1 }
 ;
 local_eq:
-| LocalVarID Equal { Util.ID(false, $1) }
-| LocalVar Equal   { Util.VAR(false, $1) }
+| LocalVarID Equal { $1 }
+| LocalVar Equal   { $1 }
 ;
 opt_local:
 | /* empty */ { None }

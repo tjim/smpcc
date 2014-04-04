@@ -14,4 +14,4 @@ state.cmo : oli.cmx
 state.cmx : oli.cmx
 util.cmo :
 util.cmx :
-llparse.cmi :
+llparse.cmi : util.cmx
