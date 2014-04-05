@@ -7,7 +7,7 @@ smpcc: oli.cmx state.cmx options.cmx gobe.cmx main.cmx llvmfixup.o bindings.o
 	ocamlopt -cc 'g++ -Wno-write-strings' -cclib -rdynamic $(LIBS) $^ -o $@
 
 parse: llparse.cmx lllex.cmx
-	ocamlopt $^ -o $@
+	ocamlopt nums.cmxa $^ -o $@
 
 clean:
 	$(RM) *.cmx *.cmi *.o

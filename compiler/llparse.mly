@@ -1,4 +1,8 @@
 %{
+let list_of_string s =
+  let a = Array.create (String.length s) 'a' in
+  String.iteri (fun i c -> a.(i) <- c) s;
+  List.map (fun c -> (Util.Integer 8, Util.Int(Big_int.big_int_of_int(Char.code c)))) (Array.to_list a)
 %}
 %token <string> APFloat
 %token <string> APInt
@@ -305,10 +309,10 @@ mdlist:
 | Exclaim APInt mdlist { $2::$3 }
 ;
 mdnodevector:
-| Kw_null                 {()}
-| Kw_null mdnodevector    {()}
-| type_value              {()}
-| type_value mdnodevector {()}
+| Kw_null                 { [None] }
+| Kw_null mdnodevector    { None::$2 }
+| type_value              { [Some $1] }
+| type_value mdnodevector { (Some $1)::$2 }
 ;
 constant_or_global:
 | Kw_constant { true }
@@ -418,76 +422,71 @@ opt_volatile:
 | Kw_volatile { true }
 ;
 value:
-| GlobalID                                                                                  {()}
-| GlobalVar                                                                                 {()}
-| LocalVarID                                                                                {()}
-| LocalVar                                                                                  {()}
-| Exclaim mdvalue                                                                           {()}
-| APInt                                                                                     {()}
-| APFloat                                                                                   {()}
-| Kw_true                                                                                   {()}
-| Kw_false                                                                                  {()}
-| Kw_null                                                                                   {()}
-| Kw_undef                                                                                  {()}
-| Kw_zeroinitializer                                                                        {()}
-| Lbrace type_value_list Rbrace                                                             {()}
-| Less Lbrace Rbrace Greater                                                                {()}
-| Less Lbrace type_value_LIST Rbrace Greater                                                {()}
-| Less type_value_list Greater                                                              {()}
-| Lsquare type_value_list Rsquare                                                           {()}
-| Kw_c StringConstant                                                                       {()}
-| Kw_asm opt_sideeffect opt_alignstack opt_inteldialect StringConstant Comma StringConstant {()}
-| Kw_blockaddress Lparen value Comma value Rparen                                           {()}
-| Kw_trunc         Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_zext          Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_sext          Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_fptrunc       Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_fpext         Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_bitcast       Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_addrspacecast Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_uitofp        Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_sitofp        Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_fptoui        Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_fptosi        Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_inttoptr      Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_ptrtoint      Lparen type_value Kw_to typ Rparen                                       {()}
-| Kw_extractvalue Lparen type_value index_list Rparen                                       {()}
-| Kw_insertvalue Lparen type_value Comma type_value index_list Rparen                       {()}
-| Kw_icmp icmp_predicate Lparen type_value Comma type_value Rparen                          {()}
-| Kw_fcmp fcmp_predicate Lparen type_value Comma type_value Rparen                          {()}
-
-| Kw_add opt_nuw opt_nsw_nuw Lparen type_value Comma type_value Rparen                      {()}
-| Kw_sub opt_nuw opt_nsw_nuw Lparen type_value Comma type_value Rparen                      {()}
-| Kw_mul opt_nuw opt_nsw_nuw Lparen type_value Comma type_value Rparen                      {()}
-| Kw_shl opt_nuw opt_nsw_nuw Lparen type_value Comma type_value Rparen                      {()}
-
-| Kw_sdiv opt_exact             Lparen type_value Comma type_value Rparen                   {()}
-| Kw_udiv opt_exact             Lparen type_value Comma type_value Rparen                   {()}
-| Kw_lshr opt_exact             Lparen type_value Comma type_value Rparen                   {()}
-| Kw_ashr opt_exact             Lparen type_value Comma type_value Rparen                   {()}
-
-| Kw_fadd                       Lparen type_value Comma type_value Rparen                   {()}
-| Kw_fsub                       Lparen type_value Comma type_value Rparen                   {()}
-| Kw_fmul                       Lparen type_value Comma type_value Rparen                   {()}
-| Kw_fdiv                       Lparen type_value Comma type_value Rparen                   {()}
-| Kw_urem                       Lparen type_value Comma type_value Rparen                   {()}
-| Kw_srem                       Lparen type_value Comma type_value Rparen                   {()}
-| Kw_frem                       Lparen type_value Comma type_value Rparen                   {()}
-
-| Kw_and Lparen type_value Comma type_value Rparen                                          {()}
-| Kw_or  Lparen type_value Comma type_value Rparen                                          {()}
-| Kw_xor Lparen type_value Comma type_value Rparen                                          {()}
-
-| Kw_getelementptr opt_inbounds Lparen type_value_list Rparen                               {()}
-| Kw_shufflevector                 Lparen type_value_list Rparen                            {()}
-| Kw_insertelement                 Lparen type_value_list Rparen                            {()}
-| Kw_extractelement                Lparen type_value_list Rparen                            {()}
-| Kw_select                        Lparen type_value_list Rparen                            {()}
+| GlobalID                                                                                  { Util.Variable $1 }
+| GlobalVar                                                                                 { Util.Variable $1 }
+| LocalVarID                                                                                { Util.Variable $1 }
+| LocalVar                                                                                  { Util.Variable $1 }
+| Exclaim mdvalue                                                                           { $2 }
+| APInt                                                                                     { Util.Int(Big_int.big_int_of_string $1) }
+| APFloat                                                                                   { Util.Float $1 }
+| Kw_true                                                                                   { Util.True }
+| Kw_false                                                                                  { Util.False }
+| Kw_null                                                                                   { Util.Null }
+| Kw_undef                                                                                  { Util.UndefValue }
+| Kw_zeroinitializer                                                                        { Util.Zero }
+| Lbrace type_value_list Rbrace                                                             { Util.ConstantStruct(false, $2) }
+| Less Lbrace Rbrace Greater                                                                { Util.ConstantStruct(true, []) }
+| Less Lbrace type_value_LIST Rbrace Greater                                                { Util.ConstantStruct(true, $3) }
+| Less type_value_list Greater                                                              { Util.ConstantVector($2) }
+| Lsquare type_value_list Rsquare                                                           { Util.ConstantArray($2) }
+| Kw_c StringConstant                                                                       { Util.ConstantArray(list_of_string $2) }
+| Kw_asm opt_sideeffect opt_alignstack opt_inteldialect StringConstant Comma StringConstant { Util.Asm($2, $3, $4, $5, $7) }
+| Kw_blockaddress               Lparen value Comma value Rparen                             { Util.Blockaddress($3, $5) }
+| Kw_trunc                      Lparen type_value Kw_to typ Rparen                          { Util.Trunc         ($3, $5) }
+| Kw_zext                       Lparen type_value Kw_to typ Rparen                          { Util.Zext          ($3, $5) }
+| Kw_sext                       Lparen type_value Kw_to typ Rparen                          { Util.Sext          ($3, $5) }
+| Kw_fptrunc                    Lparen type_value Kw_to typ Rparen                          { Util.Fptrunc       ($3, $5) }
+| Kw_fpext                      Lparen type_value Kw_to typ Rparen                          { Util.Fpext         ($3, $5) }
+| Kw_bitcast                    Lparen type_value Kw_to typ Rparen                          { Util.Bitcast       ($3, $5) }
+| Kw_addrspacecast              Lparen type_value Kw_to typ Rparen                          { Util.Addrspacecast ($3, $5) }
+| Kw_uitofp                     Lparen type_value Kw_to typ Rparen                          { Util.Uitofp        ($3, $5) }
+| Kw_sitofp                     Lparen type_value Kw_to typ Rparen                          { Util.Sitofp        ($3, $5) }
+| Kw_fptoui                     Lparen type_value Kw_to typ Rparen                          { Util.Fptoui        ($3, $5) }
+| Kw_fptosi                     Lparen type_value Kw_to typ Rparen                          { Util.Fptosi        ($3, $5) }
+| Kw_inttoptr                   Lparen type_value Kw_to typ Rparen                          { Util.Inttoptr      ($3, $5) }
+| Kw_ptrtoint                   Lparen type_value Kw_to typ Rparen                          { Util.Ptrtoint      ($3, $5) }
+| Kw_extractvalue               Lparen type_value index_list Rparen                         { Util.ExtractValue($3, $4) }
+| Kw_insertvalue                Lparen type_value Comma type_value index_list Rparen        { Util.InsertValue($3, $5, $6) }
+| Kw_icmp icmp_predicate        Lparen type_value Comma type_value Rparen                   { Util.Icmp($2, $4, $6) }
+| Kw_fcmp fcmp_predicate        Lparen type_value Comma type_value Rparen                   { Util.Fcmp($2, $4, $6) }
+| Kw_add opt_nuw_nsw            Lparen type_value Comma type_value Rparen                   { Util.Add(fst $2, snd $2, $4, $6) }
+| Kw_sub opt_nuw_nsw            Lparen type_value Comma type_value Rparen                   { Util.Sub(fst $2, snd $2, $4, $6) }
+| Kw_mul opt_nuw_nsw            Lparen type_value Comma type_value Rparen                   { Util.Mul(fst $2, snd $2, $4, $6) }
+| Kw_shl opt_nuw_nsw            Lparen type_value Comma type_value Rparen                   { Util.Shl(fst $2, snd $2, $4, $6) }
+| Kw_sdiv opt_exact             Lparen type_value Comma type_value Rparen                   { Util.Sdiv($2, $4, $6) }
+| Kw_udiv opt_exact             Lparen type_value Comma type_value Rparen                   { Util.Udiv($2, $4, $6) }
+| Kw_lshr opt_exact             Lparen type_value Comma type_value Rparen                   { Util.Lshr($2, $4, $6) }
+| Kw_ashr opt_exact             Lparen type_value Comma type_value Rparen                   { Util.Ashr($2, $4, $6) }
+| Kw_fadd                       Lparen type_value Comma type_value Rparen                   { Util.Fadd($3, $5) }
+| Kw_fsub                       Lparen type_value Comma type_value Rparen                   { Util.Fsub($3, $5) }
+| Kw_fmul                       Lparen type_value Comma type_value Rparen                   { Util.Fmul($3, $5) }
+| Kw_fdiv                       Lparen type_value Comma type_value Rparen                   { Util.Fdiv($3, $5) }
+| Kw_urem                       Lparen type_value Comma type_value Rparen                   { Util.Urem($3, $5) }
+| Kw_srem                       Lparen type_value Comma type_value Rparen                   { Util.Srem($3, $5) }
+| Kw_frem                       Lparen type_value Comma type_value Rparen                   { Util.Frem($3, $5) }
+| Kw_and                        Lparen type_value Comma type_value Rparen                   { Util.And($3, $5) }
+| Kw_or                         Lparen type_value Comma type_value Rparen                   { Util.Or($3, $5) }
+| Kw_xor                        Lparen type_value Comma type_value Rparen                   { Util.Xor($3, $5) }
+| Kw_getelementptr opt_inbounds Lparen type_value_list Rparen                               { Util.Getelementptr($2, $4) }
+| Kw_shufflevector              Lparen type_value_list Rparen                               { Util.Shufflevector  $3 }
+| Kw_insertelement              Lparen type_value_list Rparen                               { Util.Insertelement  $3 }
+| Kw_extractelement             Lparen type_value_list Rparen                               { Util.Extractelement $3 }
+| Kw_select                     Lparen type_value_list Rparen                               { Util.Select         $3 }
 ;
 mdvalue:
-| APInt                      {()}
-| StringConstant             {()}
-| Lbrace mdnodevector Rbrace {()}
+| APInt                      { Util.MDNode(int_of_string $1) }
+| StringConstant             { Util.MDString $1 }
+| Lbrace mdnodevector Rbrace { Util.MDNodeVector $2 }
 ;
 type_value_LIST:
 | type_value                       { [$1] }
@@ -499,40 +498,40 @@ type_value_list:
 | type_value Comma type_value_list { $1::$3 }
 ;
 index_list:
-| Comma APInt            { [$2] }
-| Comma APInt index_list { $2::$3 }
+| Comma APInt            { [(int_of_string $2)] }
+| Comma APInt index_list { (int_of_string $2)::$3 }
 ;
 fcmp_predicate:
-| Kw_oeq   {()}
-| Kw_one   {()}
-| Kw_olt   {()}
-| Kw_ogt   {()}
-| Kw_ole   {()}
-| Kw_oge   {()}
-| Kw_ord   {()}
-| Kw_uno   {()}
-| Kw_ueq   {()}
-| Kw_une   {()}
-| Kw_ult   {()}
-| Kw_ugt   {()}
-| Kw_ule   {()}
-| Kw_uge   {()}
-| Kw_true  {()}
-| Kw_false {()}
+| Kw_oeq   { Util.F.Oeq   }
+| Kw_one   { Util.F.One   }
+| Kw_olt   { Util.F.Olt   }
+| Kw_ogt   { Util.F.Ogt   }
+| Kw_ole   { Util.F.Ole   }
+| Kw_oge   { Util.F.Oge   }
+| Kw_ord   { Util.F.Ord   }
+| Kw_uno   { Util.F.Uno   }
+| Kw_ueq   { Util.F.Ueq   }
+| Kw_une   { Util.F.Une   }
+| Kw_ult   { Util.F.Ult   }
+| Kw_ugt   { Util.F.Ugt   }
+| Kw_ule   { Util.F.Ule   }
+| Kw_uge   { Util.F.Uge   }
+| Kw_true  { Util.F.True  }
+| Kw_false { Util.F.False }
 ;
 icmp_predicate:
-| Kw_eq  {()}
-| Kw_ne  {()}
-| Kw_slt {()}
-| Kw_sgt {()}
-| Kw_sle {()}
-| Kw_sge {()}
-| Kw_ult {()}
-| Kw_ugt {()}
-| Kw_ule {()}
-| Kw_uge {()}
+| Kw_eq  { Util.I.Eq  }
+| Kw_ne  { Util.I.Ne  }
+| Kw_slt { Util.I.Slt }
+| Kw_sgt { Util.I.Sgt }
+| Kw_sle { Util.I.Sle }
+| Kw_sge { Util.I.Sge }
+| Kw_ult { Util.I.Ult }
+| Kw_ugt { Util.I.Ugt }
+| Kw_ule { Util.I.Ule }
+| Kw_uge { Util.I.Uge }
 ;
-function_body: 
+function_body:
 | Lbrace basicblock_list Rbrace { $2 }
 ;
 basicblock_list:
@@ -541,7 +540,7 @@ basicblock_list:
 ;
 basicblock:
 | opt_labelstr instruction_list { ($1, $2) }
-;  
+;
 instruction_list:
 | terminator_instruction       { [$1] }
 | instruction instruction_list { $1::$2 }
@@ -571,10 +570,10 @@ compare:
 | type_value Comma value {()}
 ;
 instruction:
-| local_eq Kw_add opt_nuw opt_nsw_nuw arithmetic                                                                  {()}
-| local_eq Kw_sub opt_nuw opt_nsw_nuw arithmetic                                                                  {()}
-| local_eq Kw_mul opt_nuw opt_nsw_nuw arithmetic                                                                  {()}
-| local_eq Kw_shl opt_nuw opt_nsw_nuw arithmetic                                                                  {()}
+| local_eq Kw_add opt_nuw_nsw arithmetic                                                                  {()}
+| local_eq Kw_sub opt_nuw_nsw arithmetic                                                                  {()}
+| local_eq Kw_mul opt_nuw_nsw arithmetic                                                                  {()}
+| local_eq Kw_shl opt_nuw_nsw arithmetic                                                                  {()}
 | local_eq Kw_fadd fast_math_flags arithmetic                                                                     {()}
 | local_eq Kw_fsub fast_math_flags arithmetic                                                                     {()}
 | local_eq Kw_fmul fast_math_flags arithmetic                                                                     {()}
@@ -684,7 +683,7 @@ fast_math_flag:
 terminator_instruction:
 | Kw_unreachable                                                   {()}
 | Kw_ret Kw_void                                                   {()} /* we need to distinguish void from all other types else we have a dependent grammar */
-| Kw_ret non_void_type value                                       {()} 
+| Kw_ret non_void_type value                                       {()}
 | Kw_br type_value                                                 {()}
 | Kw_br type_value Comma type_value Comma type_value               {()}
 | Kw_indirectbr type_value Comma Lsquare type_value_LIST Rsquare   {()}
@@ -817,16 +816,16 @@ opt_inteldialect:
 | /* empty */     { false }
 | Kw_inteldialect { true }
 ;
-opt_nuw:
-| /* empty */ { false }
-| Kw_nuw      { true }
 opt_exact:
 | /* empty */ { false }
 | Kw_exact    { true }
 ;
-opt_nsw_nuw:
-| /* empty */    { None }
-| Kw_nsw opt_nuw { Some $2 }
+opt_nuw_nsw:
+| /* empty */   { (false, false) }
+| Kw_nuw Kw_nsw { (true, true)   }
+| Kw_nsw Kw_nuw { (true, true)   }
+| Kw_nuw        { (true, false)  }
+| Kw_nsw        { (false, true)  }
 ;
 opt_thread_local:
 | /* empty */                                   {()}
