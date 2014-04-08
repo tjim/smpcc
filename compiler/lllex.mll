@@ -272,7 +272,7 @@ parse eof                                                    { Eof }
 | ['_' 'a'-'z' 'A'-'Z'] idchar*                              { keyword(Lexing.lexeme lexbuf) }
 | '!' metachar0 metachar*                                    { MetadataVar(Lexing.lexeme lexbuf) }
 | '!'                                                        { Exclaim }
-| '#' digit+                                                 { AttrGrpID(Lexing.lexeme lexbuf) }
+| '#' (digit+ as x)                                          { AttrGrpID x }
 | '0' 'x' hexdigit+                                          { APFloat(Lexing.lexeme lexbuf) }
 | '0' 'x' 'K' hexdigit+                                      { APFloat(Lexing.lexeme lexbuf) }
 | '0' 'x' 'L' hexdigit+                                      { APFloat(Lexing.lexeme lexbuf) }

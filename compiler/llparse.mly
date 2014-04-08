@@ -262,43 +262,43 @@ let list_of_string s =
 %token Kw_insertvalue
 %token Kw_landingpad
 %start main
-%type <unit list> main
+%type <Util.toplevel list> main
 %%
 main:
 | Eof           { [] }
 | toplevel main { $1::$2 }
 ;
 toplevel:
-| declare                                      {$1}
-| define                                       {$1}
-| Kw_module Kw_asm StringConstant              {()}
-| Kw_target Kw_triple Equal StringConstant     {()}
-| Kw_target Kw_datalayout Equal StringConstant {()}
-| Kw_deplibs Equal Lsquare string_list Rsquare {()}
-| LocalVarID Equal Kw_type Kw_opaque           {()}
-| LocalVarID Equal Kw_type typ                 {()}
-| LocalVar Equal Kw_type Kw_opaque             {()}
-| LocalVar Equal Kw_type typ                   {()}
+| declare                                      { Util.FunDecl }
+| define                                       { Util.FunDefn }
+| Kw_module Kw_asm StringConstant              { Util.AsmDefn $3 }
+| Kw_target Kw_triple Equal StringConstant     { Util.Target $4 }
+| Kw_target Kw_datalayout Equal StringConstant { Util.Datalayout $4}
+| Kw_deplibs Equal Lsquare string_list Rsquare { Util.Deplibs $4 }
+| LocalVarID Equal Kw_type Kw_opaque           { Util.Type($1, None) }
+| LocalVarID Equal Kw_type typ                 { Util.Type($1, Some $4) }
+| LocalVar Equal Kw_type Kw_opaque             { Util.Type($1, None) }
+| LocalVar Equal Kw_type typ                   { Util.Type($1, Some $4) }
 | global_eq external_linkage opt_visibility opt_dll_storageclass opt_thread_local
     opt_addrspace opt_unnamed_addr opt_externally_initialized
-    constant_or_global typ trailing_attributes           {()}
+    constant_or_global typ trailing_attributes           { Util.Global($1, Some $2, $3, $4, $6, $7, $8, $9, $10, None, $11) }
 | global_eq non_external_linkage opt_visibility opt_dll_storageclass opt_thread_local
     opt_addrspace opt_unnamed_addr opt_externally_initialized
-    constant_or_global typ value trailing_attributes     {()}
-| global_eq external_linkage opt_visibility Kw_alias opt_linkage aliasee     {()}
-| global_eq non_external_linkage opt_visibility Kw_alias opt_linkage aliasee {()}
-| Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace                 {()}
-| MetadataVar Equal Exclaim Lbrace mdlist Rbrace                             {()}
-| Kw_attributes AttrGrpID Equal Lbrace group_attributes Rbrace                {()}
+    constant_or_global typ value trailing_attributes     { Util.Global($1, $2, $3, $4, $6, $7, $8, $9, $10, Some $11, $12) }
+| global_eq external_linkage opt_visibility Kw_alias opt_linkage aliasee     { Util.GlobalAlias($1, Some $2, $3, $5, $6) }
+| global_eq non_external_linkage opt_visibility Kw_alias opt_linkage aliasee { Util.GlobalAlias($1, $2, $3, $5, $6) }
+| Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace                 { Util.MDNodeDefn(int_of_string $2, $4, $7) }
+| MetadataVar Equal Exclaim Lbrace mdlist Rbrace                             { Util.MDVarDefn($1, $5) }
+| Kw_attributes AttrGrpID Equal Lbrace group_attributes Rbrace               { Util.AttrDefn($2, $5) }
 ;
 global_eq: /* may want to allow empty here (per llvm parser) but haven't seen it yet and it causes grammar conflicts */
 | GlobalID Equal  { $1 }
 | GlobalVar Equal { $1 }
 ;
 aliasee:
-| Kw_bitcast       Lparen type_value Kw_to typ Rparen         {()}
-| Kw_getelementptr opt_inbounds Lparen type_value_list Rparen {()}
-| type_value                                                  {()}
+| Kw_bitcast       Lparen type_value Kw_to typ Rparen         { Util.A_bitcast($3, $5) }
+| Kw_getelementptr opt_inbounds Lparen type_value_list Rparen { Util.A_getelementptr($2, $4) }
+| type_value                                                  { Util.A_type_value $1 }
 ;
 string_list:
 | /* empty */                { [] }
@@ -306,7 +306,7 @@ string_list:
 ;
 mdlist:
 | /* empty */          { [] }
-| Exclaim APInt mdlist { $2::$3 }
+| Exclaim APInt mdlist { (int_of_string $2)::$3 }
 ;
 mdnodevector:
 | Kw_null                 { [None] }
@@ -319,9 +319,9 @@ constant_or_global:
 | Kw_global   { false }
 ;
 trailing_attributes:
-| /* empty */                                         {()}
-| Comma Kw_section StringConstant trailing_attributes {()}
-| Comma Kw_align APInt trailing_attributes            {()}
+| /* empty */                                         { [] }
+| Comma Kw_section StringConstant trailing_attributes { (Util.Section $3)::$4 }
+| Comma Kw_align APInt trailing_attributes            { (Util.Align(int_of_string $3))::$4 }
 declare:
 | Kw_declare function_header                          {$2}
 ;
@@ -403,7 +403,7 @@ opt_cleanup:
 ;
 opt_comma_align:
 | /* empty */          { None }
-| Comma Kw_align APInt { Some $3 }
+| Comma Kw_align APInt { Some(int_of_string $3) }
 ;
 opt_gc:
 | /* empty */          { None }
@@ -557,100 +557,95 @@ opt_local:
 | /* empty */ { None }
 | local_eq    { Some $1 }
 ;
-arithmetic:
-| type_value Comma value {()}
-;
-logical:
-| type_value Comma value {()}
-;
-cast:
-| type_value Kw_to typ {()}
-;
-compare:
-| type_value Comma value {()}
-;
 instruction:
-| local_eq Kw_add opt_nuw_nsw arithmetic                                                                  {()}
-| local_eq Kw_sub opt_nuw_nsw arithmetic                                                                  {()}
-| local_eq Kw_mul opt_nuw_nsw arithmetic                                                                  {()}
-| local_eq Kw_shl opt_nuw_nsw arithmetic                                                                  {()}
-| local_eq Kw_fadd fast_math_flags arithmetic                                                                     {()}
-| local_eq Kw_fsub fast_math_flags arithmetic                                                                     {()}
-| local_eq Kw_fmul fast_math_flags arithmetic                                                                     {()}
-| local_eq Kw_fdiv fast_math_flags arithmetic                                                                     {()}
-| local_eq Kw_frem fast_math_flags arithmetic                                                                     {()}
-| local_eq Kw_sdiv opt_exact arithmetic                                                                           {()}
-| local_eq Kw_udiv opt_exact arithmetic                                                                           {()}
-| local_eq Kw_lshr opt_exact arithmetic                                                                           {()}
-| local_eq Kw_ashr opt_exact arithmetic                                                                           {()}
-| local_eq Kw_urem arithmetic                                                                                     {()}
-| local_eq Kw_srem arithmetic                                                                                     {()}
-| local_eq Kw_and logical                                                                                         {()}
-| local_eq Kw_or logical                                                                                          {()}
-| local_eq Kw_xor logical                                                                                         {()}
-| local_eq Kw_icmp icmp_predicate compare                                                                         {()}
-| local_eq Kw_fcmp fcmp_predicate compare                                                                         {()}
-| local_eq Kw_trunc cast                                                                                          {()}
-| local_eq Kw_zext cast                                                                                           {()}
-| local_eq Kw_sext cast                                                                                           {()}
-| local_eq Kw_fptrunc cast                                                                                        {()}
-| local_eq Kw_fpext cast                                                                                          {()}
-| local_eq Kw_bitcast cast                                                                                        {()}
-| local_eq Kw_addrspacecast cast                                                                                  {()}
-| local_eq Kw_uitofp cast                                                                                         {()}
-| local_eq Kw_sitofp cast                                                                                         {()}
-| local_eq Kw_fptoui cast                                                                                         {()}
-| local_eq Kw_fptosi cast                                                                                         {()}
-| local_eq Kw_inttoptr cast                                                                                       {()}
-| local_eq Kw_ptrtoint cast                                                                                       {()}
-| local_eq Kw_va_arg type_value Comma typ                                                                         {()}
-| local_eq Kw_getelementptr opt_inbounds type_value_LIST                                                          {()}
-| local_eq Kw_extractelement type_value_LIST                                                                      {()}
-| local_eq Kw_insertelement type_value_LIST                                                                       {()}
-| local_eq Kw_shufflevector type_value_LIST                                                                       {()}
-| local_eq Kw_select type_value_LIST                                                                              {()}
-| local_eq Kw_phi typ phi_list                                                                                    {()}
-| local_eq Kw_landingpad typ Kw_personality type_value opt_cleanup landingpad_list                                {()}
-| opt_local opt_tail Kw_call opt_callingconv return_attributes typ value Lparen param_list Rparen call_attributes {()}
-| local_eq Kw_alloca alloc                                                                                        {()}
-| local_eq Kw_load  opt_atomic opt_volatile type_value scopeandordering opt_comma_align                           {()}
-| Kw_store opt_atomic opt_volatile type_value Comma type_value scopeandordering opt_comma_align                   {()}
-| Kw_cmpxchg opt_volatile type_value Comma type_value Comma type_value opt_singlethread ordering ordering         {()}
-| Kw_atomicrmw opt_volatile binop type_value Comma type_value opt_singlethread ordering                           {()}
-| Kw_fence opt_singlethread ordering                                                                              {()}
-| local_eq Kw_extractvalue type_value index_list                                                                  {()}
-| local_eq Kw_insertvalue type_value Comma type_value index_list                                                  {()}
+ | local_eq Kw_add opt_nuw_nsw type_value Comma value      { Util.Add($3, $4, $6) }
+ | local_eq Kw_sub opt_nuw_nsw type_value Comma value      { Util.Sub($3, $4, $6) }
+ | local_eq Kw_mul opt_nuw_nsw type_value Comma value      { Util.Mul($3, $4, $6) }
+ | local_eq Kw_shl opt_nuw_nsw type_value Comma value      { Util.Shl($3, $4, $6) }
+ | local_eq Kw_fadd fast_math_flags type_value Comma value { Util.Fadd($3, $4, $6) }
+ | local_eq Kw_fsub fast_math_flags type_value Comma value { Util.Fsub($3, $4, $6) }
+ | local_eq Kw_fmul fast_math_flags type_value Comma value { Util.Fmul($3, $4, $6) }
+ | local_eq Kw_fdiv fast_math_flags type_value Comma value { Util.Fdiv($3, $4, $6) }
+ | local_eq Kw_frem fast_math_flags type_value Comma value { Util.Frem($3, $4, $6) }
+ | local_eq Kw_sdiv opt_exact type_value Comma value       { Util.Sdiv($3, $4, $6) }
+ | local_eq Kw_udiv opt_exact type_value Comma value       { Util.Udiv($3, $4, $6) }
+ | local_eq Kw_lshr opt_exact type_value Comma value       { Util.Lshr($3, $4, $6) }
+ | local_eq Kw_ashr opt_exact type_value Comma value       { Util.Ashr($3, $4, $6) }
+ | local_eq Kw_urem type_value Comma value                 { Util.Urem($3, $5) }
+ | local_eq Kw_srem type_value Comma value                 { Util.Srem($3, $5) }
+ | local_eq Kw_and type_value Comma value                  { Util.And($3, $5) }
+ | local_eq Kw_or type_value Comma value                   { Util.Or($3, $5) }
+ | local_eq Kw_xor type_value Comma value                  { Util.Xor($3, $5) }
+ | local_eq Kw_icmp icmp_predicate type_value Comma value  { Util.Icmp($3, $4, $6) }
+ | local_eq Kw_fcmp fcmp_predicate type_value Comma value  { Util.Fcmp($3, $4, $6) }
+ | local_eq Kw_trunc type_value Kw_to typ                  { Util.Trunc($3, $5) }
+ | local_eq Kw_zext type_value Kw_to typ                   { Util.Zext($3, $5) }
+ | local_eq Kw_sext type_value Kw_to typ                   { Util.Sext($3, $5) }
+ | local_eq Kw_fptrunc type_value Kw_to typ                { Util.Fptrunc($3, $5) }
+ | local_eq Kw_fpext type_value Kw_to typ                  { Util.Fpext($3, $5) }
+ | local_eq Kw_bitcast type_value Kw_to typ                { Util.Bitcast($3, $5) }
+ | local_eq Kw_addrspacecast type_value Kw_to typ          { Util.Addrspacecast($3, $5) }
+ | local_eq Kw_uitofp type_value Kw_to typ                 { Util.Uitofp($3, $5) }
+ | local_eq Kw_sitofp type_value Kw_to typ                 { Util.Sitofp($3, $5) }
+ | local_eq Kw_fptoui type_value Kw_to typ                 { Util.Fptoui($3, $5) }
+ | local_eq Kw_fptosi type_value Kw_to typ                 { Util.Fptosi($3, $5) }
+ | local_eq Kw_inttoptr type_value Kw_to typ               { Util.Inttoptr($3, $5) }
+ | local_eq Kw_ptrtoint type_value Kw_to typ               { Util.Ptrtoint($3, $5) }
+ | local_eq Kw_va_arg type_value Comma typ                 { Util.Va_arg($3, $5) }
+ | local_eq Kw_getelementptr opt_inbounds type_value_LIST  { Util.Getelementptr($3, $4) }
+ | local_eq Kw_extractelement type_value_LIST              { Util.Extractelement($3) }
+ | local_eq Kw_insertelement type_value_LIST               { Util.Insertelement($3) }
+ | local_eq Kw_shufflevector type_value_LIST               { Util.Shufflevector($3) }
+ | local_eq Kw_select type_value_LIST                      { Util.Select($3) }
+ | local_eq Kw_phi typ phi_list                            { Util.Phi($3, $4) }
+ | local_eq Kw_landingpad typ Kw_personality type_value opt_cleanup landingpad_list
+                                                           { Util.Landingpad($3, $5, $6, $7) }
+| opt_local opt_tail Kw_call opt_callingconv return_attributes typ value Lparen param_list Rparen call_attributes
+                                                           { Util.Call($2, $4, $5, $6, $7, $9, $11) }
+| local_eq Kw_alloca alloc                                 { let x, y, z, w = $3 in Util.Alloca(x, y, z, w) }
+| local_eq Kw_load  opt_atomic opt_volatile type_value scopeandordering opt_comma_align
+                                                           { Util.Load($3, $4, $5, $6, $7) }
+| Kw_store opt_atomic opt_volatile type_value Comma type_value scopeandordering opt_comma_align
+                                                           { Util.Store($2, $3, $4, $6, $7, $8) }
+| Kw_cmpxchg opt_volatile type_value Comma type_value Comma type_value opt_singlethread ordering ordering
+                                                           { Util.Cmpxchg($2, $3, $5, $7, $8, $9, $10) }
+| Kw_atomicrmw opt_volatile binop type_value Comma type_value opt_singlethread ordering
+                                                           { Util.Atomicrmw($2, $3, $4, $6, $7, $8) }
+| Kw_fence opt_singlethread ordering                       { Util.Fence($2, $3) }
+| local_eq Kw_extractvalue type_value index_list           { Util.Extractvalue($3, $4) }
+| local_eq Kw_insertvalue type_value Comma type_value index_list
+                                                           { Util.Insertvalue($3, $5, $6) }
 ;
 binop:
-| Kw_xchg {()}
-| Kw_add  {()}
-| Kw_sub  {()}
-| Kw_and  {()}
-| Kw_nand {()}
-| Kw_or   {()}
-| Kw_xor  {()}
-| Kw_max  {()}
-| Kw_min  {()}
-| Kw_umax {()}
-| Kw_umin {()}
+| Kw_xchg { Util.Xchg }
+| Kw_add  { Util.Add  }
+| Kw_sub  { Util.Sub  }
+| Kw_and  { Util.And  }
+| Kw_nand { Util.Nand }
+| Kw_or   { Util.Or   }
+| Kw_xor  { Util.Xor  }
+| Kw_max  { Util.Max  }
+| Kw_min  { Util.Min  }
+| Kw_umax { Util.Umax }
+| Kw_umin { Util.Umin }
 ;
 phi_list:
 | Lsquare value Comma value Rsquare                { [($2, $4)] }
 | Lsquare value Comma value Rsquare Comma phi_list { ($2, $4)::$7 }
 ;
 landingpad_list:
-| Kw_catch type_value                  {()}
-| Kw_filter type_value                 {()}
-| Kw_catch type_value landingpad_list  {()}
-| Kw_filter type_value landingpad_list {()}
+| Kw_catch typ value                  { [Util.Catch($2, $3)] }
+| Kw_filter typ value                 { [Util.Filter($2, $3)] }
+| Kw_catch typ value landingpad_list  { (Util.Catch($2, $3))::$4 }
+| Kw_filter typ value landingpad_list { (Util.Filter($2, $3))::$4 }
 ;
 ordering:
-| Kw_unordered {()}
-| Kw_monotonic {()}
-| Kw_acquire   {()}
-| Kw_release   {()}
-| Kw_acq_rel   {()}
-| Kw_seq_cst   {()}
+| Kw_unordered { Util.Unordered }
+| Kw_monotonic { Util.Monotonic }
+| Kw_acquire   { Util.Acquire   }
+| Kw_release   { Util.Release   }
+| Kw_acq_rel   { Util.Acq_rel   }
+| Kw_seq_cst   { Util.Seq_cst   }
 ;
 opt_singlethread:
 | /* empty */               { false }
@@ -660,82 +655,81 @@ scopeandordering:
 | opt_singlethread ordering { Some($1, $2) }
 ;
 alloc:
-| Kw_inalloca typ Comma type_value Comma Kw_align APInt {()}
-| Kw_inalloca typ Comma type_value                      {()}
-| Kw_inalloca typ Comma Kw_align APInt                  {()}
-| Kw_inalloca typ                                       {()}
-| typ Comma type_value Comma Kw_align APInt             {()}
-| typ Comma type_value                                  {()}
-| typ Comma Kw_align APInt                              {()}
-| typ                                                   {()}
+| Kw_inalloca typ Comma type_value Comma Kw_align APInt { (true,  $2, Some $4, Some(int_of_string $7)) }
+| Kw_inalloca typ Comma type_value                      { (true,  $2, Some $4, None) }
+| Kw_inalloca typ Comma Kw_align APInt                  { (true,  $2, None, Some(int_of_string $5))}
+| Kw_inalloca typ                                       { (true,  $2, None, None) }
+| typ Comma type_value Comma Kw_align APInt             { (false, $1, Some $3, Some(int_of_string $6)) }
+| typ Comma type_value                                  { (false, $1, Some $3, None) }
+| typ Comma Kw_align APInt                              { (false, $1, None, Some(int_of_string $4))}
+| typ                                                   { (false, $1, None, None) }
 ;
 fast_math_flags:
 | /* empty */                    { [] }
 | fast_math_flag fast_math_flags { $1::$2 }
 ;
 fast_math_flag:
-| Kw_fast {()}
-| Kw_nnan {()}
-| Kw_ninf {()}
-| Kw_nsz  {()}
-| Kw_arcp {()}
+| Kw_fast { Util.Fast }
+| Kw_nnan { Util.Nnan }
+| Kw_ninf { Util.Ninf }
+| Kw_nsz  { Util.Nsz  }
+| Kw_arcp { Util.Arcp }
 ;
 terminator_instruction:
-| Kw_unreachable                                                   {()}
-| Kw_ret Kw_void                                                   {()} /* we need to distinguish void from all other types else we have a dependent grammar */
-| Kw_ret non_void_type value                                       {()}
-| Kw_br type_value                                                 {()}
-| Kw_br type_value Comma type_value Comma type_value               {()}
-| Kw_indirectbr type_value Comma Lsquare type_value_LIST Rsquare   {()}
-| Kw_resume type_value                                             {()}
-| Kw_switch type_value Comma type_value Lsquare jump_table Rsquare {()}
-| local_eq Kw_invoke opt_callingconv return_attributes typ value Lparen param_list Rparen function_attributes Kw_to type_value Kw_unwind type_value {()}
+| Kw_unreachable                                                   { Util.Unreachable }
+| Kw_ret Kw_void                                                   { Util.Return None } /* we need to distinguish void from all other types else we have a dependent grammar */
+| Kw_ret non_void_type value                                       { Util.Return(Some($2, $3)) }
+| Kw_br type_value                                                 { Util.Br($2, None) }
+| Kw_br type_value Comma type_value Comma type_value               { Util.Br($2, Some($4, $6)) }
+| Kw_indirectbr type_value Comma Lsquare type_value_LIST Rsquare   { Util.Indirectbr($2, $5) }
+| Kw_resume type_value                                             { Util.Resume $2 }
+| Kw_switch type_value Comma type_value Lsquare jump_table Rsquare { Util.Switch($2, $4, $6) }
+| local_eq Kw_invoke opt_callingconv return_attributes typ value Lparen param_list Rparen function_attributes Kw_to type_value Kw_unwind type_value { Util.Invoke($3, $4, $5, $6, $8, $10, $12, $14) }
 ;
 call_attributes:
 | /* empty */                    { [] }
 | call_attribute call_attributes { $1::$2 }
 ;
 call_attribute:
-| Kw_noreturn {()}
-| Kw_nounwind {()}
-| Kw_readnone {()}
-| Kw_readonly {()}
+| Kw_noreturn { Util.Noreturn }
+| Kw_nounwind { Util.Nounwind }
+| Kw_readnone { Util.Readnone }
+| Kw_readonly { Util.Readonly }
 ;
 function_attributes:
 | /* empty */                            { [] }
 | function_attribute function_attributes { $1::$2 }
 ;
 function_attribute:
-| AttrGrpID                                {()}
-| StringConstant Equal StringConstant      {()}
-/* | Kw_align APInt                        {()} not needed since always printed after section, if we use this it causes shift/reduce conflicts */
-| Kw_alignstack Equal Lparen APSint Rparen {()}
-| Kw_alwaysinline                          {()}
-| Kw_builtin                               {()}
-| Kw_cold                                  {()}
-| Kw_inlinehint                            {()}
-| Kw_minsize                               {()}
-| Kw_naked                                 {()}
-| Kw_nobuiltin                             {()}
-| Kw_noduplicate                           {()}
-| Kw_noimplicitfloat                       {()}
-| Kw_noinline                              {()}
-| Kw_nonlazybind                           {()}
-| Kw_noredzone                             {()}
-| Kw_noreturn                              {()}
-| Kw_nounwind                              {()}
-| Kw_optnone                               {()}
-| Kw_optsize                               {()}
-| Kw_readnone                              {()}
-| Kw_readonly                              {()}
-| Kw_returns_twice                         {()}
-| Kw_ssp                                   {()}
-| Kw_sspreq                                {()}
-| Kw_sspstrong                             {()}
-| Kw_sanitize_address                      {()}
-| Kw_sanitize_thread                       {()}
-| Kw_sanitize_memory                       {()}
-| Kw_uwtable                               {()}
+| AttrGrpID                                { Util.AttrGrpID(int_of_string $1) }
+| StringConstant Equal StringConstant      { Util.Attr($1, $3) }
+| Kw_alignstack Equal Lparen APInt Rparen  { Util.Alignstack(int_of_string $4) }
+| Kw_alwaysinline                          { Util.Alwaysinline     }
+| Kw_builtin                               { Util.Builtin          }
+| Kw_cold                                  { Util.Cold             }
+| Kw_inlinehint                            { Util.Inlinehint       }
+| Kw_minsize                               { Util.Minsize          }
+| Kw_naked                                 { Util.Naked            }
+| Kw_nobuiltin                             { Util.Nobuiltin        }
+| Kw_noduplicate                           { Util.Noduplicate      }
+| Kw_noimplicitfloat                       { Util.Noimplicitfloat  }
+| Kw_noinline                              { Util.Noinline         }
+| Kw_nonlazybind                           { Util.Nonlazybind      }
+| Kw_noredzone                             { Util.Noredzone        }
+| Kw_noreturn                              { Util.Noreturn         }
+| Kw_nounwind                              { Util.Nounwind         }
+| Kw_optnone                               { Util.Optnone          }
+| Kw_optsize                               { Util.Optsize          }
+| Kw_readnone                              { Util.Readnone         }
+| Kw_readonly                              { Util.Readonly         }
+| Kw_returns_twice                         { Util.Returns_twice    }
+| Kw_ssp                                   { Util.Ssp              }
+| Kw_sspreq                                { Util.Sspreq           }
+| Kw_sspstrong                             { Util.Sspstrong        }
+| Kw_sanitize_address                      { Util.Sanitize_address }
+| Kw_sanitize_thread                       { Util.Sanitize_thread  }
+| Kw_sanitize_memory                       { Util.Sanitize_memory  }
+| Kw_uwtable                               { Util.Uwtable          }
 ;
 group_attributes:
 | /* empty */                      { [] }
@@ -744,8 +738,8 @@ group_attributes:
 group_attribute:
 | StringConstant                      {()}
 | StringConstant Equal StringConstant {()}
-| Kw_align Equal APSint               {()}
-| Kw_alignstack Equal APSint          {()}
+| Kw_align Equal APInt               {()}
+| Kw_alignstack Equal APInt          {()}
 | Kw_alwaysinline                     {()}
 | Kw_builtin                          {()}
 | Kw_cold                             {()}
@@ -779,23 +773,23 @@ param_list:
 | param Comma param_list { $1::$3 }
 ;
 param:
-| typ opt_param_attribute value {()}
+| typ opt_param_attribute value { ($1, $3, $2) }
 ;
 opt_param_attribute:
-| /* empty */     {()}
-| Kw_align APSint {()}
-| Kw_byval        {()}
-| Kw_inalloca     {()}
-| Kw_inreg        {()}
-| Kw_nest         {()}
-| Kw_noalias      {()}
-| Kw_nocapture    {()}
-| Kw_readnone     {()}
-| Kw_readonly     {()}
-| Kw_returned     {()}
-| Kw_signext      {()}
-| Kw_sret         {()}
-| Kw_zeroext      {()}
+| /* empty */     { None }
+| Kw_align APInt { Some(Util.Align(int_of_string $2)) }
+| Kw_byval        { Some Util.Byval     }
+| Kw_inalloca     { Some Util.Inalloca  }
+| Kw_inreg        { Some Util.Inreg     }
+| Kw_nest         { Some Util.Nest      }
+| Kw_noalias      { Some Util.Noalias   }
+| Kw_nocapture    { Some Util.Nocapture }
+| Kw_readnone     { Some Util.Readnone  }
+| Kw_readonly     { Some Util.Readonly  }
+| Kw_returned     { Some Util.Returned  }
+| Kw_signext      { Some Util.Signext   }
+| Kw_sret         { Some Util.Sret      }
+| Kw_zeroext      { Some Util.Zeroext   }
 ;
 jump_table:
 | /* empty */                            { [] }
@@ -847,69 +841,69 @@ opt_externally_initialized:
 | Kw_externally_initialized { true }
 ;
 opt_dll_storageclass:
-| /* empty */  {()}
-| Kw_dllimport {()}
-| Kw_dllexport {()}
+| /* empty */  { None }
+| Kw_dllimport { Some Util.Dllimport }
+| Kw_dllexport { Some Util.Dllexport }
 ;
 opt_linkage:
 | external_linkage     { Some $1 }
 | non_external_linkage { $1 }
 ;
 external_linkage:
-| Kw_extern_weak {()}
-| Kw_external    {()}
+| Kw_extern_weak { Util.Extern_weak }
+| Kw_external    { Util.External }
 ;
 non_external_linkage:
 | /* empty */             { None }
-| Kw_private              { Some() }
-| Kw_internal             { Some() }
-| Kw_weak                 { Some() }
-| Kw_weak_odr             { Some() }
-| Kw_linkonce             { Some() }
-| Kw_linkonce_odr         { Some() }
-| Kw_available_externally { Some() }
-| Kw_appending            { Some() }
-| Kw_common               { Some() }
+| Kw_private              { Some Util.Private }
+| Kw_internal             { Some Util.Internal }
+| Kw_weak                 { Some Util.Weak }
+| Kw_weak_odr             { Some Util.Weak_odr }
+| Kw_linkonce             { Some Util.Linkonce }
+| Kw_linkonce_odr         { Some Util.Linkonce_odr }
+| Kw_available_externally { Some Util.Available_externally }
+| Kw_appending            { Some Util.Appending }
+| Kw_common               { Some Util.Common }
 ;
 opt_visibility:
-| /* empty */  {()}
-| Kw_default   {()}
-| Kw_hidden    {()}
-| Kw_protected {()}
+| /* empty */  { None }
+| Kw_default   { Some Util.Default }
+| Kw_hidden    { Some Util.Hidden }
+| Kw_protected { Some Util.Protected }
 ;
 opt_callingconv:
-| /* empty */          {()}
-| Kw_ccc               {()}
-| Kw_fastcc            {()}
-| Kw_intel_ocl_bicc    {()}
-| Kw_coldcc            {()}
-| Kw_x86_stdcallcc     {()}
-| Kw_x86_fastcallcc    {()}
-| Kw_x86_thiscallcc    {()}
-| Kw_x86_cdeclmethodcc {()}
-| Kw_arm_apcscc        {()}
-| Kw_arm_aapcscc       {()}
-| Kw_arm_aapcs_vfpcc   {()}
-| Kw_msp430_intrcc     {()}
-| Kw_ptx_kernel        {()}
-| Kw_ptx_device        {()}
-| Kw_spir_func         {()}
-| Kw_spir_kernel       {()}
-| Kw_x86_64_sysvcc     {()}
-| Kw_x86_64_win64cc    {()}
-| Kw_webkit_jscc       {()}
-| Kw_anyregcc          {()}
-| Kw_preserve_mostcc   {()}
-| Kw_preserve_allcc    {()}
-| Kw_cc                {()}
+| /* empty */          { None }
+| Kw_ccc               { Some Util.Ccc               }
+| Kw_fastcc            { Some Util.Fastcc            }
+| Kw_intel_ocl_bicc    { Some Util.Intel_ocl_bicc    }
+| Kw_coldcc            { Some Util.Coldcc            }
+| Kw_x86_stdcallcc     { Some Util.X86_stdcallcc     }
+| Kw_x86_fastcallcc    { Some Util.X86_fastcallcc    }
+| Kw_x86_thiscallcc    { Some Util.X86_thiscallcc    }
+| Kw_x86_cdeclmethodcc { Some Util.X86_cdeclmethodcc }
+| Kw_arm_apcscc        { Some Util.Arm_apcscc        }
+| Kw_arm_aapcscc       { Some Util.Arm_aapcscc       }
+| Kw_arm_aapcs_vfpcc   { Some Util.Arm_aapcs_vfpcc   }
+| Kw_msp430_intrcc     { Some Util.Msp430_intrcc     }
+| Kw_ptx_kernel        { Some Util.Ptx_kernel        }
+| Kw_ptx_device        { Some Util.Ptx_device        }
+| Kw_spir_func         { Some Util.Spir_func         }
+| Kw_spir_kernel       { Some Util.Spir_kernel       }
+| Kw_x86_64_sysvcc     { Some Util.X86_64_sysvcc     }
+| Kw_x86_64_win64cc    { Some Util.X86_64_win64cc    }
+| Kw_webkit_jscc       { Some Util.Webkit_jscc       }
+| Kw_anyregcc          { Some Util.Anyregcc          }
+| Kw_preserve_mostcc   { Some Util.Preserve_mostcc   }
+| Kw_preserve_allcc    { Some Util.Preserve_allcc    }
+| Kw_cc                { Some Util.Cc                }
 ;
 return_attributes:
 | /* empty */                        { [] }
 | return_attribute return_attributes { $1::$2 }
 ;
 return_attribute:
-| Kw_inreg   {()}
-| Kw_noalias {()}
-| Kw_signext {()}
-| Kw_zeroext {()}
+| Kw_inreg   { Util.Inreg  }
+| Kw_noalias { Util.Noalias}
+| Kw_signext { Util.Signext}
+| Kw_zeroext { Util.Zeroext}
 ;
