@@ -139,10 +139,6 @@ type dll_storageclass =
   | Dllimport
   | Dllexport
 
-type tattr =
-  | Section of string
-  | Align of int
-
 type aliasee =
   | A_bitcast of (oType * oValue) * oType
   | A_getelementptr of bool * (oType * oValue) list
@@ -343,6 +339,27 @@ type finfo = {
     mutable fblocks: (string option * instr list) list;
   }
 
+type thread_local =
+  | Localdynamic
+  | Initialexec
+  | Localexec
+
+type ginfo = {
+    mutable gname: variable;
+    mutable glinkage: linkage option;
+    mutable gvisibility: visibility option;
+    mutable gstorageclass: dll_storageclass option;
+    mutable gthread_local: thread_local option option;
+    mutable gaddrspace: int option;
+    mutable gunnamed_addr: bool;
+    mutable gexternally_initialized: bool;
+    mutable gconstant: bool;
+    mutable gtyp: oType;
+    mutable gvalue: oValue option;
+    mutable gsection: string option;
+    mutable galign: int option;
+  }
+
 type toplevel =
   | Fun of finfo
   | Asm of string
@@ -350,7 +367,7 @@ type toplevel =
   | Datalayout of string
   | Deplibs of string list
   | Type of variable * oType option
-  | Global of variable * linkage option * visibility option * dll_storageclass option * int option * bool * bool * bool * oType * oValue option * tattr list
+  | Global of ginfo
   | GlobalAlias of variable * linkage option * visibility option * linkage option * aliasee
   | MDNodeDefn of int * oType * (oType * oValue) option list
   | MDVarDefn of string * int list

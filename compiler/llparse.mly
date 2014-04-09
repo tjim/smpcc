@@ -281,10 +281,38 @@ toplevel:
 | LocalVar Equal Kw_type typ                   { Util.Type($1, Some $4) }
 | global_eq external_linkage opt_visibility opt_dll_storageclass opt_thread_local
     opt_addrspace opt_unnamed_addr opt_externally_initialized
-    constant_or_global typ trailing_attributes           { Util.Global($1, Some $2, $3, $4, $6, $7, $8, $9, $10, None, $11) }
+    constant_or_global typ opt_section_align
+                                               { Util.Global {Util.gname = $1;
+                                                              Util.glinkage = Some $2;
+                                                              Util.gvisibility = $3;
+                                                              Util.gstorageclass = $4;
+                                                              Util.gthread_local = $5;
+                                                              Util.gaddrspace = $6;
+                                                              Util.gunnamed_addr = $7;
+                                                              Util.gexternally_initialized = $8;
+                                                              Util.gconstant = $9;
+                                                              Util.gtyp = $10;
+                                                              Util.gvalue = None;
+                                                              Util.gsection = fst $11;
+                                                              Util.galign = snd $11;}
+                                               }
 | global_eq non_external_linkage opt_visibility opt_dll_storageclass opt_thread_local
     opt_addrspace opt_unnamed_addr opt_externally_initialized
-    constant_or_global typ value trailing_attributes     { Util.Global($1, $2, $3, $4, $6, $7, $8, $9, $10, Some $11, $12) }
+    constant_or_global typ value opt_section_align
+                                               { Util.Global {Util.gname = $1;
+                                                              Util.glinkage = $2;
+                                                              Util.gvisibility = $3;
+                                                              Util.gstorageclass = $4;
+                                                              Util.gthread_local = $5;
+                                                              Util.gaddrspace = $6;
+                                                              Util.gunnamed_addr = $7;
+                                                              Util.gexternally_initialized = $8;
+                                                              Util.gconstant = $9;
+                                                              Util.gtyp = $10;
+                                                              Util.gvalue = Some $11;
+                                                              Util.gsection = fst $12;
+                                                              Util.galign = snd $12;}
+                                               }
 | global_eq external_linkage opt_visibility Kw_alias opt_linkage aliasee     { Util.GlobalAlias($1, Some $2, $3, $5, $6) }
 | global_eq non_external_linkage opt_visibility Kw_alias opt_linkage aliasee { Util.GlobalAlias($1, $2, $3, $5, $6) }
 | Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace                 { Util.MDNodeDefn(int_of_string $2, $4, $7) }
@@ -318,10 +346,6 @@ constant_or_global:
 | Kw_constant { true }
 | Kw_global   { false }
 ;
-trailing_attributes:
-| /* empty */                                         { [] }
-| Comma Kw_section StringConstant trailing_attributes { (Util.Section $3)::$4 }
-| Comma Kw_align APInt trailing_attributes            { (Util.Align(int_of_string $3))::$4 }
 function_header:
 | opt_linkage opt_visibility opt_dll_storageclass opt_callingconv return_attributes
  typ global_name argument_list opt_unnamed_addr function_attributes opt_section
@@ -410,6 +434,12 @@ opt_tail:
 opt_cleanup:
 | /* empty */ { false }
 | Kw_cleanup  { true }
+;
+opt_section_align:
+| /* empty */                                          { (None    , None) }
+| Comma Kw_section StringConstant                      { (Some $3 , None) }
+| Comma Kw_align APInt                                 { (None    , Some(int_of_string $3)) }
+| Comma Kw_section StringConstant Comma Kw_align APInt { (Some $3 , Some(int_of_string $6)) }
 ;
 opt_comma_align:
 | /* empty */          { None }
@@ -832,11 +862,11 @@ opt_nuw_nsw:
 | Kw_nsw        { (false, true)  }
 ;
 opt_thread_local:
-| /* empty */                                   {()}
-| Kw_thread_local                               {()}
-| Kw_thread_local Lparen Kw_localdynamic Rparen {()}
-| Kw_thread_local Lparen Kw_initialexec Rparen  {()}
-| Kw_thread_local Lparen Kw_localexec Rparen    {()}
+| /* empty */                                   { None }
+| Kw_thread_local                               { Some None }
+| Kw_thread_local Lparen Kw_localdynamic Rparen { Some (Some Util.Localdynamic) }
+| Kw_thread_local Lparen Kw_initialexec Rparen  { Some (Some Util.Initialexec) }
+| Kw_thread_local Lparen Kw_localexec Rparen    { Some (Some Util.Localexec) }
 ;
 opt_addrspace:
 | /* empty */                      { None }
