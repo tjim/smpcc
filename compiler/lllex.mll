@@ -256,12 +256,12 @@ parse eof                                                    { Eof }
 | ';' [^'\n''\r']*                                           { token lexbuf }
 | plusminus? digit+ '.' digit* (['e''E'] plusminus? digit+)? { APFloat(Lexing.lexeme lexbuf) }
 | plusminus? digit+                                          { APInt(Lexing.lexeme lexbuf) }
-| '@' (dquote notdquote* dquote as x)                        { GlobalVar(Util.VAR(true,x)) }
-| '@' (idchar0 idchar* as x)                                 { GlobalVar(Util.VAR(true,x)) }
-| '@' (digit+ as x)                                          { GlobalID(Util.ID(true,int_of_string x)) }
-| '%' (dquote notdquote* dquote as x)                        { LocalVar(Util.VAR(false,x)) }
-| '%' (idchar0 idchar* as x)                                 { LocalVar(Util.VAR(false,x)) }
-| '%' (digit+ as x)                                          { LocalVarID(Util.ID(false,int_of_string x)) }
+| '@' (dquote notdquote* dquote as x)                        { GlobalVar(Util.Name(true,x)) }
+| '@' (idchar0 idchar* as x)                                 { GlobalVar(Util.Name(true,x)) }
+| '@' (digit+ as x)                                          { GlobalID(Util.Id(true,int_of_string x)) }
+| '%' (dquote notdquote* dquote as x)                        { LocalVar(Util.Name(false,x)) }
+| '%' (idchar0 idchar* as x)                                 { LocalVar(Util.Name(false,x)) }
+| '%' (digit+ as x)                                          { LocalVarID(Util.Id(false,int_of_string x)) }
 | (dquote notdquote+ dquote as x) ':'                        { LabelStr x }
 | dquote notdquote* dquote                                   { StringConstant(Lexing.lexeme lexbuf) }
 | (idchar+ as x) ':'                                         { LabelStr x }
