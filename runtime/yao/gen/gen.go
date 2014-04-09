@@ -1,12 +1,13 @@
 package gen
 
 import (
-	"github.com/tjim/smpcc/runtime/base"
 	"bytes"
 	"crypto/aes"
 	"fmt"
 	"math"
 	"math/rand"
+
+	"github.com/tjim/smpcc/runtime/base"
 	"github.com/tjim/smpcc/runtime/ot"
 )
 
@@ -284,19 +285,10 @@ func (y YaoState) Select(s, a, b []base.Wire) []base.Wire {
 		panic("Wire mismatch in gen.Select()")
 	}
 	result := make([]base.Wire, len(a))
+
 	for i := 0; i < len(a); i++ {
-		w := genWire()
-		result[i] = w
-		t := make([]base.Ciphertext, 8)
-		encrypt_slot(t, w[0], s[0][0], a[i][0], b[i][0])
-		encrypt_slot(t, w[1], s[0][0], a[i][0], b[i][1])
-		encrypt_slot(t, w[0], s[0][0], a[i][1], b[i][0])
-		encrypt_slot(t, w[1], s[0][0], a[i][1], b[i][1])
-		encrypt_slot(t, w[0], s[0][1], a[i][0], b[i][0])
-		encrypt_slot(t, w[0], s[0][1], a[i][0], b[i][1])
-		encrypt_slot(t, w[1], s[0][1], a[i][1], b[i][0])
-		encrypt_slot(t, w[1], s[0][1], a[i][1], b[i][1])
-		y.io.SendT(t)
+		// result[i] = y.Or(y.And(s, a[i:i+1]), y.And(y.Not(s), b[i:i+1]))[0]
+		result[i] = y.Xor(b[i:i+1], y.And(s, y.Xor(a[i:i+1], b[i:i+1])))[0]
 	}
 	return result
 }

@@ -156,8 +156,8 @@ func (y YaoState) Select(s, a, b []base.Key) []base.Key {
 	}
 	result := make([]base.Key, len(a))
 	for i := 0; i < len(a); i++ {
-		t := y.io.RecvT()
-		result[i] = gen.Decrypt(t, s[0], a[i], b[i])
+		// result[i] = y.Or(y.And(s, a[i:i+1]), y.And(y.Not(s), b[i:i+1]))[0]
+		result[i] = y.Xor(b[i:i+1], y.And(s, y.Xor(a[i:i+1], b[i:i+1])))[0]
 	}
 	return result
 }
