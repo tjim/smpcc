@@ -1,12 +1,13 @@
 package gen
 
 import (
-	"github.com/tjim/smpcc/runtime/base"
 	"bytes"
 	"crypto/aes"
 	"fmt"
 	"math"
 	"math/rand"
+
+	"github.com/tjim/smpcc/runtime/base"
 	"github.com/tjim/smpcc/runtime/ot"
 )
 
@@ -141,20 +142,39 @@ func (y GaxState) Add(a, b []base.Wire) []base.Wire {
 	c := y.And(a[0:1], b[0:1])[0] /* carry bit */
 	for i := 1; i < len(a); i++ {
 		/* compute the result bit */
-		result[i] = y.Xor(y.Xor(a[i:i+1], b[i:i+1]), []base.Wire{c})[0]
-		/* compute the carry bit. */
-		w := genWire()
-		t := make([]base.Ciphertext, 8)
-		y.encrypt_slot(t, w[0], c[0], a[i][0], b[i][0])
-		y.encrypt_slot(t, w[0], c[0], a[i][0], b[i][1])
-		y.encrypt_slot(t, w[0], c[0], a[i][1], b[i][0])
-		y.encrypt_slot(t, w[1], c[0], a[i][1], b[i][1])
-		y.encrypt_slot(t, w[0], c[1], a[i][0], b[i][0])
-		y.encrypt_slot(t, w[1], c[1], a[i][0], b[i][1])
-		y.encrypt_slot(t, w[1], c[1], a[i][1], b[i][0])
-		y.encrypt_slot(t, w[1], c[1], a[i][1], b[i][1])
-		y.io.SendT(t)
-		c = w
+		inner := y.Xor(a[i:i+1], b[i:i+1])
+		// fmt.Printf("gen inner length %d\n", len(inner))
+		result[i] = y.Xor(inner, []base.Wire{c})[0]
+
+		/* compute the next carry bit w2. */
+
+		w0 := genWire()
+		t0 := make([]base.Ciphertext, 4)
+		y.encrypt_slot(t0, w0[0], a[i][0], b[i][0])
+		y.encrypt_slot(t0, w0[0], a[i][0], b[i][1])
+		y.encrypt_slot(t0, w0[0], a[i][1], b[i][0])
+		y.encrypt_slot(t0, w0[1], a[i][1], b[i][1])
+		y.io.SendT(t0)
+
+		w1 := genWire()
+		t1 := make([]base.Ciphertext, 4)
+		y.encrypt_slot(t1, w1[0], c[0], inner[0][0])
+		y.encrypt_slot(t1, w1[0], c[0], inner[0][1])
+		y.encrypt_slot(t1, w1[0], c[1], inner[0][0])
+		y.encrypt_slot(t1, w1[1], c[1], inner[0][1])
+		y.io.SendT(t1)
+
+		// get the actual carry
+		w2 := genWire()
+		t2 := make([]base.Ciphertext, 4)
+		y.encrypt_slot(t2, w2[0], w0[0], w1[0])
+		y.encrypt_slot(t2, w2[1], w0[0], w1[1])
+		y.encrypt_slot(t2, w2[1], w0[1], w1[0])
+		y.encrypt_slot(t2, w2[1], w0[1], w1[1])
+		y.io.SendT(t2)
+
+		// set the carry output
+		c = w2
 	}
 	return result
 }
