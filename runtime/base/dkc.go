@@ -4,7 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"math/big"
-	"fmt"
 )
 
 var FIXED_KEY Key = []byte{83, 36, 191, 126, 172, 151, 226, 234, 140, 225, 71, 219, 216, 96, 130, 209, 17,
@@ -50,7 +49,6 @@ func GaDKC_D(A, B, T, P Key) Key {
 //--- GaX
 
 func GaXDKC_E(A, B, T, X Key) Key {
-	fmt.Println("hello")
 	if len(A) != 16 || len(B) != 16 {
 		panic("Doubling approach won't work")
 	}
