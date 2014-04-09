@@ -108,23 +108,20 @@ func (y GaxState) Add(a, b []base.Key) []base.Key {
 	}
 	result := make([]base.Key, len(a))
 	result[0] = y.Xor(a[0:1], b[0:1])[0]
-	c := y.And(a[0:1], b[0:1])[0] /* carry bit */
+	c := y.And(a[0:1], b[0:1]) /* carry bit */
 	for i := 1; i < len(a); i++ {
+		/* compute the result bit */
 		inner := y.Xor(a[i:i+1], b[i:i+1])
-		// fmt.Printf("eval inner length %d\n", len(inner))
-		result[i] = y.Xor(inner, []base.Key{c})[0]
+		// fmt.Printf("gen inner length %d\n", len(inner))
+		result[i] = y.Xor(inner, c)[0]
 
-		/* compute the borrow bit */
-		t0 := y.io.RecvT()
-		w0 := y.Decrypt(t0, a[i], b[i])
+		/* compute the next carry bit w2. */
+		and1 := y.And(a[i:i+1], b[i:i+1])
+		and2 := y.And(inner, c)
+		or1 := y.Or(and1, and2)
 
-		t1 := y.io.RecvT()
-		w1 := y.Decrypt(t1, c, inner[0])
-
-		t2 := y.io.RecvT()
-		w2 := y.Decrypt(t2, w0, w1)
-
-		c = w2
+		// set the carry output
+		c = or1
 	}
 	return result
 }
@@ -138,13 +135,20 @@ func (y GaxState) Sub(a, b []base.Key) []base.Key {
 	}
 	result := make([]base.Key, len(a))
 	result[0] = y.Xor(a[0:1], b[0:1])[0]
-	c := y.And(y.Not(a[0:1]), b[0:1])[0] /* borrow bit */
+	c := y.And(y.Not(a[0:1]), b[0:1]) /* borrow bit */
 	for i := 1; i < len(a); i++ {
 		/* compute the result bit */
-		result[i] = y.Xor(y.Xor(a[i:i+1], b[i:i+1]), []base.Key{c})[0]
-		/* compute the borrow bit */
-		t := y.io.RecvT()
-		c = y.Decrypt(t, c, a[i], b[i])
+		inner := y.Xor(a[i:i+1], b[i:i+1])
+		// fmt.Printf("gen inner length %d\n", len(inner))
+		result[i] = y.Xor(inner, c)[0]
+
+		/* compute the next carry bit w2. */
+		and1 := y.And(a[i:i+1], y.Not(b[i:i+1]))
+		and2 := y.And(y.Not(inner), c)
+		or1 := y.Or(and1, and2)
+
+		// set the carry output
+		c = or1
 	}
 	return result
 }
