@@ -1,8 +1,55 @@
 %{
+
+type toplevel =
+  | Fun of Util.finfo
+  | Asm of string
+  | Target of string
+  | Datalayout of string
+  | Deplibs of string list
+  | Typ of Util.var * Util.typ option
+  | Global of Util.ginfo
+  | Alias of Util.ainfo
+  | MDNodeDefn of Util.mdinfo
+  | MDVarDefn of string * int list
+  | Attrgrp of string * Util.attribute list
+
 let list_of_string s =
   let a = Array.create (String.length s) 'a' in
   String.iteri (fun i c -> a.(i) <- c) s;
   List.map (fun c -> (Util.Integer 8, Util.Int(Big_int.big_int_of_int(Char.code c)))) (Array.to_list a)
+
+let process_toplevels t =
+  let cu = {
+    Util.ctarget=None;
+    Util.cdatalayout=None;
+    Util.casms=[];
+    Util.cfuns=[];
+    Util.ctyps=[];
+    Util.cglobals=[];
+    Util.caliases=[];
+    Util.cmdnodes=[];
+    Util.cmdvars=[];
+    Util.cattrgrps=[];
+  } in
+  let proc = function
+    | Fun fi -> cu.Util.cfuns <- fi::cu.Util.cfuns
+    | Asm x -> cu.Util.casms <- x::cu.Util.casms
+    | Target x ->
+        if cu.Util.ctarget<>None then failwith "compilation unit with multiple targets"
+        else cu.Util.ctarget <- Some x
+    | Datalayout x ->
+        if cu.Util.cdatalayout<>None then failwith "compilation unit with multiple datalayouts"
+        else cu.Util.cdatalayout <- Some x
+    | Deplibs _ -> () (* parses but ignored in LLVM 3.4, to be removed in 4.0 *)
+    | Typ(x,y) -> cu.Util.ctyps <- (x,y)::cu.Util.ctyps
+    | Global x -> cu.Util.cglobals <- x::cu.Util.cglobals
+    | Alias x -> cu.Util.caliases <- x::cu.Util.caliases
+    | MDNodeDefn x -> cu.Util.cmdnodes <- x::cu.Util.cmdnodes
+    | MDVarDefn(x,y) -> cu.Util.cmdvars <- (x,y)::cu.Util.cmdvars
+    | Attrgrp(x,y) -> cu.Util.cattrgrps <- (x,y)::cu.Util.cattrgrps in
+  List.iter proc t;
+  cu
+
 %}
 %token <string> APFloat
 %token <string> APInt
@@ -14,10 +61,10 @@ let list_of_string s =
 %token Eof
 %token Equal
 %token Exclaim
-%token <Util.variable> GlobalVar
-%token <Util.variable> GlobalID
-%token <Util.variable> LocalVar
-%token <Util.variable> LocalVarID
+%token <Util.var> GlobalVar
+%token <Util.var> GlobalID
+%token <Util.var> LocalVar
+%token <Util.var> LocalVarID
 %token Greater
 %token <string> LabelStr
 %token Lbrace
@@ -262,62 +309,68 @@ let list_of_string s =
 %token Kw_insertvalue
 %token Kw_landingpad
 %start main
-%type <Util.toplevel list> main
+%type <Util.cunit> main
 %%
 main:
+| toplevel_list { process_toplevels $1 }
+;
+toplevel_list:
 | Eof           { [] }
-| toplevel main { $1::$2 }
+| toplevel toplevel_list { $1::$2 }
 ;
 toplevel:
-| Kw_declare function_header                   { Util.Fun $2 }
-| Kw_define function_header function_body      { $2.Util.fblocks <- $3; Util.Fun $2 }
-| Kw_module Kw_asm StringConstant              { Util.Asm $3 }
-| Kw_target Kw_triple Equal StringConstant     { Util.Target $4 }
-| Kw_target Kw_datalayout Equal StringConstant { Util.Datalayout $4}
-| Kw_deplibs Equal Lsquare string_list Rsquare { Util.Deplibs $4 }
-| LocalVarID Equal Kw_type Kw_opaque           { Util.Type($1, None) }
-| LocalVarID Equal Kw_type typ                 { Util.Type($1, Some $4) }
-| LocalVar Equal Kw_type Kw_opaque             { Util.Type($1, None) }
-| LocalVar Equal Kw_type typ                   { Util.Type($1, Some $4) }
+| Kw_declare function_header                   { Fun $2 }
+| Kw_define function_header function_body      { $2.Util.fblocks <- $3; Fun $2 }
+| Kw_module Kw_asm StringConstant              { Asm $3 }
+| Kw_target Kw_triple Equal StringConstant     { Target $4 }
+| Kw_target Kw_datalayout Equal StringConstant { Datalayout $4}
+| Kw_deplibs Equal Lsquare string_list Rsquare { Deplibs $4 }
+| LocalVarID Equal Kw_type Kw_opaque           { Typ($1, None) }
+| LocalVarID Equal Kw_type typ                 { Typ($1, Some $4) }
+| LocalVar Equal Kw_type Kw_opaque             { Typ($1, None) }
+| LocalVar Equal Kw_type typ                   { Typ($1, Some $4) }
 | global_eq external_linkage opt_visibility opt_dll_storageclass opt_thread_local
     opt_addrspace opt_unnamed_addr opt_externally_initialized
     constant_or_global typ opt_section_align
-                                               { Util.Global {Util.gname = $1;
-                                                              Util.glinkage = Some $2;
-                                                              Util.gvisibility = $3;
-                                                              Util.gstorageclass = $4;
-                                                              Util.gthread_local = $5;
-                                                              Util.gaddrspace = $6;
-                                                              Util.gunnamed_addr = $7;
-                                                              Util.gexternally_initialized = $8;
-                                                              Util.gconstant = $9;
-                                                              Util.gtyp = $10;
-                                                              Util.gvalue = None;
-                                                              Util.gsection = fst $11;
-                                                              Util.galign = snd $11;}
+                                               { Global {Util.gname = $1;
+                                                         Util.glinkage = Some $2;
+                                                         Util.gvisibility = $3;
+                                                         Util.gstorageclass = $4;
+                                                         Util.gthread_local = $5;
+                                                         Util.gaddrspace = $6;
+                                                         Util.gunnamed_addr = $7;
+                                                         Util.gexternally_initialized = $8;
+                                                         Util.gconstant = $9;
+                                                         Util.gtyp = $10;
+                                                         Util.gvalue = None;
+                                                         Util.gsection = fst $11;
+                                                         Util.galign = snd $11;}
                                                }
 | global_eq non_external_linkage opt_visibility opt_dll_storageclass opt_thread_local
     opt_addrspace opt_unnamed_addr opt_externally_initialized
     constant_or_global typ value opt_section_align
-                                               { Util.Global {Util.gname = $1;
-                                                              Util.glinkage = $2;
-                                                              Util.gvisibility = $3;
-                                                              Util.gstorageclass = $4;
-                                                              Util.gthread_local = $5;
-                                                              Util.gaddrspace = $6;
-                                                              Util.gunnamed_addr = $7;
-                                                              Util.gexternally_initialized = $8;
-                                                              Util.gconstant = $9;
-                                                              Util.gtyp = $10;
-                                                              Util.gvalue = Some $11;
-                                                              Util.gsection = fst $12;
-                                                              Util.galign = snd $12;}
+                                               { Global {Util.gname = $1;
+                                                         Util.glinkage = $2;
+                                                         Util.gvisibility = $3;
+                                                         Util.gstorageclass = $4;
+                                                         Util.gthread_local = $5;
+                                                         Util.gaddrspace = $6;
+                                                         Util.gunnamed_addr = $7;
+                                                         Util.gexternally_initialized = $8;
+                                                         Util.gconstant = $9;
+                                                         Util.gtyp = $10;
+                                                         Util.gvalue = Some $11;
+                                                         Util.gsection = fst $12;
+                                                         Util.galign = snd $12;}
                                                }
-| global_eq external_linkage opt_visibility Kw_alias opt_linkage aliasee     { Util.GlobalAlias($1, Some $2, $3, $5, $6) }
-| global_eq non_external_linkage opt_visibility Kw_alias opt_linkage aliasee { Util.GlobalAlias($1, $2, $3, $5, $6) }
-| Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace                 { Util.MDNodeDefn(int_of_string $2, $4, $7) }
-| MetadataVar Equal Exclaim Lbrace mdlist Rbrace                             { Util.MDVarDefn($1, $5) }
-| Kw_attributes AttrGrpID Equal Lbrace group_attributes Rbrace               { Util.Attrgrp($2, $5) }
+| global_eq external_linkage opt_visibility Kw_alias opt_linkage aliasee
+    { Alias({Util.aname=$1; Util.avisibility=$3; Util.alinkage=$5; Util.aaliasee=$6}) }
+| global_eq non_external_linkage opt_visibility Kw_alias opt_linkage aliasee
+    { Alias({Util.aname=$1; Util.avisibility=$3; Util.alinkage=$5; Util.aaliasee=$6}) }
+| Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace
+    { MDNodeDefn({Util.mdid=int_of_string $2; Util.mdtyp=$4; Util.mdcontents=$7}) }
+| MetadataVar Equal Exclaim Lbrace mdlist Rbrace                             { MDVarDefn($1, $5) }
+| Kw_attributes AttrGrpID Equal Lbrace group_attributes Rbrace               { Attrgrp($2, $5) }
 ;
 global_eq: /* may want to allow empty here (per llvm parser) but haven't seen it yet and it causes grammar conflicts */
 | GlobalID Equal  { $1 }
@@ -350,7 +403,7 @@ function_header:
 | opt_linkage opt_visibility opt_dll_storageclass opt_callingconv return_attributes
  typ global_name argument_list opt_unnamed_addr function_attributes opt_section
  opt_align opt_gc opt_prefix
-                             { 
+                             {
                                {Util.flinkage = $1;
                                 Util.fvisibility = $2;
                                 Util.fstorageclass = $3;
@@ -383,8 +436,8 @@ non_void_type:
 | Kw_label                             { Util.Label }
 | Kw_metadata                          { Util.Metadata }
 | Kw_x86_mmx                           { Util.X86_mmx }
-| LocalVar                             { Util.Varty($1) }
-| LocalVarID                           { Util.Varty($1) }
+| LocalVar                             { Util.Vartyp($1) }
+| LocalVarID                           { Util.Vartyp($1) }
 | Lbrace Rbrace                        { Util.Struct(false, []) }
 | Less Lbrace Rbrace Greater           { Util.Struct(true, []) }
 | Lbrace type_list Rbrace              { Util.Struct(false, $2) }
@@ -392,7 +445,7 @@ non_void_type:
 | Lsquare APInt Kw_x typ Rsquare       { Util.Array(int_of_string $2, $4) }
 | Less APInt Kw_x typ Greater          { Util.Vector(int_of_string $2, $4) }
 | typ opt_addrspace Star               { Util.Pointer($1, $2) }
-| typ argument_list                    { Util.FunctionTy($1, fst $2, snd $2) }
+| typ argument_list                    { Util.FunTy($1, fst $2, snd $2) }
 ;
 type_list:
 | typ                 { [$1] }
@@ -462,10 +515,10 @@ opt_volatile:
 | Kw_volatile { true }
 ;
 value:
-| GlobalID                                                                                  { Util.Variable $1 }
-| GlobalVar                                                                                 { Util.Variable $1 }
-| LocalVarID                                                                                { Util.Variable $1 }
-| LocalVar                                                                                  { Util.Variable $1 }
+| GlobalID                                                                                  { Util.Var $1 }
+| GlobalVar                                                                                 { Util.Var $1 }
+| LocalVarID                                                                                { Util.Var $1 }
+| LocalVar                                                                                  { Util.Var $1 }
 | Exclaim mdvalue                                                                           { $2 }
 | APInt                                                                                     { Util.Int(Big_int.big_int_of_string $1) }
 | APFloat                                                                                   { Util.Float $1 }
