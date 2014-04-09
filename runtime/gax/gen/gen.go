@@ -59,6 +59,7 @@ func encrypt_nonoptimized(keys []base.Key, result []byte) []byte {
 }
 
 func encrypt_slot_nonoptimized(t base.GarbledTable, plaintext []byte, keys []base.Key) {
+	// fmt.Println("Non-optimized encrypt slot")
 	t[slot(keys)] = encrypt_nonoptimized(keys, plaintext)
 }
 
@@ -296,18 +297,7 @@ func (y GaxState) Select(s, a, b []base.Wire) []base.Wire {
 	}
 	result := make([]base.Wire, len(a))
 	for i := 0; i < len(a); i++ {
-		w := genWire()
-		result[i] = w
-		t := make([]base.Ciphertext, 8)
-		y.encrypt_slot(t, w[0], s[0][0], a[i][0], b[i][0])
-		y.encrypt_slot(t, w[1], s[0][0], a[i][0], b[i][1])
-		y.encrypt_slot(t, w[0], s[0][0], a[i][1], b[i][0])
-		y.encrypt_slot(t, w[1], s[0][0], a[i][1], b[i][1])
-		y.encrypt_slot(t, w[0], s[0][1], a[i][0], b[i][0])
-		y.encrypt_slot(t, w[0], s[0][1], a[i][0], b[i][1])
-		y.encrypt_slot(t, w[1], s[0][1], a[i][1], b[i][0])
-		y.encrypt_slot(t, w[1], s[0][1], a[i][1], b[i][1])
-		y.io.SendT(t)
+		result[i] = y.Or(y.And(s, a[i:i+1]), y.And(y.Not(s), b[i:i+1]))[0]
 	}
 	return result
 }
