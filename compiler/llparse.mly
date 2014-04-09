@@ -317,7 +317,7 @@ toplevel:
 | global_eq non_external_linkage opt_visibility Kw_alias opt_linkage aliasee { Util.GlobalAlias($1, $2, $3, $5, $6) }
 | Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace                 { Util.MDNodeDefn(int_of_string $2, $4, $7) }
 | MetadataVar Equal Exclaim Lbrace mdlist Rbrace                             { Util.MDVarDefn($1, $5) }
-| Kw_attributes AttrGrpID Equal Lbrace group_attributes Rbrace               { Util.AttrDefn($2, $5) }
+| Kw_attributes AttrGrpID Equal Lbrace group_attributes Rbrace               { Util.Attrgrp($2, $5) }
 ;
 global_eq: /* may want to allow empty here (per llvm parser) but haven't seen it yet and it causes grammar conflicts */
 | GlobalID Equal  { $1 }
@@ -742,7 +742,7 @@ function_attributes:
 ;
 function_attribute:
 | AttrGrpID                                { Util.AttrGrpID(int_of_string $1) }
-| StringConstant Equal StringConstant      { Util.Attr($1, $3) }
+| StringConstant Equal StringConstant      { Util.Attr($1, Some $3) }
 | Kw_alignstack Equal Lparen APInt Rparen  { Util.Alignstack(int_of_string $4) }
 | Kw_alwaysinline                          { Util.Alwaysinline     }
 | Kw_builtin                               { Util.Builtin          }
@@ -776,36 +776,36 @@ group_attributes:
 | group_attribute group_attributes { $1::$2 }
 ;
 group_attribute:
-| StringConstant                      {()}
-| StringConstant Equal StringConstant {()}
-| Kw_align Equal APInt               {()}
-| Kw_alignstack Equal APInt          {()}
-| Kw_alwaysinline                     {()}
-| Kw_builtin                          {()}
-| Kw_cold                             {()}
-| Kw_inlinehint                       {()}
-| Kw_minsize                          {()}
-| Kw_naked                            {()}
-| Kw_nobuiltin                        {()}
-| Kw_noduplicate                      {()}
-| Kw_noimplicitfloat                  {()}
-| Kw_noinline                         {()}
-| Kw_nonlazybind                      {()}
-| Kw_noredzone                        {()}
-| Kw_noreturn                         {()}
-| Kw_nounwind                         {()}
-| Kw_optnone                          {()}
-| Kw_optsize                          {()}
-| Kw_readnone                         {()}
-| Kw_readonly                         {()}
-| Kw_returns_twice                    {()}
-| Kw_ssp                              {()}
-| Kw_sspreq                           {()}
-| Kw_sspstrong                        {()}
-| Kw_sanitize_address                 {()}
-| Kw_sanitize_thread                  {()}
-| Kw_sanitize_memory                  {()}
-| Kw_uwtable                          {()}
+| StringConstant                      { Util.Attr($1, None) }
+| StringConstant Equal StringConstant { Util.Attr($1, Some $3) }
+| Kw_align Equal APInt                { Util.Align(int_of_string $3) }
+| Kw_alignstack Equal APInt           { Util.Alignstack(int_of_string $3) }
+| Kw_alwaysinline                     { Util.Alwaysinline    }
+| Kw_builtin                          { Util.Builtin         }
+| Kw_cold                             { Util.Cold            }
+| Kw_inlinehint                       { Util.Inlinehint      }
+| Kw_minsize                          { Util.Minsize         }
+| Kw_naked                            { Util.Naked           }
+| Kw_nobuiltin                        { Util.Nobuiltin       }
+| Kw_noduplicate                      { Util.Noduplicate     }
+| Kw_noimplicitfloat                  { Util.Noimplicitfloat }
+| Kw_noinline                         { Util.Noinline        }
+| Kw_nonlazybind                      { Util.Nonlazybind     }
+| Kw_noredzone                        { Util.Noredzone       }
+| Kw_noreturn                         { Util.Noreturn        }
+| Kw_nounwind                         { Util.Nounwind        }
+| Kw_optnone                          { Util.Optnone         }
+| Kw_optsize                          { Util.Optsize         }
+| Kw_readnone                         { Util.Readnone        }
+| Kw_readonly                         { Util.Readonly        }
+| Kw_returns_twice                    { Util.Returns_twice   }
+| Kw_ssp                              { Util.Ssp             }
+| Kw_sspreq                           { Util.Sspreq          }
+| Kw_sspstrong                        { Util.Sspstrong       }
+| Kw_sanitize_address                 { Util.Sanitize_address}
+| Kw_sanitize_thread                  { Util.Sanitize_thread }
+| Kw_sanitize_memory                  { Util.Sanitize_memory }
+| Kw_uwtable                          { Util.Uwtable         }
 ;
 param_list:
 | /* empty */            { [] }
@@ -817,7 +817,7 @@ param:
 ;
 opt_param_attribute:
 | /* empty */     { None }
-| Kw_align APInt { Some(Util.Align(int_of_string $2)) }
+| Kw_align APInt  { Some(Util.Align(int_of_string $2)) }
 | Kw_byval        { Some Util.Byval     }
 | Kw_inalloca     { Some Util.Inalloca  }
 | Kw_inreg        { Some Util.Inreg     }

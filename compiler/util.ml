@@ -144,51 +144,51 @@ type aliasee =
   | A_getelementptr of bool * (oType * oValue) list
   | A_type_value of (oType * oValue)
 
-type param_attribute =
-  | Align of int (* dup *)
-  | Byval
-  | Inalloca
-  | Inreg        (* dup *)
-  | Nest
-  | Noalias      (* dup *)
-  | Nocapture
-  | Readnone
-  | Readonly
-  | Returned
-  | Signext      (* dup *)
-  | Sret
-  | Zeroext      (* dup *)
-
-type function_attribute =
-| AttrGrpID of int
-| Attr of string * string
-| Alignstack of int
-| Alwaysinline
-| Builtin
-| Cold
-| Inlinehint
-| Minsize
-| Naked
-| Nobuiltin
-| Noduplicate
-| Noimplicitfloat
-| Noinline
-| Nonlazybind
-| Noredzone
-| Noreturn
-| Nounwind
-| Optnone
-| Optsize
-| Readnone
-| Readonly
-| Returns_twice
-| Ssp
-| Sspreq
-| Sspstrong
-| Sanitize_address
-| Sanitize_thread
-| Sanitize_memory
-| Uwtable
+type attribute =
+  | Align of int                   (* param_attribute *)
+  | Byval                          (* param_attribute *)
+  | Inalloca                       (* param_attribute *)
+  | Inreg                          (* param_attribute *) (* return_attribute *)
+  | Nest                           (* param_attribute *)
+  | Noalias                        (* param_attribute *) (* return_attribute *)
+  | Nocapture                      (* param_attribute *)
+  | Readnone                       (* param_attribute *) (* function_attribute *) (* call_attribute *)
+  | Readonly                       (* param_attribute *) (* function_attribute *) (* call_attribute *)
+  | Returned                       (* param_attribute *)
+  | Signext                        (* param_attribute *) (* return_attribute *)
+  | Sret                           (* param_attribute *)
+  | Zeroext                        (* param_attribute *) (* return_attribute *)
+  | AttrGrpID of int               (* function_attribute *)
+  | Attr of string * string option (* function_attribute *)
+  | Alignstack of int              (* function_attribute *)
+  | Alwaysinline                   (* function_attribute *)
+  | Builtin                        (* function_attribute *)
+  | Cold                           (* function_attribute *)
+  | Inlinehint                     (* function_attribute *)
+  | Minsize                        (* function_attribute *)
+  | Naked                          (* function_attribute *)
+  | Nobuiltin                      (* function_attribute *)
+  | Noduplicate                    (* function_attribute *)
+  | Noimplicitfloat                (* function_attribute *)
+  | Noinline                       (* function_attribute *)
+  | Nonlazybind                    (* function_attribute *)
+  | Noredzone                      (* function_attribute *)
+  | Noreturn                       (* function_attribute *) (* call_attribute *)
+  | Nounwind                       (* function_attribute *) (* call_attribute *)
+  | Optnone                        (* function_attribute *)
+  | Optsize                        (* function_attribute *)
+  | Returns_twice                  (* function_attribute *)
+  | Ssp                            (* function_attribute *)
+  | Sspreq                         (* function_attribute *)
+  | Sspstrong                      (* function_attribute *)
+  | Sanitize_address               (* function_attribute *)
+  | Sanitize_thread                (* function_attribute *)
+  | Sanitize_memory                (* function_attribute *)
+  | Uwtable                        (* function_attribute *)
+type call_attribute = attribute
+type return_attribute = attribute
+type param_attribute = attribute
+type function_attribute = attribute
 
 type callingconv =
   | Ccc
@@ -215,12 +215,6 @@ type callingconv =
   | Preserve_allcc
   | Cc
 
-type return_attribute =
-  | Inreg
-  | Noalias
-  | Signext
-  | Zeroext
-
 type fast_math_flag =
 | Fast
 | Nnan
@@ -239,12 +233,6 @@ type ordering =
 type landingpad =
   | Catch of oType * oValue
   | Filter of oType * oValue
-
-type call_attribute =
-| Noreturn
-| Nounwind
-| Readnone
-| Readonly
 
 type binop =
 | Xchg
@@ -371,4 +359,4 @@ type toplevel =
   | GlobalAlias of variable * linkage option * visibility option * linkage option * aliasee
   | MDNodeDefn of int * oType * (oType * oValue) option list
   | MDVarDefn of string * int list
-  | AttrDefn of string * unit list
+  | Attrgrp of string * attribute list
