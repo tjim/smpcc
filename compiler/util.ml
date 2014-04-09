@@ -325,10 +325,27 @@ type instr =
   | Switch of (oType * oValue) * (oType * oValue) * ((oType * oValue) * (oType * oValue)) list
   | Invoke of callingconv option * return_attribute list * oType * oValue * ((oType * oValue * param_attribute option) list) * function_attribute list * (oType * oValue) * (oType * oValue)
 
+type finfo = {
+    mutable flinkage: linkage option;
+    mutable fvisibility: visibility option;
+    mutable fstorageclass: dll_storageclass option;
+    mutable fcallingconv: callingconv option;
+    mutable freturnattrs: return_attribute list;
+    mutable freturntyp: oType;
+    mutable fname: variable;
+    mutable fparams: (oType list * bool);
+    mutable funnamed_addr: bool;
+    mutable fattrs: function_attribute list;
+    mutable fsection: string option;
+    mutable falign: int option;
+    mutable fgc: string option;
+    mutable fprefix: (oType * oValue) option;
+    mutable fblocks: (string option * instr list) list;
+  }
+
 type toplevel =
-  | FunDecl
-  | FunDefn
-  | AsmDefn of string
+  | Fun of finfo
+  | Asm of string
   | Target of string
   | Datalayout of string
   | Deplibs of string list

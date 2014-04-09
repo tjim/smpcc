@@ -262,9 +262,9 @@ parse eof                                                    { Eof }
 | '%' (dquote notdquote* dquote as x)                        { LocalVar(Util.VAR(false,x)) }
 | '%' (idchar0 idchar* as x)                                 { LocalVar(Util.VAR(false,x)) }
 | '%' (digit+ as x)                                          { LocalVarID(Util.ID(false,int_of_string x)) }
-| dquote notdquote+ dquote ':'                               { LabelStr(Lexing.lexeme lexbuf) }
+| (dquote notdquote+ dquote as x) ':'                        { LabelStr x }
 | dquote notdquote* dquote                                   { StringConstant(Lexing.lexeme lexbuf) }
-| idchar+ ':'                                                { LabelStr(Lexing.lexeme lexbuf) }
+| (idchar+ as x) ':'                                         { LabelStr x }
 | "..."                                                      { DotDotDot }
 | 'i' (digit+ as numbits)                                    { I(int_of_string numbits) }
 | ['u' 's'] "0x" hexdigit+                                   { APSint(Lexing.lexeme lexbuf) }

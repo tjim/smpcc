@@ -269,9 +269,9 @@ main:
 | toplevel main { $1::$2 }
 ;
 toplevel:
-| declare                                      { Util.FunDecl }
-| define                                       { Util.FunDefn }
-| Kw_module Kw_asm StringConstant              { Util.AsmDefn $3 }
+| Kw_declare function_header                   { Util.Fun $2 }
+| Kw_define function_header function_body      { $2.Util.fblocks <- $3; Util.Fun $2 }
+| Kw_module Kw_asm StringConstant              { Util.Asm $3 }
 | Kw_target Kw_triple Equal StringConstant     { Util.Target $4 }
 | Kw_target Kw_datalayout Equal StringConstant { Util.Datalayout $4}
 | Kw_deplibs Equal Lsquare string_list Rsquare { Util.Deplibs $4 }
@@ -322,17 +322,27 @@ trailing_attributes:
 | /* empty */                                         { [] }
 | Comma Kw_section StringConstant trailing_attributes { (Util.Section $3)::$4 }
 | Comma Kw_align APInt trailing_attributes            { (Util.Align(int_of_string $3))::$4 }
-declare:
-| Kw_declare function_header                          {$2}
-;
-define:
-| Kw_define function_header function_body {()}
-;
 function_header:
 | opt_linkage opt_visibility opt_dll_storageclass opt_callingconv return_attributes
  typ global_name argument_list opt_unnamed_addr function_attributes opt_section
  opt_align opt_gc opt_prefix
-                             {()}
+                             { 
+                               {Util.flinkage = $1;
+                                Util.fvisibility = $2;
+                                Util.fstorageclass = $3;
+                                Util.fcallingconv = $4;
+                                Util.freturnattrs = $5;
+                                Util.freturntyp = $6;
+                                Util.fname = $7;
+                                Util.fparams = $8;
+                                Util.funnamed_addr = $9;
+                                Util.fattrs = $10;
+                                Util.fsection = $11;
+                                Util.falign = $12;
+                                Util.fgc = $13;
+                                Util.fprefix = $14;
+                                Util.fblocks = [];}
+                             }
 ;
 typ:
 | Kw_void       { Util.Void }
@@ -387,7 +397,7 @@ opt_section:
 ;
 opt_align:
 | /* empty */    { None }
-| Kw_align APInt { Some $2 }
+| Kw_align APInt { Some(int_of_string $2) }
 ;
 opt_inbounds:
 | /* empty */ { false }
@@ -602,7 +612,7 @@ instruction:
                                                            { Util.Landingpad($3, $5, $6, $7) }
 | opt_local opt_tail Kw_call opt_callingconv return_attributes typ value Lparen param_list Rparen call_attributes
                                                            { Util.Call($2, $4, $5, $6, $7, $9, $11) }
-| local_eq Kw_alloca alloc                                 { let x, y, z, w = $3 in Util.Alloca(x, y, z, w) }
+| local_eq Kw_alloca alloc                                 { $3 }
 | local_eq Kw_load  opt_atomic opt_volatile type_value scopeandordering opt_comma_align
                                                            { Util.Load($3, $4, $5, $6, $7) }
 | Kw_store opt_atomic opt_volatile type_value Comma type_value scopeandordering opt_comma_align
@@ -655,14 +665,14 @@ scopeandordering:
 | opt_singlethread ordering { Some($1, $2) }
 ;
 alloc:
-| Kw_inalloca typ Comma type_value Comma Kw_align APInt { (true,  $2, Some $4, Some(int_of_string $7)) }
-| Kw_inalloca typ Comma type_value                      { (true,  $2, Some $4, None) }
-| Kw_inalloca typ Comma Kw_align APInt                  { (true,  $2, None, Some(int_of_string $5))}
-| Kw_inalloca typ                                       { (true,  $2, None, None) }
-| typ Comma type_value Comma Kw_align APInt             { (false, $1, Some $3, Some(int_of_string $6)) }
-| typ Comma type_value                                  { (false, $1, Some $3, None) }
-| typ Comma Kw_align APInt                              { (false, $1, None, Some(int_of_string $4))}
-| typ                                                   { (false, $1, None, None) }
+| Kw_inalloca typ Comma type_value Comma Kw_align APInt { Util.Alloca(true,  $2, Some $4, Some(int_of_string $7)) }
+| Kw_inalloca typ Comma type_value                      { Util.Alloca(true,  $2, Some $4, None) }
+| Kw_inalloca typ Comma Kw_align APInt                  { Util.Alloca(true,  $2, None, Some(int_of_string $5))}
+| Kw_inalloca typ                                       { Util.Alloca(true,  $2, None, None) }
+| typ Comma type_value Comma Kw_align APInt             { Util.Alloca(false, $1, Some $3, Some(int_of_string $6)) }
+| typ Comma type_value                                  { Util.Alloca(false, $1, Some $3, None) }
+| typ Comma Kw_align APInt                              { Util.Alloca(false, $1, None, Some(int_of_string $4))}
+| typ                                                   { Util.Alloca(false, $1, None, None) }
 ;
 fast_math_flags:
 | /* empty */                    { [] }
