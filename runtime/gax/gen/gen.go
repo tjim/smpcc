@@ -296,8 +296,10 @@ func (y GaxState) Select(s, a, b []base.Wire) []base.Wire {
 		panic("Wire mismatch in gen.Select()")
 	}
 	result := make([]base.Wire, len(a))
+
 	for i := 0; i < len(a); i++ {
-		result[i] = y.Or(y.And(s, a[i:i+1]), y.And(y.Not(s), b[i:i+1]))[0]
+		// result[i] = y.Or(y.And(s, a[i:i+1]), y.And(y.Not(s), b[i:i+1]))[0]
+		result[i] = y.Xor(b[i:i+1], y.And(s, y.Xor(a[i:i+1], b[i:i+1])))[0]
 	}
 	return result
 }
