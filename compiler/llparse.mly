@@ -632,15 +632,12 @@ basicblock_list:
 | basicblock basicblock_list { $1::$2 }
 ;
 basicblock:
-| opt_labelstr instruction_list { ($1, $2) }
+| LabelStr instruction_list { (Some(Util.Name(false, $1)), $2) }
+| instruction_list          { (None, $1) }
 ;
 instruction_list:
 | terminator_instruction       { [$1] }
 | instruction instruction_list { $1::$2 }
-;
-opt_labelstr:
-| /* empty */ { None }
-| LabelStr    { Some $1 }
 ;
 local_eq:
 | LocalVarID Equal { $1 }

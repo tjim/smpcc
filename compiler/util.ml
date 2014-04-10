@@ -318,7 +318,7 @@ type finfo = {
     mutable falign: int option;
     mutable fgc: string option;
     mutable fprefix: (typ * value) option;
-    mutable fblocks: (string option * (var option * instr) list) list;
+    mutable fblocks: (var option * (var option * instr) list) list;
   }
 
 type thread_local =
@@ -368,6 +368,32 @@ type cunit = {
     mutable cmdvars: (string * int list) list;
     mutable cmdnodes: mdinfo list;
   }
+
+let number_cu cu =
+  let number_blocks f =
+    let number_block n (name, instrs) =
+      let rec max n = function
+        | [] -> n
+        | hd::tl -> if n>hd then max n tl else max hd tl in
+      let instr_numbers =
+        List.concat
+          (List.map
+             (function 
+               | (Some(Id(false, x)), _) -> [x]
+               | _ -> [])
+             instrs) in
+      match name with
+      | None -> Some(Id(false, n)), max n instr_numbers + 1
+      | Some _ -> name, if instr_numbers = [] then n else max n instr_numbers + 1 in
+    let num = ref 0 in
+    f.fblocks <-
+      List.map
+        (fun (name, instrs) ->
+          let name', num' = number_block !num (name, instrs) in
+          num := num';
+          (name', instrs))
+        f.fblocks in
+  List.iter number_blocks cu.cfuns
 
 open Printf
 
@@ -882,7 +908,8 @@ let bpr_block b (nameopt, instrs) =
   bprintf b "; <label>:%s%a\n" 
     (match nameopt with
     | None -> "<<UNNAMED>>"
-    | Some x -> x)
+    | Some(Name(_,x)) -> x
+    | Some(Id(_,x)) -> string_of_int x)
     pad_to_column 50;
   List.iter (bpr_instr b) instrs;
   bprintf b "\n"

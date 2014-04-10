@@ -299,6 +299,7 @@ let lexbuf =
     Lexing.from_channel stdin;;
 try
   let cu = main token lexbuf in
+  Util.number_cu cu;
   let b = Buffer.create 11 in
   Util.bpr_cu b cu;
   Printf.printf "%s" (Buffer.contents b);
