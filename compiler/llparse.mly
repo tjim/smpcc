@@ -379,7 +379,7 @@ global_eq: /* may want to allow empty here (per llvm parser) but haven't seen it
 aliasee:
 | Kw_bitcast       Lparen type_value Kw_to typ Rparen         { Util.A_bitcast($3, $5) }
 | Kw_getelementptr opt_inbounds Lparen type_value_list Rparen { Util.A_getelementptr($2, $4) }
-| type_value                                                  { Util.A_type_value $1 }
+| type_value                                                  { Util.A_typ_value $1 }
 ;
 string_list:
 | /* empty */                { [] }
@@ -438,14 +438,14 @@ non_void_type:
 | Kw_x86_mmx                           { Util.X86_mmx }
 | LocalVar                             { Util.Vartyp($1) }
 | LocalVarID                           { Util.Vartyp($1) }
-| Lbrace Rbrace                        { Util.Struct(false, []) }
-| Less Lbrace Rbrace Greater           { Util.Struct(true, []) }
-| Lbrace type_list Rbrace              { Util.Struct(false, $2) }
-| Less Lbrace type_list Rbrace Greater { Util.Struct(true, $3) }
-| Lsquare APInt Kw_x typ Rsquare       { Util.Array(int_of_string $2, $4) }
+| Lbrace Rbrace                        { Util.Structtyp(false, []) }
+| Less Lbrace Rbrace Greater           { Util.Structtyp(true, []) }
+| Lbrace type_list Rbrace              { Util.Structtyp(false, $2) }
+| Less Lbrace type_list Rbrace Greater { Util.Structtyp(true, $3) }
+| Lsquare APInt Kw_x typ Rsquare       { Util.Arraytyp(int_of_string $2, $4) }
 | Less APInt Kw_x typ Greater          { Util.Vector(int_of_string $2, $4) }
 | typ opt_addrspace Star               { Util.Pointer($1, $2) }
-| typ argument_list                    { Util.FunTy($1, fst $2, snd $2) }
+| typ argument_list                    { Util.Funtyp($1, fst $2, snd $2) }
 ;
 type_list:
 | typ                 { [$1] }
@@ -525,14 +525,14 @@ value:
 | Kw_true                                                                                   { Util.True }
 | Kw_false                                                                                  { Util.False }
 | Kw_null                                                                                   { Util.Null }
-| Kw_undef                                                                                  { Util.UndefValue }
+| Kw_undef                                                                                  { Util.Undef }
 | Kw_zeroinitializer                                                                        { Util.Zero }
-| Lbrace type_value_list Rbrace                                                             { Util.ConstantStruct(false, $2) }
-| Less Lbrace Rbrace Greater                                                                { Util.ConstantStruct(true, []) }
-| Less Lbrace type_value_LIST Rbrace Greater                                                { Util.ConstantStruct(true, $3) }
-| Less type_value_list Greater                                                              { Util.ConstantVector($2) }
-| Lsquare type_value_list Rsquare                                                           { Util.ConstantArray($2) }
-| Kw_c StringConstant                                                                       { Util.ConstantArray(list_of_string $2) }
+| Lbrace type_value_list Rbrace                                                             { Util.Struct(false, $2) }
+| Less Lbrace Rbrace Greater                                                                { Util.Struct(true, []) }
+| Less Lbrace type_value_LIST Rbrace Greater                                                { Util.Struct(true, $3) }
+| Less type_value_list Greater                                                              { Util.Vector($2) }
+| Lsquare type_value_list Rsquare                                                           { Util.Array($2) }
+| Kw_c StringConstant                                                                       { Util.Array(list_of_string $2) }
 | Kw_asm opt_sideeffect opt_alignstack opt_inteldialect StringConstant Comma StringConstant { Util.Asm($2, $3, $4, $5, $7) }
 | Kw_blockaddress               Lparen value Comma value Rparen                             { Util.Blockaddress($3, $5) }
 | Kw_trunc                      Lparen type_value Kw_to typ Rparen                          { Util.Trunc         ($3, $5) }
@@ -548,8 +548,8 @@ value:
 | Kw_fptosi                     Lparen type_value Kw_to typ Rparen                          { Util.Fptosi        ($3, $5) }
 | Kw_inttoptr                   Lparen type_value Kw_to typ Rparen                          { Util.Inttoptr      ($3, $5) }
 | Kw_ptrtoint                   Lparen type_value Kw_to typ Rparen                          { Util.Ptrtoint      ($3, $5) }
-| Kw_extractvalue               Lparen type_value index_list Rparen                         { Util.ExtractValue($3, $4) }
-| Kw_insertvalue                Lparen type_value Comma type_value index_list Rparen        { Util.InsertValue($3, $5, $6) }
+| Kw_extractvalue               Lparen type_value index_list Rparen                         { Util.Extractvalue($3, $4) }
+| Kw_insertvalue                Lparen type_value Comma type_value index_list Rparen        { Util.Insertvalue($3, $5, $6) }
 | Kw_icmp icmp_predicate        Lparen type_value Comma type_value Rparen                   { Util.Icmp($2, $4, $6) }
 | Kw_fcmp fcmp_predicate        Lparen type_value Comma type_value Rparen                   { Util.Fcmp($2, $4, $6) }
 | Kw_add opt_nuw_nsw            Lparen type_value Comma type_value Rparen                   { Util.Add(fst $2, snd $2, $4, $6) }
@@ -577,9 +577,9 @@ value:
 | Kw_select                     Lparen type_value_list Rparen                               { Util.Select         $3 }
 ;
 mdvalue:
-| APInt                      { Util.MDNode(int_of_string $1) }
-| StringConstant             { Util.MDString $1 }
-| Lbrace mdnodevector Rbrace { Util.MDNodeVector $2 }
+| APInt                      { Util.Mdnode(int_of_string $1) }
+| StringConstant             { Util.Mdstring $1 }
+| Lbrace mdnodevector Rbrace { Util.Mdnodevector $2 }
 ;
 type_value_LIST:
 | type_value                       { [$1] }
@@ -651,63 +651,63 @@ opt_local:
 | local_eq    { Some $1 }
 ;
 instruction:
- | local_eq Kw_add opt_nuw_nsw type_value Comma value      { Util.Add($3, $4, $6) }
- | local_eq Kw_sub opt_nuw_nsw type_value Comma value      { Util.Sub($3, $4, $6) }
- | local_eq Kw_mul opt_nuw_nsw type_value Comma value      { Util.Mul($3, $4, $6) }
- | local_eq Kw_shl opt_nuw_nsw type_value Comma value      { Util.Shl($3, $4, $6) }
- | local_eq Kw_fadd fast_math_flags type_value Comma value { Util.Fadd($3, $4, $6) }
- | local_eq Kw_fsub fast_math_flags type_value Comma value { Util.Fsub($3, $4, $6) }
- | local_eq Kw_fmul fast_math_flags type_value Comma value { Util.Fmul($3, $4, $6) }
- | local_eq Kw_fdiv fast_math_flags type_value Comma value { Util.Fdiv($3, $4, $6) }
- | local_eq Kw_frem fast_math_flags type_value Comma value { Util.Frem($3, $4, $6) }
- | local_eq Kw_sdiv opt_exact type_value Comma value       { Util.Sdiv($3, $4, $6) }
- | local_eq Kw_udiv opt_exact type_value Comma value       { Util.Udiv($3, $4, $6) }
- | local_eq Kw_lshr opt_exact type_value Comma value       { Util.Lshr($3, $4, $6) }
- | local_eq Kw_ashr opt_exact type_value Comma value       { Util.Ashr($3, $4, $6) }
- | local_eq Kw_urem type_value Comma value                 { Util.Urem($3, $5) }
- | local_eq Kw_srem type_value Comma value                 { Util.Srem($3, $5) }
- | local_eq Kw_and type_value Comma value                  { Util.And($3, $5) }
- | local_eq Kw_or type_value Comma value                   { Util.Or($3, $5) }
- | local_eq Kw_xor type_value Comma value                  { Util.Xor($3, $5) }
- | local_eq Kw_icmp icmp_predicate type_value Comma value  { Util.Icmp($3, $4, $6) }
- | local_eq Kw_fcmp fcmp_predicate type_value Comma value  { Util.Fcmp($3, $4, $6) }
- | local_eq Kw_trunc type_value Kw_to typ                  { Util.Trunc($3, $5) }
- | local_eq Kw_zext type_value Kw_to typ                   { Util.Zext($3, $5) }
- | local_eq Kw_sext type_value Kw_to typ                   { Util.Sext($3, $5) }
- | local_eq Kw_fptrunc type_value Kw_to typ                { Util.Fptrunc($3, $5) }
- | local_eq Kw_fpext type_value Kw_to typ                  { Util.Fpext($3, $5) }
- | local_eq Kw_bitcast type_value Kw_to typ                { Util.Bitcast($3, $5) }
- | local_eq Kw_addrspacecast type_value Kw_to typ          { Util.Addrspacecast($3, $5) }
- | local_eq Kw_uitofp type_value Kw_to typ                 { Util.Uitofp($3, $5) }
- | local_eq Kw_sitofp type_value Kw_to typ                 { Util.Sitofp($3, $5) }
- | local_eq Kw_fptoui type_value Kw_to typ                 { Util.Fptoui($3, $5) }
- | local_eq Kw_fptosi type_value Kw_to typ                 { Util.Fptosi($3, $5) }
- | local_eq Kw_inttoptr type_value Kw_to typ               { Util.Inttoptr($3, $5) }
- | local_eq Kw_ptrtoint type_value Kw_to typ               { Util.Ptrtoint($3, $5) }
- | local_eq Kw_va_arg type_value Comma typ                 { Util.Va_arg($3, $5) }
- | local_eq Kw_getelementptr opt_inbounds type_value_LIST  { Util.Getelementptr($3, $4) }
- | local_eq Kw_extractelement type_value_LIST              { Util.Extractelement($3) }
- | local_eq Kw_insertelement type_value_LIST               { Util.Insertelement($3) }
- | local_eq Kw_shufflevector type_value_LIST               { Util.Shufflevector($3) }
- | local_eq Kw_select type_value_LIST                      { Util.Select($3) }
- | local_eq Kw_phi typ phi_list                            { Util.Phi($3, $4) }
- | local_eq Kw_landingpad typ Kw_personality type_value opt_cleanup landingpad_list
-                                                           { Util.Landingpad($3, $5, $6, $7) }
+| local_eq Kw_add opt_nuw_nsw type_value Comma value      { Some $1, Util.Add(fst $3, snd $3, $4, $6) }
+| local_eq Kw_sub opt_nuw_nsw type_value Comma value      { Some $1, Util.Sub(fst $3, snd $3, $4, $6) }
+| local_eq Kw_mul opt_nuw_nsw type_value Comma value      { Some $1, Util.Mul(fst $3, snd $3, $4, $6) }
+| local_eq Kw_shl opt_nuw_nsw type_value Comma value      { Some $1, Util.Shl(fst $3, snd $3, $4, $6) }
+| local_eq Kw_fadd fast_math_flags type_value Comma value { Some $1, Util.Fadd($3, $4, $6) }
+| local_eq Kw_fsub fast_math_flags type_value Comma value { Some $1, Util.Fsub($3, $4, $6) }
+| local_eq Kw_fmul fast_math_flags type_value Comma value { Some $1, Util.Fmul($3, $4, $6) }
+| local_eq Kw_fdiv fast_math_flags type_value Comma value { Some $1, Util.Fdiv($3, $4, $6) }
+| local_eq Kw_frem fast_math_flags type_value Comma value { Some $1, Util.Frem($3, $4, $6) }
+| local_eq Kw_sdiv opt_exact type_value Comma value       { Some $1, Util.Sdiv($3, $4, $6) }
+| local_eq Kw_udiv opt_exact type_value Comma value       { Some $1, Util.Udiv($3, $4, $6) }
+| local_eq Kw_lshr opt_exact type_value Comma value       { Some $1, Util.Lshr($3, $4, $6) }
+| local_eq Kw_ashr opt_exact type_value Comma value       { Some $1, Util.Ashr($3, $4, $6) }
+| local_eq Kw_urem type_value Comma value                 { Some $1, Util.Urem($3, $5) }
+| local_eq Kw_srem type_value Comma value                 { Some $1, Util.Srem($3, $5) }
+| local_eq Kw_and type_value Comma value                  { Some $1, Util.And($3, $5) }
+| local_eq Kw_or type_value Comma value                   { Some $1, Util.Or($3, $5) }
+| local_eq Kw_xor type_value Comma value                  { Some $1, Util.Xor($3, $5) }
+| local_eq Kw_icmp icmp_predicate type_value Comma value  { Some $1, Util.Icmp($3, $4, $6) }
+| local_eq Kw_fcmp fcmp_predicate type_value Comma value  { Some $1, Util.Fcmp($3, $4, $6) }
+| local_eq Kw_trunc type_value Kw_to typ                  { Some $1, Util.Trunc($3, $5) }
+| local_eq Kw_zext type_value Kw_to typ                   { Some $1, Util.Zext($3, $5) }
+| local_eq Kw_sext type_value Kw_to typ                   { Some $1, Util.Sext($3, $5) }
+| local_eq Kw_fptrunc type_value Kw_to typ                { Some $1, Util.Fptrunc($3, $5) }
+| local_eq Kw_fpext type_value Kw_to typ                  { Some $1, Util.Fpext($3, $5) }
+| local_eq Kw_bitcast type_value Kw_to typ                { Some $1, Util.Bitcast($3, $5) }
+| local_eq Kw_addrspacecast type_value Kw_to typ          { Some $1, Util.Addrspacecast($3, $5) }
+| local_eq Kw_uitofp type_value Kw_to typ                 { Some $1, Util.Uitofp($3, $5) }
+| local_eq Kw_sitofp type_value Kw_to typ                 { Some $1, Util.Sitofp($3, $5) }
+| local_eq Kw_fptoui type_value Kw_to typ                 { Some $1, Util.Fptoui($3, $5) }
+| local_eq Kw_fptosi type_value Kw_to typ                 { Some $1, Util.Fptosi($3, $5) }
+| local_eq Kw_inttoptr type_value Kw_to typ               { Some $1, Util.Inttoptr($3, $5) }
+| local_eq Kw_ptrtoint type_value Kw_to typ               { Some $1, Util.Ptrtoint($3, $5) }
+| local_eq Kw_va_arg type_value Comma typ                 { Some $1, Util.Va_arg($3, $5) }
+| local_eq Kw_getelementptr opt_inbounds type_value_LIST  { Some $1, Util.Getelementptr($3, $4) }
+| local_eq Kw_extractelement type_value_LIST              { Some $1, Util.Extractelement($3) }
+| local_eq Kw_insertelement type_value_LIST               { Some $1, Util.Insertelement($3) }
+| local_eq Kw_shufflevector type_value_LIST               { Some $1, Util.Shufflevector($3) }
+| local_eq Kw_select type_value_LIST                      { Some $1, Util.Select($3) }
+| local_eq Kw_phi typ phi_list                            { Some $1, Util.Phi($3, $4) }
+| local_eq Kw_landingpad typ Kw_personality type_value opt_cleanup landingpad_list
+                                                          { Some $1, Util.Landingpad($3, $5, $6, $7) }
 | opt_local opt_tail Kw_call opt_callingconv return_attributes typ value Lparen param_list Rparen call_attributes
-                                                           { Util.Call($2, $4, $5, $6, $7, $9, $11) }
-| local_eq Kw_alloca alloc                                 { $3 }
+                                                          { $1, Util.Call($2, $4, $5, $6, $7, $9, $11) }
+| local_eq Kw_alloca alloc                                { Some $1, $3 }
 | local_eq Kw_load  opt_atomic opt_volatile type_value scopeandordering opt_comma_align
-                                                           { Util.Load($3, $4, $5, $6, $7) }
+                                                          { Some $1, Util.Load($3, $4, $5, $6, $7) }
 | Kw_store opt_atomic opt_volatile type_value Comma type_value scopeandordering opt_comma_align
-                                                           { Util.Store($2, $3, $4, $6, $7, $8) }
+                                                          { None, Util.Store($2, $3, $4, $6, $7, $8) }
 | Kw_cmpxchg opt_volatile type_value Comma type_value Comma type_value opt_singlethread ordering ordering
-                                                           { Util.Cmpxchg($2, $3, $5, $7, $8, $9, $10) }
+                                                          { None, Util.Cmpxchg($2, $3, $5, $7, $8, $9, $10) }
 | Kw_atomicrmw opt_volatile binop type_value Comma type_value opt_singlethread ordering
-                                                           { Util.Atomicrmw($2, $3, $4, $6, $7, $8) }
-| Kw_fence opt_singlethread ordering                       { Util.Fence($2, $3) }
-| local_eq Kw_extractvalue type_value index_list           { Util.Extractvalue($3, $4) }
+                                                          { None, Util.Atomicrmw($2, $3, $4, $6, $7, $8) }
+| Kw_fence opt_singlethread ordering                      { None, Util.Fence($2, $3) }
+| local_eq Kw_extractvalue type_value index_list          { Some $1, Util.Extractvalue($3, $4) }
 | local_eq Kw_insertvalue type_value Comma type_value index_list
-                                                           { Util.Insertvalue($3, $5, $6) }
+                                                          { Some $1, Util.Insertvalue($3, $5, $6) }
 ;
 binop:
 | Kw_xchg { Util.Xchg }
@@ -769,15 +769,15 @@ fast_math_flag:
 | Kw_arcp { Util.Arcp }
 ;
 terminator_instruction:
-| Kw_unreachable                                                   { Util.Unreachable }
-| Kw_ret Kw_void                                                   { Util.Return None } /* we need to distinguish void from all other types else we have a dependent grammar */
-| Kw_ret non_void_type value                                       { Util.Return(Some($2, $3)) }
-| Kw_br type_value                                                 { Util.Br($2, None) }
-| Kw_br type_value Comma type_value Comma type_value               { Util.Br($2, Some($4, $6)) }
-| Kw_indirectbr type_value Comma Lsquare type_value_LIST Rsquare   { Util.Indirectbr($2, $5) }
-| Kw_resume type_value                                             { Util.Resume $2 }
-| Kw_switch type_value Comma type_value Lsquare jump_table Rsquare { Util.Switch($2, $4, $6) }
-| local_eq Kw_invoke opt_callingconv return_attributes typ value Lparen param_list Rparen function_attributes Kw_to type_value Kw_unwind type_value { Util.Invoke($3, $4, $5, $6, $8, $10, $12, $14) }
+| Kw_unreachable                                                   { None, Util.Unreachable }
+| Kw_ret Kw_void                                                   { None, Util.Return None } /* we need to distinguish void from all other types else we have a dependent grammar */
+| Kw_ret non_void_type value                                       { None, Util.Return(Some($2, $3)) }
+| Kw_br type_value                                                 { None, Util.Br($2, None) }
+| Kw_br type_value Comma type_value Comma type_value               { None, Util.Br($2, Some($4, $6)) }
+| Kw_indirectbr type_value Comma Lsquare type_value_LIST Rsquare   { None, Util.Indirectbr($2, $5) }
+| Kw_resume type_value                                             { None, Util.Resume $2 }
+| Kw_switch type_value Comma type_value Lsquare jump_table Rsquare { None, Util.Switch($2, $4, $6) }
+| local_eq Kw_invoke opt_callingconv return_attributes typ value Lparen param_list Rparen function_attributes Kw_to type_value Kw_unwind type_value { Some $1, Util.Invoke($3, $4, $5, $6, $8, $10, $12, $14) }
 ;
 call_attributes:
 | /* empty */                    { [] }
@@ -794,7 +794,7 @@ function_attributes:
 | function_attribute function_attributes { $1::$2 }
 ;
 function_attribute:
-| AttrGrpID                                { Util.AttrGrpID(int_of_string $1) }
+| AttrGrpID                                { Util.Attrgrp(int_of_string $1) }
 | StringConstant Equal StringConstant      { Util.Attr($1, Some $3) }
 | Kw_alignstack Equal Lparen APInt Rparen  { Util.Alignstack(int_of_string $4) }
 | Kw_alwaysinline                          { Util.Alwaysinline     }

@@ -6,7 +6,7 @@ LIBS=llvm.cmxa llvm_bitreader.cmxa unix.cmxa str.cmxa
 smpcc: oli.cmx state.cmx options.cmx gobe.cmx main.cmx llvmfixup.o bindings.o
 	ocamlopt -cc 'g++ -Wno-write-strings' -cclib -rdynamic $(LIBS) $^ -o $@
 
-parse: llparse.cmx lllex.cmx
+parse: util.cmx llparse.cmx lllex.cmx
 	ocamlopt nums.cmxa $^ -o $@
 
 clean:

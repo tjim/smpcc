@@ -270,7 +270,7 @@ parse eof                                                    { Eof }
 | ['u' 's'] "0x" hexdigit+                                   { APSint(Lexing.lexeme lexbuf) }
 | "cc"                                                       { Kw_cc }
 | ['_' 'a'-'z' 'A'-'Z'] idchar*                              { keyword(Lexing.lexeme lexbuf) }
-| '!' metachar0 metachar*                                    { MetadataVar(Lexing.lexeme lexbuf) }
+| '!' (metachar0 metachar* as x)                             { MetadataVar x }
 | '!'                                                        { Exclaim }
 | '#' (digit+ as x)                                          { AttrGrpID x }
 | '0' 'x' hexdigit+                                          { APFloat(Lexing.lexeme lexbuf) }
@@ -298,8 +298,10 @@ let lexbuf =
   else
     Lexing.from_channel stdin;;
 try
-  ignore(main token lexbuf);
-  Printf.eprintf "Success!\n"
+  let cu = main token lexbuf in
+  let b = Buffer.create 11 in
+  Util.bpr_cu b cu;
+  Printf.printf "%s" (Buffer.contents b);
 with Parsing.Parse_error ->
   let p = Lexing.lexeme_start_p lexbuf in
   Printf.eprintf "Parse error at line %d character %d, the lexeme is %s\n"
