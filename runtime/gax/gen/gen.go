@@ -26,7 +26,8 @@ type GaxState struct {
 }
 
 var (
-	AESCount uint = 0
+	AESCount  uint     = 0
+	ALL_ZEROS base.Key = make([]byte, KEY_SIZE)
 )
 
 func NewGaxState(io base.Genio, id ConcurrentId) GaxState {
@@ -41,6 +42,20 @@ func slot(keys []base.Key) int {
 		result += int(key[0] % 2)
 	}
 	return result
+}
+
+func findZeroSlots(a, b []base.Wire) (res [][2]int) {
+	res = make([][2]int, len(a))
+	for i, wire := range a {
+		for j1 := 0; j1 <= 1; j1++ {
+			for j2 := 0; j2 <= 1; j2++ {
+				if (wire[j1][0]%2 == 0) && (b[i][j2][0]%2 == 0) {
+					res[i] = [2]int{j1, j2}
+				}
+			}
+		}
+	}
+	return
 }
 
 func encrypt(keys []base.Key, plaintext, tweak []byte) []byte {
@@ -70,6 +85,11 @@ func (gax GaxState) encrypt_slot(t base.GarbledTable, plaintext []byte, keys ...
 		return
 	}
 	// log.Println("Optimized encrypt slot")
+	tweak := gax.computeTweak()
+	t[slot(keys)] = encrypt(keys, plaintext, tweak)
+}
+
+func (gax *GaxState) computeTweak() base.Key {
 	tweak := make([]byte, base.KEY_SIZE)
 	tweak[0] = byte(gax.gateId)
 	tweak[1] = byte(gax.gateId >> 8)
@@ -77,7 +97,7 @@ func (gax GaxState) encrypt_slot(t base.GarbledTable, plaintext []byte, keys ...
 	for i = 0; i < 8; i++ {
 		tweak[i+2] = byte(gax.concurrentId >> (8 * i))
 	}
-	t[slot(keys)] = encrypt(keys, plaintext, tweak)
+	return tweak
 }
 
 var key0 base.Key    // The XOR random constant
@@ -117,6 +137,22 @@ func genWire() base.Wire {
 	return []base.Key{k0, k1}
 }
 
+func (g *GaxState) genWireRR(key0, key1 base.Key, gateVal int) base.Wire {
+	init_key0()
+	var k0, k1 base.Key
+	if gateVal == 0 {
+		k0 = base.GaXDKC_E(key0, key1, g.computeTweak(), ALL_ZEROS)
+		k1 = base.XorKey(k0, key0)
+	} else if gateVal == 1 {
+		k1 = base.GaXDKC_E(key0, key1, g.computeTweak(), ALL_ZEROS)
+		k0 = base.XorKey(k1, key0)
+	} else {
+		panic("Invalid gateVal")
+	}
+
+	return []base.Key{k0, k1}
+}
+
 // Generates an array of wires. A wire is a pair of keys.
 func genWires(size int) []base.Wire {
 	if size <= 0 {
@@ -131,59 +167,7 @@ func genWires(size int) []base.Wire {
 
 /* http://www.llvm.org/docs/LangRef.html */
 
-func (y GaxState) Add(a, b []base.Wire) []base.Wire {
-	if len(a) != len(b) {
-		panic(fmt.Sprintf("Wire mismatch in gen.Add(), %d vs %d", len(a), len(b)))
-	}
-	if len(a) == 0 {
-		panic("empty arguments in gen.Add()")
-	}
-	result := make([]base.Wire, len(a))
-	result[0] = y.Xor(a[0:1], b[0:1])[0]
-	c := y.And(a[0:1], b[0:1]) /* carry bit */
-	for i := 1; i < len(a); i++ {
-		/* compute the result bit */
-		inner := y.Xor(a[i:i+1], b[i:i+1])
-		// fmt.Printf("gen inner length %d\n", len(inner))
-		result[i] = y.Xor(inner, c)[0]
-
-		/* compute the next carry bit w2. */
-		and1 := y.And(a[i:i+1], b[i:i+1])
-		and2 := y.And(inner, c)
-		or1 := y.Or(and1, and2)
-
-		// set the carry output
-		c = or1
-	}
-	return result
-}
-
-func (y GaxState) Sub(a, b []base.Wire) []base.Wire {
-	if len(a) != len(b) {
-		panic("argument mismatch in Sub()")
-	}
-	if len(a) == 0 {
-		panic("empty arguments in Sub()")
-	}
-	result := make([]base.Wire, len(a))
-	result[0] = y.Xor(a[0:1], b[0:1])[0]
-	c := y.And(y.Not(a[0:1]), b[0:1]) /* borrow bit */
-	for i := 1; i < len(a); i++ {
-		/* compute the result bit */
-		inner := y.Xor(a[i:i+1], b[i:i+1])
-		// fmt.Printf("gen inner length %d\n", len(inner))
-		result[i] = y.Xor(inner, c)[0]
-
-		/* compute the next carry bit w2. */
-		and1 := y.And(a[i:i+1], y.Not(b[i:i+1]))
-		and2 := y.And(y.Not(inner), c)
-		or1 := y.Or(and1, and2)
-
-		// set the carry output
-		c = or1
-	}
-	return result
-}
+// Gates built directly using encrypt_slot
 
 func (y GaxState) And(a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
@@ -191,7 +175,7 @@ func (y GaxState) And(a, b []base.Wire) []base.Wire {
 	}
 	result := make([]base.Wire, len(a))
 	for i := 0; i < len(a); i++ {
-		w := genWire()
+		w := y.genWireRR(a[i][0], b[i][0], 0)
 		result[i] = w
 		t := make([]base.Ciphertext, 4)
 		y.encrypt_slot(t, w[0], a[i][0], b[i][0])
@@ -209,7 +193,7 @@ func (y GaxState) Or(a, b []base.Wire) []base.Wire {
 	}
 	result := make([]base.Wire, len(a))
 	for i := 0; i < len(a); i++ {
-		w := genWire()
+		w := y.genWireRR(a[i][0], b[i][0], 0)
 		result[i] = w
 		t := make([]base.Ciphertext, 4)
 		y.encrypt_slot(t, w[0], a[i][0], b[i][0])
@@ -288,22 +272,6 @@ func (y GaxState) Icmp_uge(a, b []base.Wire) []base.Wire {
 	return y.Or(highbit_gt, y.And(highbit_eq, y.Icmp_uge(a[1:], b[1:])))
 }
 
-func (y GaxState) Select(s, a, b []base.Wire) []base.Wire {
-	if len(s) != 1 {
-		panic("Wire mismatch in gen.Select()")
-	}
-	if len(a) != len(b) {
-		panic("Wire mismatch in gen.Select()")
-	}
-	result := make([]base.Wire, len(a))
-
-	for i := 0; i < len(a); i++ {
-		// result[i] = y.Or(y.And(s, a[i:i+1]), y.And(y.Not(s), b[i:i+1]))[0]
-		result[i] = y.Xor(b[i:i+1], y.And(s, y.Xor(a[i:i+1], b[i:i+1])))[0]
-	}
-	return result
-}
-
 /* example: Const(0,1,0,0) is 8 */
 func (y GaxState) Const(bits ...int) []base.Wire {
 	if len(bits) == 0 {
@@ -344,7 +312,7 @@ func (y GaxState) Nand(a, b []base.Wire) []base.Wire {
 	}
 	result := make([]base.Wire, len(a))
 	for i := 0; i < len(a); i++ {
-		w := genWire()
+		w := y.genWireRR(a[i][0], b[i][0], 1)
 		result[i] = w
 		t := make([]base.Ciphertext, 4)
 		y.encrypt_slot(t, w[1], a[i][0], b[i][0])
@@ -352,6 +320,24 @@ func (y GaxState) Nand(a, b []base.Wire) []base.Wire {
 		y.encrypt_slot(t, w[1], a[i][1], b[i][0])
 		y.encrypt_slot(t, w[0], a[i][1], b[i][1])
 		y.io.SendT(t)
+	}
+	return result
+}
+
+// Gates built by composing other gates
+
+func (y GaxState) Select(s, a, b []base.Wire) []base.Wire {
+	if len(s) != 1 {
+		panic("Wire mismatch in gen.Select()")
+	}
+	if len(a) != len(b) {
+		panic("Wire mismatch in gen.Select()")
+	}
+	result := make([]base.Wire, len(a))
+
+	for i := 0; i < len(a); i++ {
+		// result[i] = y.Or(y.And(s, a[i:i+1]), y.And(y.Not(s), b[i:i+1]))[0]
+		result[i] = y.Xor(b[i:i+1], y.And(s, y.Xor(a[i:i+1], b[i:i+1])))[0]
 	}
 	return result
 }
@@ -365,6 +351,62 @@ func (y GaxState) Not(a []base.Wire) []base.Wire {
 	}
 	return y.Xor(a, ones)
 }
+
+func (y GaxState) Add(a, b []base.Wire) []base.Wire {
+	if len(a) != len(b) {
+		panic(fmt.Sprintf("Wire mismatch in gen.Add(), %d vs %d", len(a), len(b)))
+	}
+	if len(a) == 0 {
+		panic("empty arguments in gen.Add()")
+	}
+	result := make([]base.Wire, len(a))
+	result[0] = y.Xor(a[0:1], b[0:1])[0]
+	c := y.And(a[0:1], b[0:1]) /* carry bit */
+	for i := 1; i < len(a); i++ {
+		/* compute the result bit */
+		inner := y.Xor(a[i:i+1], b[i:i+1])
+		// fmt.Printf("gen inner length %d\n", len(inner))
+		result[i] = y.Xor(inner, c)[0]
+
+		/* compute the next carry bit w2. */
+		and1 := y.And(a[i:i+1], b[i:i+1])
+		and2 := y.And(inner, c)
+		or1 := y.Or(and1, and2)
+
+		// set the carry output
+		c = or1
+	}
+	return result
+}
+
+func (y GaxState) Sub(a, b []base.Wire) []base.Wire {
+	if len(a) != len(b) {
+		panic("argument mismatch in Sub()")
+	}
+	if len(a) == 0 {
+		panic("empty arguments in Sub()")
+	}
+	result := make([]base.Wire, len(a))
+	result[0] = y.Xor(a[0:1], b[0:1])[0]
+	c := y.And(y.Not(a[0:1]), b[0:1]) /* borrow bit */
+	for i := 1; i < len(a); i++ {
+		/* compute the result bit */
+		inner := y.Xor(a[i:i+1], b[i:i+1])
+		// fmt.Printf("gen inner length %d\n", len(inner))
+		result[i] = y.Xor(inner, c)[0]
+
+		/* compute the next carry bit w2. */
+		and1 := y.And(a[i:i+1], y.Not(b[i:i+1]))
+		and2 := y.And(y.Not(inner), c)
+		or1 := y.Or(and1, and2)
+
+		// set the carry output
+		c = or1
+	}
+	return result
+}
+
+// Other gates and helper functions
 
 func (y GaxState) Reveal(a []base.Wire) []bool {
 	// log.Printf("Inside gen reveal const0=%v, const1=%v\n", const0, const1)

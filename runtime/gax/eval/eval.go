@@ -72,6 +72,7 @@ func decrypt_nonoptimized(keys []base.Key, ciphertext []byte) []byte {
 	// log.Printf("Decrypt_nonoptimized, result = %v\n", result)
 	return result
 }
+
 func Decrypt_nonoptimized(t base.GarbledTable, keys []base.Key) []byte {
 	return decrypt_nonoptimized(keys, t[slot(keys)])
 }
