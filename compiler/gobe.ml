@@ -621,8 +621,22 @@ let print_function_circuit m f =
   bprintf b "import \"%s%s/eval\"\n" package_prefix (match options.circuitlib with None -> "yao" | Some x -> x);
   bprintf b "import \"fmt\"\n";
   bprintf b "import \"os\"\n";
+  bprintf b "import \"runtime/pprof\"\n";
   bprintf b "\n";
   bprintf b "var args []string\n";
+  bprintf b "func init_args() {\n";
+  bprintf b "	args = os.Args[1:]\n";
+  bprintf b "	if len(args) > 0 && args[0] == \"-pprof\" {\n";
+  bprintf b "		args = os.Args[1:]\n";
+  bprintf b "		file := \"cpu.pprof\"\n";
+  bprintf b "		f, err := os.Create(file)\n";
+  bprintf b "		if err != nil {\n";
+  bprintf b "			fmt.Println(\"Error: \", err)\n";
+  bprintf b "		}\n";
+  bprintf b "		pprof.StartCPUProfile(f)\n";
+  bprintf b "		defer pprof.StopCPUProfile()\n";
+  bprintf b "	}\n";
+  bprintf b "}\n";
   bprintf b "func next_arg() uint64 {\n";
   bprintf b "\tif len(args) <= 0 {\n";
   bprintf b "\t\tpanic(\"Not enough command-line arguments\")\n";
@@ -636,7 +650,7 @@ let print_function_circuit m f =
   bprintf b "var %s_done = make(chan bool, 1)\n" (govar f.f_name);
   bprintf b "\n";
   bprintf b "func main() {\n";
-  bprintf b "\targs = os.Args[1:]\n";
+  bprintf b "\tinit_args()\n";
   let blocknums = List.map (fun bl -> State.bl_num bl.b_name) f.f_blocks in
   bprintf b "\tgio, eio := eval.IO(-1)\n";
   List.iter
