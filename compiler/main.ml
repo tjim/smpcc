@@ -419,34 +419,7 @@ let load_store_elimination f =
               assign_instr (Some(V.attsrcNumElts)) (Integer 32) (Integer 32) (ConstantInt(32, Some Int64.one));
 (*FIX: look at type for MemSize, on assign_instr you might have to select subset of bits*)
               assign_instr (Some(V.attsrcMemSize)) (Integer 32) (Integer 32) (ConstantInt(32, Some(Int64.of_int 4)));
-(*              assign_instr (Some(V.attsrcStackPushSize)) (Integer 32) (Integer 32) (ConstantInt(32, Some Int64.zero));*)
-(*              assign_instr (Some(V.attsrcStackPushAlign)) (Integer 32) (Integer 32) (ConstantInt(32, Some Int64.zero));*)
               assign_instr (Some(V.attsrcMemLoc)) (Integer 64) (Integer 64) x;
-              assign_instr (Some(V.attsrcStateO())) Label Label (BasicBlock b_name) ],
-            {b_name;b_instrs}::bl_list
-        | (nopt,(AllocaInst(a,ty,ops)))::tl ->
-            (*TODO: alignment*)
-            let b_name = State.fresh_label() in
-            let b_instrs, bl_list = split tl in
-            let b_instrs =
-              (assign_instr nopt ty ty (Variable V.attsrcMemRes))::b_instrs in
-            let alloc_bytes = (ConstantInt(32, Some(Int64.of_int(bytewidth(getElementType ty))))) in
-            let num_elements =
-              (match ops with
-              | [] -> (ConstantInt(32, Some(Int64.one)))
-              | (_,num_elements)::_ -> num_elements) in
-            (* TODO: num_elements is ignored for now, hard-coded to 1 *)
-            (* TODO: align is ignored for now, hard-coded for dijkstra.  It needs getAlignment(), not in ocaml interface; not the global getAlignment, the one for Instructions. *)
-            let align =
-              if (a>0) then ConstantInt(32, Some(Int64.of_int a))
-              else (ConstantInt(32, Some(Int64.of_int 0))) in
-            [ assign_instr (Some(V.attsrcIsDone)) (Integer 1) (Integer 1) (ConstantInt(1, Some Int64.zero));
-              assign_instr (Some(V.attsrcMemSize)) (Integer 32) (Integer 32) (ConstantInt(32, Some Int64.zero));
-              assign_instr (Some(V.attsrcNumElts)) (Integer 32) (Integer 32) num_elements;
-              assign_instr (Some(V.attsrcMemAct)) (Integer 2) (Integer 2) (ConstantInt(2, Some(Int64.of_int 3)));
-              assign_instr (Some(V.attsrcMemLoc)) (Integer 64) (Integer 64) (ConstantInt(64, Some Int64.zero));
-              assign_instr (Some(V.attsrcStackPushSize)) (Integer 32) (Integer 32) alloc_bytes;
-              assign_instr (Some(V.attsrcStackPushAlign)) (Integer 32) (Integer 32) align;
               assign_instr (Some(V.attsrcStateO())) Label Label (BasicBlock b_name) ],
             {b_name;b_instrs}::bl_list
         | (nopt,StoreInst(a,ty,[(_,x);(_,addr)]))::tl ->
@@ -463,10 +436,6 @@ let load_store_elimination f =
               assign_instr (Some(V.attsrcMemAct)) (Integer 2) (Integer 2) (ConstantInt(2, Some(Int64.of_int 2)));
               assign_instr (Some(V.attsrcNumElts)) (Integer 32) (Integer 32) (ConstantInt(32, Some Int64.one));
               assign_instr (Some(V.attsrcMemSize)) (Integer 32) (Integer 32) (ConstantInt(32, Some(Int64.of_int 4)));
-(*
-              assign_instr (Some(V.attsrcStackPushSize)) (Integer 32) (Integer 32) (ConstantInt(32, Some Int64.zero));
-              assign_instr (Some(V.attsrcStackPushAlign)) (Integer 32) (Integer 32) (ConstantInt(32, Some Int64.zero));
-*)
               assign_instr (Some(V.attsrcMemLoc)) (Integer 64) (Integer 64) addr;
               assign_instr (Some(V.attsrcMemVal)) (Integer 32) (Integer 32) x;
               assign_instr (Some(V.attsrcStateO())) Label Label (BasicBlock b_name) ],

@@ -63,13 +63,11 @@ let attsrcMemRes = (false,"attsrcMemRes",Integer 64)
 let attsrcMemSize = (false,"attsrcMemSize",Integer 32)
 let attsrcNumElts = (false,"attsrcNumElts",Integer 32)
 let attsrcAnswer = (false,"attsrcAnswer",Integer 32)
-let attsrcStackPushSize = (false,"attsrcStackPushSize",Integer 32)
-let attsrcStackPushAlign = (false,"attsrcStackPushAlign",Integer 32)
 
 let attsrcStateO() = (false,"attsrcStateO",Integer(get_bl_bits()))
 let special = (* NB: Works now because we have hard-coded bl_bits to 32 *)
   List.fold_right VSet.add
     [attsrcIsDone; attsrcMemAct; attsrcMemLoc; attsrcMemVal; attsrcMemSize; attsrcNumElts; attsrcAnswer;
-     attsrcStackPushSize; attsrcStackPushAlign; attsrcStateO();]
+     attsrcStateO();]
     VSet.empty
 end
