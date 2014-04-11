@@ -10,7 +10,7 @@ parse: util.cmx llparse.cmx lllex.cmx
 	ocamlopt nums.cmxa $^ -o $@
 
 clean:
-	$(RM) *.cmx *.cmi *.o
+	$(RM) *.cmx *.cmi *.o llparse.mli llparse.mli lllex.ml
 
 install: smpcc
 	mv $< $(BIN)/$<
@@ -28,6 +28,9 @@ uninstall:
 	ocamllex $< -o $@
 
 %.ml: %.mly
+	ocamlyacc $<
+
+%.mli: %.mly
 	ocamlyacc $<
 
 include .depend
