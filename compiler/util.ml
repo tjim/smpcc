@@ -2,6 +2,52 @@ type var =
   | Id   of bool * int    (* global?, index *)
   | Name of bool * string (* global?, name *)
 
+type attribute =
+  | Align of int                   (* param_attribute *)
+  | Byval                          (* param_attribute *)
+  | Inalloca                       (* param_attribute *)
+  | Inreg                          (* param_attribute *) (* return_attribute *)
+  | Nest                           (* param_attribute *)
+  | Noalias                        (* param_attribute *) (* return_attribute *)
+  | Nocapture                      (* param_attribute *)
+  | Readnone                       (* param_attribute *) (* function_attribute *) (* call_attribute *)
+  | Readonly                       (* param_attribute *) (* function_attribute *) (* call_attribute *)
+  | Returned                       (* param_attribute *)
+  | Signext                        (* param_attribute *) (* return_attribute *)
+  | Sret                           (* param_attribute *)
+  | Zeroext                        (* param_attribute *) (* return_attribute *)
+  | Attrgrp of int                 (* function_attribute *)
+  | Attr of string * string option (* function_attribute *)
+  | Alignstack of int              (* function_attribute *)
+  | Alwaysinline                   (* function_attribute *)
+  | Builtin                        (* function_attribute *)
+  | Cold                           (* function_attribute *)
+  | Inlinehint                     (* function_attribute *)
+  | Minsize                        (* function_attribute *)
+  | Naked                          (* function_attribute *)
+  | Nobuiltin                      (* function_attribute *)
+  | Noduplicate                    (* function_attribute *)
+  | Noimplicitfloat                (* function_attribute *)
+  | Noinline                       (* function_attribute *)
+  | Nonlazybind                    (* function_attribute *)
+  | Noredzone                      (* function_attribute *)
+  | Noreturn                       (* function_attribute *) (* call_attribute *)
+  | Nounwind                       (* function_attribute *) (* call_attribute *)
+  | Optnone                        (* function_attribute *)
+  | Optsize                        (* function_attribute *)
+  | Returns_twice                  (* function_attribute *)
+  | Ssp                            (* function_attribute *)
+  | Sspreq                         (* function_attribute *)
+  | Sspstrong                      (* function_attribute *)
+  | Sanitize_address               (* function_attribute *)
+  | Sanitize_thread                (* function_attribute *)
+  | Sanitize_memory                (* function_attribute *)
+  | Uwtable                        (* function_attribute *)
+type call_attribute = attribute
+type return_attribute = attribute
+type param_attribute = attribute
+type function_attribute = attribute
+
 type typ =
   | Void
   | Half
@@ -15,7 +61,7 @@ type typ =
   | Metadata
   | Vartyp  of var
   | Integer of int                   (* bitwidth *)
-  | Funtyp  of typ * typ list * bool (* return type, param types, var_arg? *)
+  | Funtyp  of typ * (typ * param_attribute list * var option) list * bool (* return type, param types, var_arg? *)
   | Structtyp of bool * typ list       (* packed?, fields *) (* TODO: name *) (* TODO: missing isLiteral *)
   | Arraytyp of int * typ             (* array length, element type *)
   | Pointer of typ * int option      (* element type, address space *)
@@ -140,52 +186,6 @@ type aliasee =
   | A_getelementptr of bool * (typ * value) list
   | A_typ_value of (typ * value)
 
-type attribute =
-  | Align of int                   (* param_attribute *)
-  | Byval                          (* param_attribute *)
-  | Inalloca                       (* param_attribute *)
-  | Inreg                          (* param_attribute *) (* return_attribute *)
-  | Nest                           (* param_attribute *)
-  | Noalias                        (* param_attribute *) (* return_attribute *)
-  | Nocapture                      (* param_attribute *)
-  | Readnone                       (* param_attribute *) (* function_attribute *) (* call_attribute *)
-  | Readonly                       (* param_attribute *) (* function_attribute *) (* call_attribute *)
-  | Returned                       (* param_attribute *)
-  | Signext                        (* param_attribute *) (* return_attribute *)
-  | Sret                           (* param_attribute *)
-  | Zeroext                        (* param_attribute *) (* return_attribute *)
-  | Attrgrp of int                 (* function_attribute *)
-  | Attr of string * string option (* function_attribute *)
-  | Alignstack of int              (* function_attribute *)
-  | Alwaysinline                   (* function_attribute *)
-  | Builtin                        (* function_attribute *)
-  | Cold                           (* function_attribute *)
-  | Inlinehint                     (* function_attribute *)
-  | Minsize                        (* function_attribute *)
-  | Naked                          (* function_attribute *)
-  | Nobuiltin                      (* function_attribute *)
-  | Noduplicate                    (* function_attribute *)
-  | Noimplicitfloat                (* function_attribute *)
-  | Noinline                       (* function_attribute *)
-  | Nonlazybind                    (* function_attribute *)
-  | Noredzone                      (* function_attribute *)
-  | Noreturn                       (* function_attribute *) (* call_attribute *)
-  | Nounwind                       (* function_attribute *) (* call_attribute *)
-  | Optnone                        (* function_attribute *)
-  | Optsize                        (* function_attribute *)
-  | Returns_twice                  (* function_attribute *)
-  | Ssp                            (* function_attribute *)
-  | Sspreq                         (* function_attribute *)
-  | Sspstrong                      (* function_attribute *)
-  | Sanitize_address               (* function_attribute *)
-  | Sanitize_thread                (* function_attribute *)
-  | Sanitize_memory                (* function_attribute *)
-  | Uwtable                        (* function_attribute *)
-type call_attribute = attribute
-type return_attribute = attribute
-type param_attribute = attribute
-type function_attribute = attribute
-
 type callingconv =
   | Ccc
   | Fastcc
@@ -285,7 +285,7 @@ type instr =
   | Select         of (typ * value) list
   | Phi            of typ * (value * value) list
   | Landingpad of typ * (typ * value) * bool * landingpad list
-  | Call of bool * callingconv option * return_attribute list * typ * value * (typ * value * param_attribute option) list * call_attribute list
+  | Call of bool * callingconv option * return_attribute list * typ * value * (typ * param_attribute list * value) list * call_attribute list
   | Alloca of bool * typ * (typ * value) option * int option
   | Load of bool * bool * (typ * value) * (bool * ordering) option * int option
   | Store of bool * bool * (typ * value) * (typ * value) * (bool * ordering) option * int option
@@ -301,7 +301,7 @@ type instr =
   | Indirectbr of (typ * value) * (typ * value) list
   | Resume of (typ * value)
   | Switch of (typ * value) * (typ * value) * ((typ * value) * (typ * value)) list
-  | Invoke of callingconv option * return_attribute list * typ * value * ((typ * value * param_attribute option) list) * function_attribute list * (typ * value) * (typ * value)
+  | Invoke of callingconv option * return_attribute list * typ * value * ((typ * param_attribute list * value) list) * function_attribute list * (typ * value) * (typ * value)
 
 type finfo = {
     mutable flinkage: linkage option;
@@ -311,7 +311,7 @@ type finfo = {
     mutable freturnattrs: return_attribute list;
     mutable freturntyp: typ;
     mutable fname: var;
-    mutable fparams: (typ list * bool);
+    mutable fparams: ((typ * param_attribute list * var option) list * bool);
     mutable funnamed_addr: bool;
     mutable fattrs: function_attribute list;
     mutable fsection: string option;
@@ -378,7 +378,7 @@ let number_cu cu =
       let instr_numbers =
         List.concat
           (List.map
-             (function 
+             (function
                | (Some(Id(false, x)), _) -> [x]
                | _ -> [])
              instrs) in
@@ -397,18 +397,51 @@ let number_cu cu =
 
 open Printf
 
-let opt pr b = function
-  | None -> ()
-  | Some x -> pr b x
-
-let bpr_concat sep bpr b =
+let between s bpr b =
   let rec loop = function
   | [] -> ()
   | [hd] -> bpr b hd
   | hd::tl ->
-      bprintf b "%a%s" bpr hd sep;
+      bprintf b "%a%s" bpr hd s;
       loop tl in
   loop
+
+let before s bpr b =
+  let rec loop = function
+  | [] -> ()
+  | hd::tl ->
+      bprintf b "%s%a" s bpr hd;
+      loop tl in
+  loop
+
+let after s bpr b =
+  let rec loop = function
+  | [] -> ()
+  | hd::tl ->
+      bprintf b "%a%s" bpr hd s;
+      loop tl in
+  loop
+
+let opt bpr b = function
+  | None -> ()
+  | Some x ->
+      bprintf b "%a" bpr x
+
+let opt_before s bpr b = function
+  | None -> ()
+  | Some x ->
+      bprintf b "%s%a" s bpr x
+
+let opt_after s bpr b = function
+  | None -> ()
+  | Some x ->
+      bprintf b "%a%s" bpr x s
+
+let yes s b x =
+  if x then bprintf b "%s" s
+
+let yesno syes sno b x =
+  bprintf b "%s" (if x then syes else sno)
 
 let bpr_binop b = function
   | Xchg -> bprintf b "xchg"
@@ -430,7 +463,7 @@ let bpr_fast_math_flag b = function
   | Nsz  -> bprintf b "nsz"
   | Arcp -> bprintf b "arcp"
 
-let bpr_fast_math_flags = bpr_concat " " bpr_fast_math_flag
+let bpr_fast_math_flags = between " " bpr_fast_math_flag
 
 let bpr_attribute b = function
   | Align x -> bprintf b "align %d" x
@@ -447,8 +480,8 @@ let bpr_attribute b = function
   | Sret -> bprintf b "sret"
   | Zeroext -> bprintf b "zeroext"
   | Attrgrp x -> bprintf b "#%d" x
-  | Attr(x,None) -> bprintf b "%s" x
-  | Attr(x,Some y) -> bprintf b "%s = %s" x y
+  | Attr(x, None) -> bprintf b "%s" x
+  | Attr(x, Some y) -> bprintf b "%s=%s" x y
   | Alignstack x -> bprintf b "alignstack = (%d)" x
   | Alwaysinline -> bprintf b "alwaysinline"
   | Builtin -> bprintf b "builtin"
@@ -476,10 +509,10 @@ let bpr_attribute b = function
   | Uwtable -> bprintf b "uwtable"
 
 let bpr_attributes =
-  bpr_concat " " bpr_attribute
+  between " " bpr_attribute
 
-let bpr_attrgrp b (x,y) =
-  bprintf b "attributes !%s = { %a }\n" x bpr_attributes y
+let bpr_attrgrp b (x, y) =
+  bprintf b "attributes #%s = { %a }\n" x bpr_attributes y
 
 let bpr_callingconv b = function
   | Ccc -> bprintf b "ccc"
@@ -570,39 +603,40 @@ let rec bpr_typ b typ =
     | Funtyp(return_ty, param_tys, is_var_arg) ->
         pr return_ty;
         bprintf b " (";
-        (match param_tys with
-        | [] ->
-            if is_var_arg then bprintf b "..."
-        | hd::tl ->
-            pr hd;
-            List.iter (fun ty2 -> bprintf b ", "; pr ty2) tl;
-            if is_var_arg then bprintf b ", ...");
+        between ", " bpr_formal b param_tys;
+        if is_var_arg then
+          if param_tys = [] then
+            bprintf b "..."
+          else bprintf b ", ...";
         bprintf b ")"
     | Structtyp(packed, typs) ->
-        if packed then bprintf b "<";
-        (match typs with
-        | [] -> bprintf b "{}"
-        | hd::tl ->
-            bprintf b "{ %a" bpr_typ hd;
-            List.iter (bprintf b ", %a " bpr_typ) tl;
-            bprintf b " }");
-        if packed then bprintf b ">"
-    | Arraytyp(len,element_ty) ->
+        bprintf b "%a{%a%a%a}%a"
+          (yes "<") packed
+          (yes " ") (typs <> [])
+          (between ", " bpr_typ) typs
+          (yes " ") (typs <> [])
+          (yes ">") packed;
+    | Arraytyp(len, element_ty) ->
         bprintf b "[%d x " len;
         pr element_ty;
         bprintf b "]"
-    | Pointer(element_ty,address_space) ->
+    | Pointer(element_ty, address_space) ->
         pr element_ty;
         (match address_space with
         | None -> ()
         | Some 0 -> ()
         | Some x -> bprintf b " addrspace(%d)" x);
         bprintf b "*"
-    | Vector(len,element_ty) ->
+    | Vector(len, element_ty) ->
         bprintf b "<%d x " len;
         pr element_ty;
         bprintf b ">"
   in pr typ
+and bpr_formal b (typ, pattrs, formal) =
+  bprintf b "%a%a%a"
+    bpr_typ typ
+    (before " " bpr_attribute) pattrs
+    (opt_before " " bpr_var) formal
 
 let bpr_linkage b = function
   | External             -> ()
@@ -625,9 +659,6 @@ let bpr_visibility b = function
 let bpr_index_list b l =
   List.iter (bprintf b ", %d") l
 
-let bpr_yesno s b x =
-  if x then bprintf b "%s" s
-
 let rec bpr_value b op = match op with
   | Var x          -> bpr_var b x
   | Mdnode x       -> bprintf b "!%d" x
@@ -640,37 +671,60 @@ let rec bpr_value b op = match op with
   | False          -> bprintf b "false"
   | Int x          -> bprintf b "%s" (Big_int.string_of_big_int x)
   | Float x        -> bprintf b "%s" x
-  | Blockaddress(x,y) ->
+  | Blockaddress(x, y) ->
       bprintf b "blockaddress(%a, %a)" bpr_value x bpr_value y
   | Array ops ->
-      bprintf b "[%a]" (bpr_concat ", " bpr_typ_value) ops
+      let is_string =
+        List.for_all
+          (function (Integer 8, Int _) -> true | _ -> false)
+          ops in
+      if is_string then begin
+        bprintf b "c\"";
+        List.iter
+          (function
+            | (_, Int x) ->
+                let c = Char.chr(Big_int.int_of_big_int x) in
+                let isprint c = c >= '\032' && c < '\128' in
+                if (isprint c && c <> '\\' && c <> '\"') then
+                  bprintf b "%c" c
+                else
+                  bprintf b "\\%.2X" (Char.code c)
+            | _ (*impossible*) -> ())
+          ops;
+        bprintf b "\""
+      end
+      else
+        bprintf b "[%a]" (between ", " bpr_typ_value) ops
   | Vector ops ->
-      bprintf b "<%a>" (bpr_concat ", " bpr_typ_value) ops
-  | Struct(is_packed,ops) ->
-      if is_packed then bprintf b "<";
-      bprintf b "{%a}" (bpr_concat ", " bpr_typ_value) ops;
-      if is_packed then bprintf b ">"
-  | Trunc(x,y)     -> bprintf b "trunc(%a, %a)" bpr_typ_value x              bpr_typ y
-  | Zext(x,y)           -> bprintf b "zext(%a, %a)" bpr_typ_value x          bpr_typ y
-  | Sext(x,y)           -> bprintf b "sext(%a, %a)" bpr_typ_value x          bpr_typ y
-  | Fptrunc(x,y)        -> bprintf b "fptrunc(%a, %a)" bpr_typ_value x       bpr_typ y
-  | Fpext(x,y)          -> bprintf b "fpext(%a, %a)" bpr_typ_value x         bpr_typ y
-  | Bitcast(x,y)        -> bprintf b "bitcast(%a, %a)" bpr_typ_value x       bpr_typ y
-  | Addrspacecast(x,y)  -> bprintf b "addrspacecast(%a, %a)" bpr_typ_value x bpr_typ y
-  | Uitofp(x,y)         -> bprintf b "uitofp(%a, %a)" bpr_typ_value x        bpr_typ y
-  | Sitofp(x,y)         -> bprintf b "sitofp(%a, %a)" bpr_typ_value x        bpr_typ y
-  | Fptoui(x,y)         -> bprintf b "fptoui(%a, %a)" bpr_typ_value x        bpr_typ y
-  | Fptosi(x,y)         -> bprintf b "fptosi(%a, %a)" bpr_typ_value x        bpr_typ y
-  | Inttoptr(x,y)       -> bprintf b "inttoptr(%a, %a)" bpr_typ_value x      bpr_typ y
-  | Ptrtoint(x,y)       -> bprintf b "ptrtoint(%a, %a)" bpr_typ_value x      bpr_typ y
-  | Extractvalue(x,y) -> bprintf b "extractvalue(%a%a)" bpr_typ_value x bpr_index_list y
-  | Insertvalue(x,y, z) -> bprintf b "insertvalue(%a, %a%a)" bpr_typ_value x bpr_typ_value y bpr_index_list z
-  | Icmp(cmp, x, y) -> bprintf b "icmp %a (%a, %a)" bpr_icmp cmp bpr_typ_value x bpr_typ_value y
-  | Fcmp(cmp, x, y)  -> bprintf b "fcmp %a (%a, %a)" bpr_fcmp cmp bpr_typ_value x bpr_typ_value y
-  | Sdiv(e, x, y)           -> bprintf b "sdiv%a(%a, %a)" (bpr_yesno " exact ") e bpr_typ_value x bpr_typ_value y
-  | Udiv(e, x, y)           -> bprintf b "udiv%a(%a, %a)" (bpr_yesno " exact ") e bpr_typ_value x bpr_typ_value y
-  | Lshr(e, x, y)           -> bprintf b "lshr%a(%a, %a)" (bpr_yesno " exact ") e bpr_typ_value x bpr_typ_value y
-  | Ashr(e, x, y)           -> bprintf b "ashr%a(%a, %a)" (bpr_yesno " exact ") e bpr_typ_value x bpr_typ_value y
+      bprintf b "<%a>" (between ", " bpr_typ_value) ops
+  | Struct(is_packed, ops) ->
+      bprintf b "%a{%a%a%a}%a"
+        (yes "<") is_packed
+        (yes " ") (ops <> [])
+        (between ", " bpr_typ_value) ops
+        (yes " ") (ops <> [])
+        (yes ">") is_packed
+  | Trunc(x, y)          -> bprintf b "trunc(%a, %a)" bpr_typ_value x              bpr_typ y
+  | Zext(x, y)           -> bprintf b "zext(%a, %a)" bpr_typ_value x          bpr_typ y
+  | Sext(x, y)           -> bprintf b "sext(%a, %a)" bpr_typ_value x          bpr_typ y
+  | Fptrunc(x, y)        -> bprintf b "fptrunc(%a, %a)" bpr_typ_value x       bpr_typ y
+  | Fpext(x, y)          -> bprintf b "fpext(%a, %a)" bpr_typ_value x         bpr_typ y
+  | Bitcast(x, y)        -> bprintf b "bitcast(%a, %a)" bpr_typ_value x       bpr_typ y
+  | Addrspacecast(x, y)  -> bprintf b "addrspacecast(%a, %a)" bpr_typ_value x bpr_typ y
+  | Uitofp(x, y)         -> bprintf b "uitofp(%a, %a)" bpr_typ_value x        bpr_typ y
+  | Sitofp(x, y)         -> bprintf b "sitofp(%a, %a)" bpr_typ_value x        bpr_typ y
+  | Fptoui(x, y)         -> bprintf b "fptoui(%a, %a)" bpr_typ_value x        bpr_typ y
+  | Fptosi(x, y)         -> bprintf b "fptosi(%a, %a)" bpr_typ_value x        bpr_typ y
+  | Inttoptr(x, y)       -> bprintf b "inttoptr(%a, %a)" bpr_typ_value x      bpr_typ y
+  | Ptrtoint(x, y)       -> bprintf b "ptrtoint(%a, %a)" bpr_typ_value x      bpr_typ y
+  | Extractvalue(x, y)   -> bprintf b "extractvalue(%a%a)" bpr_typ_value x bpr_index_list y
+  | Insertvalue(x, y, z) -> bprintf b "insertvalue(%a, %a%a)" bpr_typ_value x bpr_typ_value y bpr_index_list z
+  | Icmp(cmp, x, y)      -> bprintf b "icmp %a (%a, %a)" bpr_icmp cmp bpr_typ_value x bpr_typ_value y
+  | Fcmp(cmp, x, y)      -> bprintf b "fcmp %a (%a, %a)" bpr_fcmp cmp bpr_typ_value x bpr_typ_value y
+  | Sdiv(e, x, y)        -> bprintf b "sdiv%a(%a, %a)" (yes " exact ") e bpr_typ_value x bpr_typ_value y
+  | Udiv(e, x, y)        -> bprintf b "udiv%a(%a, %a)" (yes " exact ") e bpr_typ_value x bpr_typ_value y
+  | Lshr(e, x, y)        -> bprintf b "lshr%a(%a, %a)" (yes " exact ") e bpr_typ_value x bpr_typ_value y
+  | Ashr(e, x, y)        -> bprintf b "ashr%a(%a, %a)" (yes " exact ") e bpr_typ_value x bpr_typ_value y
   | Fadd(x, y)           -> bprintf b "fadd(%a, %a)" bpr_typ_value x bpr_typ_value y
   | Fsub(x, y)           -> bprintf b "fsub(%a, %a)" bpr_typ_value x bpr_typ_value y
   | Fmul(x, y)           -> bprintf b "fmul(%a, %a)" bpr_typ_value x bpr_typ_value y
@@ -681,62 +735,57 @@ let rec bpr_value b op = match op with
   | And (x, y)           -> bprintf b "and(%a, %a)" bpr_typ_value x bpr_typ_value y
   | Or  (x, y)           -> bprintf b "or(%a, %a)" bpr_typ_value x bpr_typ_value y
   | Xor (x, y)           -> bprintf b "xor(%a, %a)" bpr_typ_value x bpr_typ_value y
-  | Getelementptr(inbounds, x) -> bprintf b "getelementptr%a(%a)" (bpr_yesno " inbounds ") inbounds bpr_typ_value_list x
-  | Shufflevector x -> bprintf b "shufflevector(%a)" bpr_typ_value_list x
-  | Insertelement x -> bprintf b "insertelement(%a)" bpr_typ_value_list x
-  | Extractelement x -> bprintf b "extractelement(%a)" bpr_typ_value_list x
-  | Select         x -> bprintf b "select(%a)" bpr_typ_value_list x
-  | Add(nuw, nsw, x, y) -> bprintf b "add%a%a(%a, %a)" (bpr_yesno " nuw") nuw (bpr_yesno " nsw ") nsw bpr_typ_value x bpr_typ_value y
-  | Sub(nuw, nsw, x, y) -> bprintf b "sub%a%a(%a, %a)" (bpr_yesno " nuw") nuw (bpr_yesno " nsw ") nsw bpr_typ_value x bpr_typ_value y
-  | Mul(nuw, nsw, x, y) -> bprintf b "mul%a%a(%a, %a)" (bpr_yesno " nuw") nuw (bpr_yesno " nsw ") nsw bpr_typ_value x bpr_typ_value y
-  | Shl(nuw, nsw, x, y) -> bprintf b "shl%a%a(%a, %a)" (bpr_yesno " nuw") nuw (bpr_yesno " nsw ") nsw bpr_typ_value x bpr_typ_value y
+  | Getelementptr(inbounds, x) -> bprintf b "getelementptr%a(%a)" (yes " inbounds ") inbounds bpr_typ_value_list x
+  | Shufflevector x      -> bprintf b "shufflevector(%a)" bpr_typ_value_list x
+  | Insertelement x      -> bprintf b "insertelement(%a)" bpr_typ_value_list x
+  | Extractelement x     -> bprintf b "extractelement(%a)" bpr_typ_value_list x
+  | Select x             -> bprintf b "select(%a)" bpr_typ_value_list x
+  | Add(nuw, nsw, x, y)  -> bprintf b "add%a%a(%a, %a)" (yes " nuw") nuw (yes " nsw ") nsw bpr_typ_value x bpr_typ_value y
+  | Sub(nuw, nsw, x, y)  -> bprintf b "sub%a%a(%a, %a)" (yes " nuw") nuw (yes " nsw ") nsw bpr_typ_value x bpr_typ_value y
+  | Mul(nuw, nsw, x, y)  -> bprintf b "mul%a%a(%a, %a)" (yes " nuw") nuw (yes " nsw ") nsw bpr_typ_value x bpr_typ_value y
+  | Shl(nuw, nsw, x, y)  -> bprintf b "shl%a%a(%a, %a)" (yes " nuw") nuw (yes " nsw ") nsw bpr_typ_value x bpr_typ_value y
   | Asm(sideeffect, alignstack, inteldialect, x, y) ->
       bprintf b "asm %a%a%a %s, %s"
-        (bpr_yesno "sideeffect ") sideeffect
-        (bpr_yesno "alignstack ") alignstack
-        (bpr_yesno "inteldialect ") inteldialect x y
+        (yes "sideeffect ") sideeffect
+        (yes "alignstack ") alignstack
+        (yes "inteldialect ") inteldialect
+        x
+        y
 
 and bpr_typ_value b (typ, value) =
   bprintf b "%a %a" bpr_typ typ bpr_value value
 
 and bpr_typ_value_list b l =
   (match l with [] -> ()
-  | (ty,op)::tl ->
-      let all_same_type = List.for_all (fun (ty',_) -> ty=ty') tl in
+  | (ty, op)::tl ->
+      let all_same_type = List.for_all (fun (ty', _) -> ty=ty') tl in
       if all_same_type then begin
         bprintf b "%a %a" bpr_typ ty bpr_value op;
-        List.iter (fun (_,op) -> bprintf b ", %a" bpr_value op) tl
+        List.iter (fun (_, op) -> bprintf b ", %a" bpr_value op) tl
       end else
-        bpr_concat ", " (fun b (ty,op) -> bprintf b "%a %a" bpr_typ ty bpr_value op) b l)
+        between ", " (fun b (ty, op) -> bprintf b "%a %a" bpr_typ ty bpr_value op) b l)
 
 and bpr_mdnodevector b x =
   let bpr b = function
     | None -> bprintf b "null"
     | Some y -> bpr_typ_value b y in
-  bprintf b "{ %a }" (bpr_concat " " bpr) x
-
-
-let getElementType = function
-  | Arraytyp(_,ty) -> ty
-  | Pointer(ty,_) -> ty
-  | Vector(_,ty) -> ty
-  | _ -> failwith "getElementType: not an array, pointer, or vector"
+  bprintf b "{%a}" (between " " bpr) x
 
 let bpr_global b g =
-  bprintf b "%a = " bpr_var g.gname;
-  (match g.glinkage with None -> () | Some x -> bprintf b "%a " bpr_linkage x);
-  (match g.gvisibility with None -> () | Some x -> bprintf b "%a " bpr_visibility x);
-  (match g.gstorageclass with None -> () | Some x -> bprintf b "%a " bpr_storageclass x);
-  (match g.gthread_local with None -> () | Some x -> bprintf b "%a " bpr_thread_local x);
-  (match g.gaddrspace with None -> () | Some x -> bprintf b "addrspace(%d) " x);
-  if g.gunnamed_addr then bprintf b "unnamed_addr ";
-  if g.gexternally_initialized then bprintf b "externally_initialized ";
-  bprintf b "%s " (if g.gconstant then "constant" else "global");
-  bpr_typ b (getElementType g.gtyp);
-  (match g.gvalue with None -> () | Some x -> bprintf b " %a" bpr_value x);
-  (match g.gsection with None -> () | Some x -> bprintf b ", section %s" x);
-  (match g.galign with None -> () | Some x -> bprintf b ", align %d" x);
-  bprintf b "\n"
+  bprintf b "%a = %a%a%a%a%a%a%a%a%a%a%a%a\n"
+    bpr_var g.gname
+    (opt_after " " bpr_linkage) g.glinkage
+    (opt_after " " bpr_visibility) g.gvisibility
+    (opt_after " " bpr_storageclass) g.gstorageclass
+    (opt_after " " bpr_thread_local) g.gthread_local
+    (opt_after " " (fun b -> bprintf b "addrspace(%d)")) g.gaddrspace
+    (yes "unnamed_addr ") g.gunnamed_addr
+    (yes "externally_initialized ") g.gexternally_initialized
+    (yesno "constant " "global ") g.gconstant
+    bpr_typ g.gtyp
+    (opt_before " " bpr_value) g.gvalue
+    (opt (fun b -> bprintf b ", section %s")) g.gsection
+    (opt (fun b -> bprintf b ", align %d")) g.galign
 
 let bpr_alias b a =
   bprintf b "%a = " bpr_var a.aname;
@@ -745,7 +794,7 @@ let bpr_alias b a =
   (match a.alinkage with None -> () | Some x -> bprintf b "%a " bpr_linkage x);
   (match a.aaliasee with
   | A_bitcast(x, y) -> bprintf b "bitcast(%a to %a)\n" bpr_typ_value x bpr_typ y
-  | A_getelementptr(inbounds, x) -> bprintf b "getelementptr%a(%a)\n" (bpr_yesno " inbounds ") inbounds bpr_typ_value_list x
+  | A_getelementptr(inbounds, x) -> bprintf b "getelementptr%a(%a)\n" (yes " inbounds ") inbounds bpr_typ_value_list x
   | A_typ_value x -> bprintf b "%a\n" bpr_typ_value x)
 
 let pad_to_column b n =
@@ -758,10 +807,13 @@ let pad_to_column b n =
     Buffer.add_char b ' '
   done
 
-let bpr_arguments b l =
-  let pr (typ, value, popt) =
-    bprintf b "%a %a %a" bpr_typ typ bpr_value value (opt bpr_attribute) popt in
-  List.iter pr l
+let bpr_arguments =
+  let bpr b (typ, param_attributes, value) =
+    bprintf b "%a %a%a"
+      bpr_typ typ
+      (after " " bpr_attribute) param_attributes
+      bpr_value value in
+  between ", " bpr
 
 let bpr_ordering b = function
 | Unordered -> bprintf b "unordered"
@@ -771,62 +823,97 @@ let bpr_ordering b = function
 | Acq_rel   -> bprintf b "acq_rel"
 | Seq_cst   -> bprintf b "seq_cst"
 
-let bpr_instr b (nopt,i) =
+let bpr_instr b (nopt, i) =
   bprintf b "  ";
   (match nopt with None -> ()
   | Some n -> bprintf b "%a = " bpr_var n);
   (match i with
-  | Add(nuw, nsw, x, y) -> bprintf b "add %a%a%a, %a" (bpr_yesno "nuw ") nuw (bpr_yesno "nsw ") nsw bpr_typ_value x bpr_value y
-  | Sub(nuw, nsw, x, y) -> bprintf b "sub %a%a%a, %a" (bpr_yesno "nuw ") nuw (bpr_yesno "nsw ") nsw bpr_typ_value x bpr_value y
-  | Mul(nuw, nsw, x, y) -> bprintf b "mul %a%a%a, %a" (bpr_yesno "nuw ") nuw (bpr_yesno "nsw ") nsw bpr_typ_value x bpr_value y
-  | Shl(nuw, nsw, x, y) -> bprintf b "shl %a%a%a, %a" (bpr_yesno "nuw ") nuw (bpr_yesno "nsw ") nsw bpr_typ_value x bpr_value y
-  | Fadd(fmf, x, y)           -> bprintf b "fadd %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
-  | Fsub(fmf, x, y)           -> bprintf b "fsub %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
-  | Fmul(fmf, x, y)           -> bprintf b "fmul %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
-  | Fdiv(fmf, x, y)           -> bprintf b "fdiv %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
-  | Frem(fmf, x, y)           -> bprintf b "frem %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
-  | Sdiv(e, x, y)           -> bprintf b "sdiv%a %a, %a" (bpr_yesno " exact") e bpr_typ_value x bpr_value y
-  | Udiv(e, x, y)           -> bprintf b "udiv%a %a, %a" (bpr_yesno " exact") e bpr_typ_value x bpr_value y
-  | Lshr(e, x, y)           -> bprintf b "lshr%a %a, %a" (bpr_yesno " exact") e bpr_typ_value x bpr_value y
-  | Ashr(e, x, y)           -> bprintf b "ashr%a %a, %a" (bpr_yesno " exact") e bpr_typ_value x bpr_value y
-  | Urem(x, y)           -> bprintf b "urem %a, %a" bpr_typ_value x bpr_value y
-  | Srem(x, y)           -> bprintf b "srem %a, %a" bpr_typ_value x bpr_value y
-  | And (x, y)           -> bprintf b "and %a, %a" bpr_typ_value x bpr_value y
-  | Or  (x, y)           -> bprintf b "or %a, %a" bpr_typ_value x bpr_value y
-  | Xor (x, y)           -> bprintf b "xor %a, %a" bpr_typ_value x bpr_value y
+  | Add(nuw, nsw, x, y) ->
+      bprintf b "add %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
+  | Sub(nuw, nsw, x, y) ->
+      bprintf b "sub %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
+  | Mul(nuw, nsw, x, y) ->
+      bprintf b "mul %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
+  | Shl(nuw, nsw, x, y) ->
+      bprintf b "shl %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
+  | Fadd(fmf, x, y)           ->
+      bprintf b "fadd %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
+  | Fsub(fmf, x, y)           ->
+      bprintf b "fsub %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
+  | Fmul(fmf, x, y)           ->
+      bprintf b "fmul %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
+  | Fdiv(fmf, x, y)           ->
+      bprintf b "fdiv %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
+  | Frem(fmf, x, y)           ->
+      bprintf b "frem %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
+  | Sdiv(e, x, y)           ->
+      bprintf b "sdiv%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
+  | Udiv(e, x, y)           ->
+      bprintf b "udiv%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
+  | Lshr(e, x, y)           ->
+      bprintf b "lshr%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
+  | Ashr(e, x, y)           ->
+      bprintf b "ashr%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
+  | Urem(x, y)           ->
+      bprintf b "urem %a, %a" bpr_typ_value x bpr_value y
+  | Srem(x, y)           ->
+      bprintf b "srem %a, %a" bpr_typ_value x bpr_value y
+  | And (x, y)           ->
+      bprintf b "and %a, %a" bpr_typ_value x bpr_value y
+  | Or  (x, y)           ->
+      bprintf b "or %a, %a" bpr_typ_value x bpr_value y
+  | Xor (x, y)           ->
+      bprintf b "xor %a, %a" bpr_typ_value x bpr_value y
   | Icmp(icmp, x, y) ->
       bprintf b "icmp %a %a, %a" bpr_icmp icmp bpr_typ_value x bpr_value y
   | Fcmp(fcmp, x, y) ->
       bprintf b "icmp %a %a, %a" bpr_fcmp fcmp bpr_typ_value x bpr_value y
-  | Trunc(x,y)          -> bprintf b "trunc %a to %a" bpr_typ_value x         bpr_typ y
-  | Zext(x,y)           -> bprintf b "zext %a to %a" bpr_typ_value x          bpr_typ y
-  | Sext(x,y)           -> bprintf b "sext %a to %a" bpr_typ_value x          bpr_typ y
-  | Fptrunc(x,y)        -> bprintf b "fptrunc %a to %a" bpr_typ_value x       bpr_typ y
-  | Fpext(x,y)          -> bprintf b "fpext %a to %a" bpr_typ_value x         bpr_typ y
-  | Bitcast(x,y)        -> bprintf b "bitcast %a to %a" bpr_typ_value x       bpr_typ y
-  | Addrspacecast(x,y)  -> bprintf b "addrspacecast %a to %a" bpr_typ_value x bpr_typ y
-  | Uitofp(x,y)         -> bprintf b "uitofp %a to %a" bpr_typ_value x        bpr_typ y
-  | Sitofp(x,y)         -> bprintf b "sitofp %a to %a" bpr_typ_value x        bpr_typ y
-  | Fptoui(x,y)         -> bprintf b "fptoui %a to %a" bpr_typ_value x        bpr_typ y
-  | Fptosi(x,y)         -> bprintf b "fptosi %a to %a" bpr_typ_value x        bpr_typ y
-  | Inttoptr(x,y)       -> bprintf b "inttoptr %a to %a" bpr_typ_value x      bpr_typ y
-  | Ptrtoint(x,y)       -> bprintf b "ptrtoint %a to %a" bpr_typ_value x      bpr_typ y
-  | Va_arg(x,y)         -> bprintf b "va_arg %a, %a" bpr_typ_value x      bpr_typ y
-  | Getelementptr(inbounds, x) -> bprintf b "getelementptr%a %a" (bpr_yesno " inbounds") inbounds bpr_typ_value_list x
-  | Shufflevector x -> bprintf b "shufflevector %a" bpr_typ_value_list x
-  | Insertelement x -> bprintf b "insertelement %a" bpr_typ_value_list x
-  | Extractelement x -> bprintf b "extractelement %a" bpr_typ_value_list x
-  | Select         x -> bprintf b "select %a" bpr_typ_value_list x
+  | Trunc(x, y)          ->
+      bprintf b "trunc %a to %a" bpr_typ_value x         bpr_typ y
+  | Zext(x, y)           ->
+      bprintf b "zext %a to %a" bpr_typ_value x          bpr_typ y
+  | Sext(x, y)           ->
+      bprintf b "sext %a to %a" bpr_typ_value x          bpr_typ y
+  | Fptrunc(x, y)        ->
+      bprintf b "fptrunc %a to %a" bpr_typ_value x       bpr_typ y
+  | Fpext(x, y)          ->
+      bprintf b "fpext %a to %a" bpr_typ_value x         bpr_typ y
+  | Bitcast(x, y)        ->
+      bprintf b "bitcast %a to %a" bpr_typ_value x       bpr_typ y
+  | Addrspacecast(x, y)  ->
+      bprintf b "addrspacecast %a to %a" bpr_typ_value x bpr_typ y
+  | Uitofp(x, y)         ->
+      bprintf b "uitofp %a to %a" bpr_typ_value x        bpr_typ y
+  | Sitofp(x, y)         ->
+      bprintf b "sitofp %a to %a" bpr_typ_value x        bpr_typ y
+  | Fptoui(x, y)         ->
+      bprintf b "fptoui %a to %a" bpr_typ_value x        bpr_typ y
+  | Fptosi(x, y)         ->
+      bprintf b "fptosi %a to %a" bpr_typ_value x        bpr_typ y
+  | Inttoptr(x, y)       ->
+      bprintf b "inttoptr %a to %a" bpr_typ_value x      bpr_typ y
+  | Ptrtoint(x, y)       ->
+      bprintf b "ptrtoint %a to %a" bpr_typ_value x      bpr_typ y
+  | Va_arg(x, y)         ->
+      bprintf b "va_arg %a, %a" bpr_typ_value x      bpr_typ y
+  | Getelementptr(inbounds, x) ->
+      bprintf b "getelementptr%a %a" (yes " inbounds") inbounds bpr_typ_value_list x
+  | Shufflevector x ->
+      bprintf b "shufflevector %a" bpr_typ_value_list x
+  | Insertelement x ->
+      bprintf b "insertelement %a" bpr_typ_value_list x
+  | Extractelement x ->
+      bprintf b "extractelement %a" bpr_typ_value_list x
+  | Select x ->
+      bprintf b "select %a" bpr_typ_value_list x
   | Phi(ty, incoming) ->
       bprintf b "phi %a " bpr_typ ty;
       let first = ref true in
       List.iter
-        (fun (x,y) ->
+        (fun (x, y) ->
           if not !first then bprintf b ", " else first := false;
-          bprintf b "[ %a, %a ]" bpr_value x bpr_value y
-        )
-        incoming;
-      bprintf b "\n"
+          bprintf b "[ %a, %a ]" bpr_value x bpr_value y)
+        incoming
   | Landingpad(x, y, z, w) ->
       let bpr_landingpad b = function
         | Catch(typ, value) ->  bprintf b "catch %a %a" bpr_typ typ bpr_value value
@@ -834,18 +921,13 @@ let bpr_instr b (nopt,i) =
       let rec bpr b = function
         | [] -> ()
         | hd::tl -> bprintf b " %a" bpr_landingpad hd; bpr b tl in
-      bprintf b "landingpad %a personality %a%a%a" bpr_typ x bpr_typ_value y (bpr_yesno " cleanup") z bpr w
+      bprintf b "landingpad %a personality %a%a%a" bpr_typ x bpr_typ_value y (yes " cleanup") z bpr w
   | Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs) ->
       if is_tail_call then bprintf b "tail ";
       bprintf b "call ";
       (opt bpr_callingconv) b callconv;
-      (match callee_ty with
-      | Pointer(Funtyp(rt,_,false),_) -> (* false=>not is_var_arg *)
-          bprintf b "%a %a(%a) %a\n"
-            bpr_typ rt bpr_value callee_name bpr_arguments operands bpr_attributes callattrs
-      | _ ->
-          bprintf b "%a %a(%a) %a\n"
-            bpr_typ callee_ty bpr_value callee_name bpr_arguments operands bpr_attributes callattrs)
+      bprintf b "%a %a(%a)%a"
+        bpr_typ callee_ty bpr_value callee_name bpr_arguments operands (before " " bpr_attribute) callattrs
   | Alloca(x, y, z, w) ->
       bprintf b "alloca ";
       if x then bprintf b "inalloca ";
@@ -853,45 +935,55 @@ let bpr_instr b (nopt,i) =
       (match z with None -> () | Some q -> bprintf b ", %a" bpr_typ_value q);
       (match w with None -> () | Some q -> bprintf b ", align %d" q)
   | Load(x, y, z, w, v) ->
-      bprintf b "load %a%a%a" (bpr_yesno "atomic ") x (bpr_yesno "volatile ") y bpr_typ_value z;
-      (match w with None -> () | Some(q,r) -> if q then bprintf b " singlethread"; bprintf b " %a" bpr_ordering r);
+      bprintf b "load %a%a%a" (yes "atomic ") x (yes "volatile ") y bpr_typ_value z;
+      (match w with None -> () | Some(q, r) -> if q then bprintf b " singlethread"; bprintf b " %a" bpr_ordering r);
       (match v with None -> () | Some q -> bprintf b ", align %d" q)
   | Store(x, y, z, w, v, u) ->
-      bprintf b "store %a%a%a, %a" (bpr_yesno "atomic ") x (bpr_yesno "volatile ") y bpr_typ_value z bpr_typ_value w;
-      (match v with None -> () | Some(q,r) -> if q then bprintf b " singlethread"; bprintf b " %a" bpr_ordering r);
+      bprintf b "store %a%a%a, %a" (yes "atomic ") x (yes "volatile ") y bpr_typ_value z bpr_typ_value w;
+      (match v with None -> () | Some(q, r) -> if q then bprintf b " singlethread"; bprintf b " %a" bpr_ordering r);
       (match u with None -> () | Some q -> bprintf b ", align %d" q)
   | Cmpxchg(x, y, z, w, v, u, t) ->
       bprintf b "cmpxchg %a%a, %a, %a%a %a %a"
-        (bpr_yesno "volatile ") x bpr_typ_value y bpr_typ_value z bpr_typ_value w
-        (bpr_yesno " singlthread") v
+        (yes "volatile ") x bpr_typ_value y bpr_typ_value z bpr_typ_value w
+        (yes " singlthread") v
         bpr_ordering u
         bpr_ordering t
-  | Atomicrmw(x,y,z,w,v,u) ->
+  | Atomicrmw(x, y, z, w, v, u) ->
       bprintf b "atomicrmw %a%a %a, %a%a %a"
-        (bpr_yesno "volatile ") x
+        (yes "volatile ") x
         bpr_binop y
         bpr_typ_value z
         bpr_typ_value w
-        (bpr_yesno " singlthread") v
+        (yes " singlthread") v
         bpr_ordering u
   | Fence(x, y) ->
       bprintf b "fence %a%a"
-        (bpr_yesno "singlthread ") x
+        (yes "singlthread ") x
         bpr_ordering y
-  | Extractvalue(x, y) -> bprintf b "extractvalue %a%a)" bpr_typ_value x bpr_index_list y
-  | Insertvalue(x, y, z) -> bprintf b "insertvalue %a, %a%a" bpr_typ_value x bpr_typ_value y bpr_index_list z
-  | Unreachable -> bprintf b "unreachable"
-  | Return None -> bprintf b "ret void"
-  | Return(Some(x, y)) -> bprintf b "ret %a %a" bpr_typ x bpr_value y
-  | Br(x, None) -> bprintf b "br %a" bpr_typ_value x
-  | Br(x, Some(y, z)) -> bprintf b "br %a, %a, %a" bpr_typ_value x bpr_typ_value y bpr_typ_value z
-  | Indirectbr(x, y) -> bprintf b "indirectbr %a, [%a]" bpr_typ_value x bpr_typ_value_list y
-  | Resume x -> bprintf b "resume %a" bpr_typ_value x
-  | Switch(x, y, z) -> bprintf b "switch %a, %a [%a]" bpr_typ_value x bpr_typ_value y
-        (bpr_concat " "
+  | Extractvalue(x, y) ->
+      bprintf b "extractvalue %a%a)" bpr_typ_value x bpr_index_list y
+  | Insertvalue(x, y, z) ->
+      bprintf b "insertvalue %a, %a%a" bpr_typ_value x bpr_typ_value y bpr_index_list z
+  | Unreachable ->
+      bprintf b "unreachable"
+  | Return None ->
+      bprintf b "ret void"
+  | Return(Some(x, y)) ->
+      bprintf b "ret %a %a" bpr_typ x bpr_value y
+  | Br(x, None) ->
+      bprintf b "br %a" bpr_typ_value x
+  | Br(x, Some(y, z)) ->
+      bprintf b "br %a, %a, %a" bpr_typ_value x bpr_typ_value y bpr_typ_value z
+  | Indirectbr(x, y) ->
+      bprintf b "indirectbr %a, [%a]" bpr_typ_value x bpr_typ_value_list y
+  | Resume x ->
+      bprintf b "resume %a" bpr_typ_value x
+  | Switch(x, y, z) ->
+      bprintf b "switch %a, %a [%a]" bpr_typ_value x bpr_typ_value y
+        (between " "
            (fun b (c, d) -> bprintf b "%a, %a" bpr_typ_value c bpr_typ_value d)) z
   | Invoke(x, y, z, w, v, u, t, s) ->
-      bprintf b "invoke %a%a%a %a(%a)%a to %a unwind %a" 
+      bprintf b "invoke %a%a%a %a(%a)%a to %a unwind %a"
         (opt bpr_callingconv) x
         bpr_attributes y
         bpr_typ z
@@ -903,38 +995,36 @@ let bpr_instr b (nopt,i) =
   bprintf b "\n"
 
 let bpr_block b (nameopt, instrs) =
-(*  if block.b_name <> "0" then*)
-    (* TODO: predecessor blocks *)
-  bprintf b "; <label>:%s%a\n" 
-    (match nameopt with
-    | None -> "<<UNNAMED>>"
-    | Some(Name(_,x)) -> x
-    | Some(Id(_,x)) -> string_of_int x)
-    pad_to_column 50;
-  List.iter (bpr_instr b) instrs;
-  bprintf b "\n"
+  (* TODO: predecessor blocks *)
+  (match nameopt with
+    | Some(Id(false, 0)) -> ()
+    | Some(Name(_, x)) -> bprintf b "; <label>:%s%a\n" x pad_to_column 50
+    | Some(Id(_, x)) -> bprintf b "; <label>:%d%a\n" x pad_to_column 50
+    | None -> bprintf b "; <label>:<<UNNAMED>>%a\n" pad_to_column 50);
+  List.iter (bpr_instr b) instrs
 
 let bpr_function b f =
   bprintf b "\n";
-  if f.fblocks = [] then bprintf b "declare " else bprintf b "define ";
-  (opt bpr_linkage) b f.flinkage;
-  (opt bpr_visibility) b f.fvisibility;
-  (opt bpr_storageclass) b f.fstorageclass;
-  (opt bpr_callingconv) b f.fcallingconv;
-  bpr_attributes b f.freturnattrs;
-  bpr_typ b f.freturntyp;
-  bprintf b " %a("  bpr_var f.fname;
-  bpr_concat ", " bpr_typ b (fst f.fparams);
-  (match f.fparams with
-  | (_, false) -> ()
-  | ([], true) -> bprintf b "..."
-  | (_, true) -> bprintf b ", ...");
-  bprintf b ")";
-  List.iter (bprintf b " %a" bpr_attribute) f.fattrs;
+  bprintf b "%a %a%a%a%a%a%a %a(%a%a%a)%a"
+    (yesno "declare" "define") (f.fblocks = [])
+
+    (opt_after " " bpr_linkage) f.flinkage
+    (opt_after " " bpr_visibility) f.fvisibility
+    (opt_after " " bpr_storageclass) f.fstorageclass
+    (opt_after " " bpr_callingconv) f.fcallingconv
+    (after " " bpr_attribute) f.freturnattrs
+    bpr_typ f.freturntyp
+
+    bpr_var f.fname
+
+    (between ", " bpr_formal) (fst f.fparams)
+    (yes ", ") (snd f.fparams && (fst f.fparams) <> [])
+    (yes "...") (snd f.fparams)
+
+    (before " " bpr_attribute) f.fattrs;
   if f.fblocks = [] then bprintf b "\n" else begin
-    bprintf b " {\n";
-    List.iter (bpr_block b) f.fblocks;
-    bprintf b "}\n";
+    bprintf b " {\n%a}\n"
+      (between "\n" bpr_block) f.fblocks;
   end
 
 let bpr_mdnode b x =
@@ -949,17 +1039,23 @@ let bpr_cu b cu =
   | None -> ()
   | Some x -> bprintf b "target triple = %s\n" x);
   List.iter (bprintf b "module asm %s\n") cu.casms;
+  bprintf b "\n";
   List.iter
     (function
-      | (x, None) -> bprintf b "%a = type opaque\n" bpr_var x
+      | (x, None)   -> bprintf b "%a = type opaque\n" bpr_var x
       | (x, Some t) -> bprintf b "%a = type %a\n" bpr_var x bpr_typ t)
     cu.ctyps;
+  if cu.cglobals <> [] then bprintf b "\n";
   List.iter (bpr_global b) cu.cglobals;
+  if cu.caliases <> [] then bprintf b "\n";
   List.iter (bpr_alias b) cu.caliases;
   List.iter (bpr_function b) cu.cfuns;
+  if cu.cattrgrps <> [] then bprintf b "\n";
   List.iter (bpr_attrgrp b) cu.cattrgrps;
+  if cu.cmdvars <> [] then bprintf b "\n";
   List.iter
-    (fun (x,l) ->
-      bprintf b "!%s = { %s }\n" x (String.concat ", " (List.map string_of_int l)))
+    (fun (x, l) ->
+      bprintf b "!%s = !{%s}\n" x (String.concat " " (List.map (fun y -> "!"^(string_of_int y)) l)))
     cu.cmdvars;
+  if cu.cmdnodes <> [] then bprintf b "\n";
   List.iter (bpr_mdnode b) cu.cmdnodes

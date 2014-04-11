@@ -14,9 +14,22 @@ type toplevel =
   | Attrgrp of string * Util.attribute list
 
 let list_of_string s =
-  let a = Array.create (String.length s) 'a' in
-  String.iteri (fun i c -> a.(i) <- c) s;
-  List.map (fun c -> (Util.Integer 8, Util.Int(Big_int.big_int_of_int(Char.code c)))) (Array.to_list a)
+  if String.length s < 2 || String.get s 0 <> '"' || String.get s (String.length s - 1) <> '"' then
+    failwith "list_of_string: expected quoted string constant";
+  let l = ref [] in
+  for i = (String.length s - 2) downto 1 do
+    l := (String.get s i)::(!l)
+  done;
+  let is_hexdigit c =
+    ('0' <= c && c <= '9') || ('A' <= c && c <= 'F') || ('A' <= c && c <= 'F') in
+  let rec build = function
+    | '\\'::x::y::tl when is_hexdigit x && is_hexdigit y ->
+        (Scanf.sscanf (Printf.sprintf "%c%c" x y) "%x" (fun i -> i))::(build tl)
+    | [] -> []
+    | hd::tl -> (Char.code hd)::(build tl) in
+  List.map
+    (fun i -> (Util.Integer 8, Util.Int(Big_int.big_int_of_int i)))
+    (build !l)
 
 let process_toplevels t =
   let cu = {
@@ -47,7 +60,7 @@ let process_toplevels t =
     | MDNodeDefn x -> cu.Util.cmdnodes <- x::cu.Util.cmdnodes
     | MDVarDefn(x,y) -> cu.Util.cmdvars <- (x,y)::cu.Util.cmdvars
     | Attrgrp(x,y) -> cu.Util.cattrgrps <- (x,y)::cu.Util.cattrgrps in
-  List.iter proc t;
+  List.iter proc (List.rev t);
   cu
 
 %}
@@ -456,7 +469,7 @@ global_name:
 | GlobalVar { $1 }
 ;
 argument_list:
-Lparen arg_type_list Rparen {$2}
+Lparen arg_type_list Rparen { $2 }
 ;
 arg_type_list:
 | /* empty */                  { ([], false) }
@@ -465,8 +478,8 @@ arg_type_list:
 | arg_type Comma arg_type_list { ($1::(fst $3), snd $3) }
 ;
 arg_type:
-| typ          { $1 }
-| typ LocalVar { $1 } /* NB we discard parameter names in function types */
+| typ param_attribute_list          { ($1, $2, None) }
+| typ param_attribute_list LocalVar { ($1, $2, Some $3) }
 ;
 opt_section:
 | /* empty */               { None }
@@ -863,23 +876,25 @@ param_list:
 | param Comma param_list { $1::$3 }
 ;
 param:
-| typ opt_param_attribute value { ($1, $3, $2) }
+| typ param_attribute_list value { ($1, $2, $3) }
 ;
-opt_param_attribute:
-| /* empty */     { None }
-| Kw_align APInt  { Some(Util.Align(int_of_string $2)) }
-| Kw_byval        { Some Util.Byval     }
-| Kw_inalloca     { Some Util.Inalloca  }
-| Kw_inreg        { Some Util.Inreg     }
-| Kw_nest         { Some Util.Nest      }
-| Kw_noalias      { Some Util.Noalias   }
-| Kw_nocapture    { Some Util.Nocapture }
-| Kw_readnone     { Some Util.Readnone  }
-| Kw_readonly     { Some Util.Readonly  }
-| Kw_returned     { Some Util.Returned  }
-| Kw_signext      { Some Util.Signext   }
-| Kw_sret         { Some Util.Sret      }
-| Kw_zeroext      { Some Util.Zeroext   }
+param_attribute_list:
+| /* empty */                          { [] }
+| param_attribute param_attribute_list { $1::$2 }
+param_attribute:
+| Kw_align APInt  { Util.Align(int_of_string $2) }
+| Kw_byval        { Util.Byval     }
+| Kw_inalloca     { Util.Inalloca  }
+| Kw_inreg        { Util.Inreg     }
+| Kw_nest         { Util.Nest      }
+| Kw_noalias      { Util.Noalias   }
+| Kw_nocapture    { Util.Nocapture }
+| Kw_readnone     { Util.Readnone  }
+| Kw_readonly     { Util.Readonly  }
+| Kw_returned     { Util.Returned  }
+| Kw_signext      { Util.Signext   }
+| Kw_sret         { Util.Sret      }
+| Kw_zeroext      { Util.Zeroext   }
 ;
 jump_table:
 | /* empty */                            { [] }
