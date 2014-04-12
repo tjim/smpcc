@@ -292,23 +292,17 @@ parse eof                                                    { Eof }
 | _                                                          { Error }
 
 {
-let lexbuf =
-  if Array.length Sys.argv > 1 then
-    Lexing.from_channel (open_in Sys.argv.(1))
-  else
-    Lexing.from_channel stdin;;
-try
-  let cu = main token lexbuf in
-  Util.number_cu cu;
-  let b = Buffer.create 11 in
-  Util.bpr_cu b cu;
-  Printf.printf "%s" (Buffer.contents b);
-with Parsing.Parse_error ->
-  let p = Lexing.lexeme_start_p lexbuf in
-  Printf.eprintf "Parse error at line %d character %d, the lexeme is %s\n"
-    p.Lexing.pos_lnum
-    (p.Lexing.pos_cnum - p.Lexing.pos_bol)
-    (Lexing.lexeme lexbuf);
-  failwith "Oh noes not that parse error!"
-;;
+let parse ch =
+  let lexbuf = Lexing.from_channel ch in
+  let cu =
+    try main token lexbuf
+    with Parsing.Parse_error ->
+      let p = Lexing.lexeme_start_p lexbuf in
+      Printf.eprintf "Parse error at line %d character %d, the lexeme is %s\n"
+        p.Lexing.pos_lnum
+        (p.Lexing.pos_cnum - p.Lexing.pos_bol)
+        (Lexing.lexeme lexbuf);
+      failwith "Giving up" in
+  number_cu cu;
+  cu
 }

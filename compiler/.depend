@@ -1,3 +1,5 @@
+echo.cmo : util.cmx lllex.cmx
+echo.cmx : util.cmx lllex.cmx
 gobe.cmo : state.cmx options.cmx oli.cmx
 gobe.cmx : state.cmx options.cmx oli.cmx
 lllex.cmo : util.cmx llparse.cmi
