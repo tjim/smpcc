@@ -403,10 +403,10 @@ mdlist:
 | Exclaim APInt mdlist { (int_of_string $2)::$3 }
 ;
 mdnodevector:
-| Kw_null                 { [None] }
-| Kw_null mdnodevector    { None::$2 }
-| type_value              { [Some $1] }
-| type_value mdnodevector { (Some $1)::$2 }
+| Kw_null                       { [None] }
+| Kw_null Comma mdnodevector    { None::$3 }
+| type_value                    { [Some $1] }
+| type_value Comma mdnodevector { (Some $1)::$3 }
 ;
 constant_or_global:
 | Kw_constant { true }

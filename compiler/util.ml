@@ -813,7 +813,7 @@ and bpr_mdnodevector b x =
   let bpr b = function
     | None -> bprintf b "null"
     | Some y -> bpr_typ_value b y in
-  bprintf b "{%a}" (between " " bpr) x
+  bprintf b "{%a}" (between ", " bpr) x
 
 let bpr_global b g =
   bprintf b "%a = %a%a%a%a%a%a%a%a%a%a%a%a\n"
