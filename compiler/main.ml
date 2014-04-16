@@ -534,7 +534,7 @@ let run_phases f =
           optional_print f options.gep (fun () ->
             State.set_bl_bits (List.length f.fblocks))))))
 
-let file2module cil_extra_args file =
+let file2cu cil_extra_args file =
   if Filename.check_suffix file ".c" then
     (* TODO: clean up temp files in case of error *)
     let src_file =
@@ -577,17 +577,24 @@ let file2module cil_extra_args file =
           failwith(sprintf "Error: failed to remove temporary directory %s, exit code %d" (Filename.quote temp_dir) ret);
         cil_file in
     (* Run clang *)
-    let obj_file = Filename.temp_file "mpcc" ".o" in
+    let ll_file = Filename.temp_file "mpcc" ".ll" in
     let cmd =
-      sprintf "clang -c %s -emit-llvm %s -o %s" options.optflag (Filename.quote src_file) (Filename.quote obj_file) in
+      sprintf "clang -S %s -emit-llvm %s -o %s" options.optflag (Filename.quote src_file) (Filename.quote ll_file) in
+    printf "running: %s\n" cmd;
     let ret = Sys.command(cmd) in
     if ret <> 0 then
       failwith(sprintf "Error: clang failed with exit code %d" ret);
     (* Obtain clang output *)
-    let ch = open_in obj_file in
-    let cu = Lllex.parse ch in
+    let ch = open_in ll_file in
+    let cu =
+      try
+        Lllex.parse ch
+      with e ->
+        close_in ch;
+        Sys.remove ll_file;
+        raise e in
     close_in ch;
-    Sys.remove obj_file;
+    Sys.remove ll_file;
     cu
   else
     failwith(sprintf "Error: unrecognized file extension (%s)" file)
@@ -659,7 +666,7 @@ begin
   else if options.fv then
     List.iter
       (fun file ->
-        let m = file2module cil_extra_args file in
+        let m = file2cu cil_extra_args file in
         printf "****FREE VARIABLE ANALYSIS**************************************\n";
         List.iter
           (fun (f:finfo) ->
@@ -676,7 +683,7 @@ begin
   else if options.pr then
     List.iter
       (fun file ->
-        let m = file2module cil_extra_args file in
+        let m = file2cu cil_extra_args file in
         let b = Buffer.create 11 in
         bpr_cu b m;
         printf "%s" (Buffer.contents b))
@@ -684,12 +691,12 @@ begin
   else if options.cfg then
     List.iter
       (fun file ->
-        let m = file2module cil_extra_args file in
+        let m = file2cu cil_extra_args file in
         cfg (List.hd m.cfuns))
       args
   else
     let file = List.hd args in
-    let m = file2module cil_extra_args file in
+    let m = file2cu cil_extra_args file in
     if options.output = None then
       options.output <- Some(Filename.basename (Filename.chop_suffix file ".c"));
     let f =

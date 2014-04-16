@@ -6,8 +6,8 @@ lllex.cmo : util.cmx llparse.cmi
 lllex.cmx : util.cmx llparse.cmx
 llparse.cmo : util.cmx llparse.cmi
 llparse.cmx : util.cmx llparse.cmi
-main.cmo : util.cmx state.cmx options.cmx gobe.cmx
-main.cmx : util.cmx state.cmx options.cmx gobe.cmx
+main.cmo : util.cmx state.cmx options.cmx lllex.cmx gobe.cmx
+main.cmx : util.cmx state.cmx options.cmx lllex.cmx gobe.cmx
 oli.cmo :
 oli.cmx :
 options.cmo :
