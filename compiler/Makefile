@@ -1,10 +1,10 @@
 BIN=/usr/local/bin
 CXXFLAGS=-I/usr/lib/ocaml
 CFLAGS=-I/usr/lib/ocaml
-LIBS=llvm.cmxa llvm_bitreader.cmxa unix.cmxa str.cmxa
+LIBS=nums.cmxa unix.cmxa str.cmxa
 
-smpcc: oli.cmx state.cmx options.cmx gobe.cmx main.cmx llvmfixup.o bindings.o
-	ocamlopt -cc 'g++ -Wno-write-strings' -cclib -rdynamic $(LIBS) $^ -o $@
+smpcc: util.cmx llparse.cmx lllex.cmx state.cmx options.cmx gobe.cmx main.cmx
+	ocamlopt $(LIBS) $^ -o $@
 
 parse: util.cmx llparse.cmx lllex.cmx echo.cmx
 	ocamlopt nums.cmxa $^ -o $@

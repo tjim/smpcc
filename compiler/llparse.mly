@@ -645,8 +645,8 @@ basicblock_list:
 | basicblock basicblock_list { $1::$2 }
 ;
 basicblock:
-| LabelStr instruction_list { (Some(Util.Name(false, $1)), $2) }
-| instruction_list          { (None, $1) }
+| LabelStr instruction_list { {Util.bname=Util.Name(false, $1); Util.binstrs=$2} }
+| instruction_list          { {Util.bname=Util.Id(false, -1); Util.binstrs=$1} }
 ;
 instruction_list:
 | terminator_instruction       { [$1] }
