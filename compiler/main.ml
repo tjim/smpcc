@@ -616,7 +616,7 @@ begin
   let (x,args) = getopt "-help" args             in options.help <- x;
   let (x,args) = getopt "-debug-blocks" args     in options.debug_blocks <- x;
   let (x,args) = getopt "-debug-load-store" args in options.debug_load_store <- x;
-  let (x,args) = getopt "-no-cil" args           in if x then options.delta <- false;
+  let (x,args) = getopt "-no-cil" args           in options.cil <- not x;
   let (x,args) = getopt "-delta" args            in options.delta <- x;
   let (x,args) = getopt1 "-circuitlib" args      in options.circuitlib <- x;
   let (x,args) = getopt1 "-fname" args           in options.fname <- x;
@@ -639,7 +639,7 @@ begin
   let (x,args) = getopt "-O4" args               in if x then options.optflag <- "-O4";
   let (cil_extra_args,args) = getallopts args    in
   if options.help then
-    (printf "Usage: ./mpcc.byte foo.o [options]\n";
+    (printf "Usage: ./smpcc foo.c [options]\n";
      printf "Options: -help                       Print this help message\n";
      printf "         -no-cil                     Do not run cil transformation (flattening)\n";
      printf "         -delta                      Delta printing\n";
