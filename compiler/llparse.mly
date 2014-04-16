@@ -806,6 +806,7 @@ call_attributes:
 | call_attribute call_attributes { $1::$2 }
 ;
 call_attribute:
+| AttrGrpID   { Util.Attrgrp(int_of_string $1) }
 | Kw_noreturn { Util.Noreturn }
 | Kw_nounwind { Util.Nounwind }
 | Kw_readnone { Util.Readnone }
