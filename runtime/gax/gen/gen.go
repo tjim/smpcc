@@ -173,8 +173,10 @@ func (y GaxState) And(a, b []base.Wire) []base.Wire {
 		panic("Wire mismatch in gen.And()")
 	}
 	result := make([]base.Wire, len(a))
+	zeroSlots := findZeroSlots(a, b)
 	for i := 0; i < len(a); i++ {
-		w := y.genWireRR(a[i][0], b[i][0], 0)
+		w := y.genWireRR(a[i][zeroSlots[i][0]], b[i][zeroSlots[i][1]],
+			zeroSlots[i][1]&zeroSlots[i][1])
 		// w := genWire()
 		result[i] = w
 		t := make([]base.Ciphertext, 4)
@@ -192,8 +194,10 @@ func (y GaxState) Or(a, b []base.Wire) []base.Wire {
 		panic("Wire mismatch in gen.Or()")
 	}
 	result := make([]base.Wire, len(a))
+	zeroSlots := findZeroSlots(a, b)
 	for i := 0; i < len(a); i++ {
-		w := y.genWireRR(a[i][0], b[i][0], 0)
+		w := y.genWireRR(a[i][zeroSlots[i][0]], b[i][zeroSlots[i][1]],
+			zeroSlots[i][1]|zeroSlots[i][1])
 		// w := genWire()
 		result[i] = w
 		t := make([]base.Ciphertext, 4)
@@ -312,8 +316,11 @@ func (y GaxState) Nand(a, b []base.Wire) []base.Wire {
 		panic("Wire mismatch in gen.Nand()")
 	}
 	result := make([]base.Wire, len(a))
+	zeroSlots := findZeroSlots(a, b)
+
 	for i := 0; i < len(a); i++ {
-		w := y.genWireRR(a[i][0], b[i][0], 1)
+		w := y.genWireRR(a[i][zeroSlots[i][0]], b[i][zeroSlots[i][1]],
+			1-zeroSlots[i][1]&zeroSlots[i][1])
 		// w := genWire()
 		result[i] = w
 		t := make([]base.Ciphertext, 4)
