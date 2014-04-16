@@ -176,14 +176,18 @@ func (y GaxState) And(a, b []base.Wire) []base.Wire {
 	zeroSlots := findZeroSlots(a, b)
 	for i := 0; i < len(a); i++ {
 		w := y.genWireRR(a[i][zeroSlots[i][0]], b[i][zeroSlots[i][1]],
-			zeroSlots[i][1]&zeroSlots[i][1])
+			zeroSlots[i][0]&zeroSlots[i][1])
 		// w := genWire()
 		result[i] = w
-		t := make([]base.Ciphertext, 4)
-		y.encrypt_slot(t, w[0], a[i][0], b[i][0])
-		y.encrypt_slot(t, w[0], a[i][0], b[i][1])
-		y.encrypt_slot(t, w[0], a[i][1], b[i][0])
-		y.encrypt_slot(t, w[1], a[i][1], b[i][1])
+		t := make([]base.Ciphertext, 3)
+		for j1 := 0; j1 <= 1; j1++ {
+			for j2 := 0; j2 <= 1; j2++ {
+				if j1 == zeroSlots[i][0] && j2 == zeroSlots[i][1] {
+					continue
+				}
+				y.encrypt_slot(t, w[j1&j2], a[i][j1], b[i][j2])
+			}
+		}
 		y.io.SendT(t)
 	}
 	return result
@@ -197,7 +201,7 @@ func (y GaxState) Or(a, b []base.Wire) []base.Wire {
 	zeroSlots := findZeroSlots(a, b)
 	for i := 0; i < len(a); i++ {
 		w := y.genWireRR(a[i][zeroSlots[i][0]], b[i][zeroSlots[i][1]],
-			zeroSlots[i][1]|zeroSlots[i][1])
+			zeroSlots[i][0]|zeroSlots[i][1])
 		// w := genWire()
 		result[i] = w
 		t := make([]base.Ciphertext, 4)
@@ -320,7 +324,7 @@ func (y GaxState) Nand(a, b []base.Wire) []base.Wire {
 
 	for i := 0; i < len(a); i++ {
 		w := y.genWireRR(a[i][zeroSlots[i][0]], b[i][zeroSlots[i][1]],
-			1-zeroSlots[i][1]&zeroSlots[i][1])
+			1-zeroSlots[i][0]&zeroSlots[i][1])
 		// w := genWire()
 		result[i] = w
 		t := make([]base.Ciphertext, 4)
