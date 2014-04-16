@@ -137,19 +137,18 @@ func genWire() base.Wire {
 	return []base.Key{k0, k1}
 }
 
-func (g *GaxState) genWireRR(key0, key1 base.Key, gateVal int) base.Wire {
+func (g *GaxState) genWireRR(inKey0, inKey1 base.Key, gateVal int) base.Wire {
 	init_key0()
 	var k0, k1 base.Key
 	if gateVal == 0 {
-		k0 = base.GaXDKC_E(key0, key1, g.computeTweak(), ALL_ZEROS)
+		k0 = base.GaXDKC_E(inKey0, inKey1, g.computeTweak(), ALL_ZEROS)
 		k1 = base.XorKey(k0, key0)
 	} else if gateVal == 1 {
-		k1 = base.GaXDKC_E(key0, key1, g.computeTweak(), ALL_ZEROS)
+		k1 = base.GaXDKC_E(inKey0, inKey1, g.computeTweak(), ALL_ZEROS)
 		k0 = base.XorKey(k1, key0)
 	} else {
 		panic("Invalid gateVal")
 	}
-
 	return []base.Key{k0, k1}
 }
 
@@ -176,6 +175,7 @@ func (y GaxState) And(a, b []base.Wire) []base.Wire {
 	result := make([]base.Wire, len(a))
 	for i := 0; i < len(a); i++ {
 		w := y.genWireRR(a[i][0], b[i][0], 0)
+		// w := genWire()
 		result[i] = w
 		t := make([]base.Ciphertext, 4)
 		y.encrypt_slot(t, w[0], a[i][0], b[i][0])
@@ -194,6 +194,7 @@ func (y GaxState) Or(a, b []base.Wire) []base.Wire {
 	result := make([]base.Wire, len(a))
 	for i := 0; i < len(a); i++ {
 		w := y.genWireRR(a[i][0], b[i][0], 0)
+		// w := genWire()
 		result[i] = w
 		t := make([]base.Ciphertext, 4)
 		y.encrypt_slot(t, w[0], a[i][0], b[i][0])
@@ -313,6 +314,7 @@ func (y GaxState) Nand(a, b []base.Wire) []base.Wire {
 	result := make([]base.Wire, len(a))
 	for i := 0; i < len(a); i++ {
 		w := y.genWireRR(a[i][0], b[i][0], 1)
+		// w := genWire()
 		result[i] = w
 		t := make([]base.Ciphertext, 4)
 		y.encrypt_slot(t, w[1], a[i][0], b[i][0])
