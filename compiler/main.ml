@@ -654,7 +654,7 @@ begin
      printf "         -branch                     Stop after branch elimination\n";
      printf "         -load-store                 Stop after load-store elimination\n";
      printf "         -gep                        Stop after getelementptr elimination\n";
-     printf "         -O0|-O1|-O2|-Os|-Ofast|-O4  Set clang optimization level";
+     printf "         -O0|-O1|-O2|-Os|-Ofast|-O4  Set clang optimization level\n";
      exit 0)
   else if options.fv then
     List.iter
