@@ -702,6 +702,8 @@ begin
   if options.help then
     (printf "Usage: ./smpcc foo.c [options]\n";
      printf "Options: -help                       Print this help message\n";
+     printf "         -debug-blocks               Print the active block during execution\n";
+     printf "         -debug-load-store           Execute loads and stores inside blocks (without splitting)\n";
      printf "         -no-cil                     Do not run cil transformation (flattening)\n";
      printf "         -delta                      Delta printing\n";
      printf "         -circuitlib <lib>           Specify the circuit library (default is yao)\n";
