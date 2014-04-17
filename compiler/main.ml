@@ -154,7 +154,171 @@ module V = State.V
 
  *)
 
-let repl_instrs var replacement instrs = failwith "repl_instrs"
+let rec repl_typ_value var replacement (typ,value) =
+  (typ, repl_value var replacement value)
+and repl_value var replacement x =
+  let rv = repl_value var replacement in
+  let rtv (typ,value) = (typ, rv value) in
+  match x with
+  | Var var2                   -> if var=var2 then replacement else x
+  | Basicblock var2            -> if var=var2 then replacement else x
+  | Mdnode _                   -> x
+  | Mdstring _                 -> x
+  | Null                       -> x
+  | Undef                      -> x
+  | Zero                       -> x
+  | True                       -> x
+  | False                      -> x
+  | Int _                      -> x
+  | Float _                    -> x
+  | Asm _                      -> x
+  | Mdnodevector l             -> Mdnodevector (List.map (function None -> None | Some(typ, value) -> Some(typ, rv value)) l)
+  | Blockaddress(x, y)         -> Blockaddress(rv x, rv y)
+  | Array ops                  -> Array(List.map rtv ops)
+  | Vector ops                 -> Vector(List.map rtv ops)
+  | Struct(is_packed, ops)     -> Struct(is_packed, List.map rtv ops)
+  | Trunc(x, y)                -> Trunc(rtv x, y)
+  | Zext(x, y)                 -> Zext(rtv x, y)         
+  | Sext(x, y)                 -> Sext(rtv x, y)         
+  | Fptrunc(x, y)              -> Fptrunc(rtv x, y)      
+  | Fpext(x, y)                -> Fpext(rtv x, y)        
+  | Bitcast(x, y)              -> Bitcast(rtv x, y)      
+  | Addrspacecast(x, y)        -> Addrspacecast(rtv x, y)
+  | Uitofp(x, y)               -> Uitofp(rtv x, y)       
+  | Sitofp(x, y)               -> Sitofp(rtv x, y)       
+  | Fptoui(x, y)               -> Fptoui(rtv x, y)       
+  | Fptosi(x, y)               -> Fptosi(rtv x, y)       
+  | Inttoptr(x, y)             -> Inttoptr(rtv x, y)     
+  | Ptrtoint(x, y)             -> Ptrtoint(rtv x, y)     
+  | Extractvalue(x, y)         -> Extractvalue(rtv x, y)
+  | Insertvalue(x, y, z)       -> Insertvalue(rtv x, rtv y, z)
+  | Icmp(cmp, x, y)            -> Icmp(cmp, rtv x, rtv y)
+  | Fcmp(cmp, x, y)            -> Fcmp(cmp, rtv x, rtv y)
+  | Sdiv(e, x, y)              -> Sdiv(e, rtv x, rtv y)  
+  | Udiv(e, x, y)              -> Udiv(e, rtv x, rtv y)  
+  | Lshr(e, x, y)              -> Lshr(e, rtv x, rtv y)  
+  | Ashr(e, x, y)              -> Ashr(e, rtv x, rtv y)  
+  | Fadd(x, y)                 -> Fadd(rtv x, rtv y)     
+  | Fsub(x, y)                 -> Fsub(rtv x, rtv y)     
+  | Fmul(x, y)                 -> Fmul(rtv x, rtv y)     
+  | Fdiv(x, y)                 -> Fdiv(rtv x, rtv y)     
+  | Frem(x, y)                 -> Frem(rtv x, rtv y)     
+  | Urem(x, y)                 -> Urem(rtv x, rtv y)     
+  | Srem(x, y)                 -> Srem(rtv x, rtv y)     
+  | And (x, y)                 -> And (rtv x, rtv y)     
+  | Or  (x, y)                 -> Or  (rtv x, rtv y)     
+  | Xor (x, y)                 -> Xor (rtv x, rtv y)     
+  | Getelementptr(inbounds, x) -> Getelementptr(inbounds, List.map rtv x)
+  | Shufflevector x            -> Shufflevector(List.map rtv x)
+  | Insertelement x            -> Insertelement(List.map rtv x) 
+  | Extractelement x           -> Extractelement(List.map rtv x)
+  | Select x                   -> Select(List.map rtv x)
+  | Add(nuw, nsw, x, y)        -> Add(nuw, nsw, rtv x, rtv y)
+  | Sub(nuw, nsw, x, y)        -> Sub(nuw, nsw, rtv x, rtv y)
+  | Mul(nuw, nsw, x, y)        -> Mul(nuw, nsw, rtv x, rtv y)
+  | Shl(nuw, nsw, x, y)        -> Shl(nuw, nsw, rtv x, rtv y)
+and repl_instr var replacement x =
+  let rv = repl_value var replacement in
+  let rtv = repl_typ_value var replacement in
+  let rtvl = List.map (repl_typ_value var replacement) in
+  match x with 
+  | Add(nuw, nsw, x, y) -> Add(nuw, nsw, rtv x, rv y)
+  | Sub(nuw, nsw, x, y) -> Sub(nuw, nsw, rtv x, rv y)
+  | Mul(nuw, nsw, x, y) -> Mul(nuw, nsw, rtv x, rv y)
+  | Shl(nuw, nsw, x, y) -> Shl(nuw, nsw, rtv x, rv y)
+  | Fadd(fmf, x, y)           -> Fadd(fmf, rtv x, rv y)
+  | Fsub(fmf, x, y)           -> Fsub(fmf, rtv x, rv y)
+  | Fmul(fmf, x, y)           -> Fmul(fmf, rtv x, rv y)
+  | Fdiv(fmf, x, y)           -> Fdiv(fmf, rtv x, rv y)
+  | Frem(fmf, x, y)           -> Frem(fmf, rtv x, rv y)
+  | Sdiv(e, x, y)           -> Sdiv(e, rtv x, rv y)
+  | Udiv(e, x, y)           -> Udiv(e, rtv x, rv y)
+  | Lshr(e, x, y)           -> Lshr(e, rtv x, rv y)
+  | Ashr(e, x, y)           -> Ashr(e, rtv x, rv y)
+  | Urem(x, y)           -> Urem(rtv x, rv y)
+  | Srem(x, y)           -> Srem(rtv x, rv y)
+  | And (x, y)           -> And (rtv x, rv y)
+  | Or  (x, y)           -> Or  (rtv x, rv y)
+  | Xor (x, y)           -> Xor (rtv x, rv y)
+  | Icmp(icmp, x, y) -> Icmp(icmp, rtv x, rv y)
+  | Fcmp(fcmp, x, y) -> Fcmp(fcmp, rtv x, rv y)
+  | Trunc(x, y)          -> Trunc(rtv x, y)        
+  | Zext(x, y)           -> Zext(rtv x, y)         
+  | Sext(x, y)           -> Sext(rtv x, y)         
+  | Fptrunc(x, y)        -> Fptrunc(rtv x, y)      
+  | Fpext(x, y)          -> Fpext(rtv x, y)        
+  | Bitcast(x, y)        -> Bitcast(rtv x, y)      
+  | Addrspacecast(x, y)  -> Addrspacecast(rtv x, y)
+  | Uitofp(x, y)         -> Uitofp(rtv x, y)       
+  | Sitofp(x, y)         -> Sitofp(rtv x, y)       
+  | Fptoui(x, y)         -> Fptoui(rtv x, y)       
+  | Fptosi(x, y)         -> Fptosi(rtv x, y)       
+  | Inttoptr(x, y)       -> Inttoptr(rtv x, y)     
+  | Ptrtoint(x, y)       -> Ptrtoint(rtv x, y)     
+  | Va_arg(x, y)         -> Va_arg(rtv x, y)       
+  | Getelementptr(inbounds, x) -> Getelementptr(inbounds, x)
+  | Shufflevector x -> Shufflevector(rtvl x)
+  | Insertelement x -> Insertelement(rtvl x)
+  | Extractelement x -> Extractelement(rtvl x)
+  | Select x -> Select(rtvl x)
+  | Phi(ty, incoming) -> Phi(ty,
+                             List.map (fun (v1,v2) -> (rv v1, rv v2)) incoming)
+  | Landingpad(x, y, z, w) ->
+      Landingpad(x, rtv y, z,
+                 List.map (function
+                   | Catch(typ, value) -> Catch(typ, rv value)
+                   | Filter(typ, value) ->Filter(typ, rv value)) w)
+  | Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs) ->
+      Call(is_tail_call, callconv, retattrs, callee_ty, rv callee_name,
+           List.map (fun (typ,attrs,value) -> (typ,attrs,rv value)) operands,
+           callattrs)
+  | Alloca(x, y, z, w) ->
+      Alloca(x, y,
+             (match z with None -> None | Some q -> Some(rtv q)),
+             w)
+  | Load(x, y, z, w, v) ->
+      Load(x, y, rtv z, w, v)
+  | Store(x, y, z, w, v, u) ->
+      Store(x, y, rtv z, rtv w, v, u)
+  | Cmpxchg(x, y, z, w, v, u, t) ->
+      Cmpxchg(x, rtv y, rtv z, rtv w, v, u, t)
+  | Atomicrmw(x, y, z, w, v, u) ->
+      Atomicrmw(x, y, rtv z, rtv w, v, u)
+  | Fence(x, y) -> Fence(x, y)
+  | Extractvalue(x, y) ->
+      Extractvalue(rtv x, y)
+  | Insertvalue(x, y, z) ->
+      Insertvalue(rtv x, rtv y, z)
+  | Unreachable ->
+      Unreachable
+  | Return None ->
+      Return None
+  | Return(Some tv) ->
+      Return(Some(rtv tv))
+  | Br(x, None) ->
+      Br(rtv x, None)
+  | Br(x, Some(y, z)) ->
+      Br(rtv x, Some(rtv y, rtv z))
+  | Indirectbr(x, y) ->
+      Indirectbr(rtv x, rtvl y)
+  | Resume x ->
+      Resume(rtv x)
+  | Switch(x, y, z) ->
+      Switch(rtv x, rtv y, List.map (fun (a,b) -> (rtv a, rtv b)) z)
+  | Invoke(x, y, z, w, v, u, t, s) ->
+      Invoke(x, y, z, rv w, List.map (fun (typ,attrs,value) -> (typ,attrs,rv value)) v, u, rtv t, rtv s)
+
+let repl_instrs var replacement instrs =
+  let rec loop = function
+    | [] -> []
+    | (nopt,instr)::tl ->
+        let replaced = repl_instr var replacement instr in
+        (match nopt with
+        | None -> (nopt, replaced)::(loop tl)
+        | Some x ->
+            if x=var then (Some x,replaced)::tl else
+            (Some x, replaced)::(loop tl)) in
+  loop instrs
 
 (* wow this is ugly *)
 (*
@@ -331,7 +495,7 @@ let phi_elimination f =
       let before_and_afters =
         List.map
           (fun (var, value) ->
-            let ty = typ_of_var var in
+            let ty = State.typ_of_var var in
             let temp_var = Name(false, State.fresh()) in
             let before = assign_instr temp_var ty ty value in
             let after = assign_instr var ty ty (Var temp_var) in

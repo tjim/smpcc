@@ -12,6 +12,29 @@ let string_constants = Hashtbl.create 10
 let govar v =
   Str.global_replace (Str.regexp "[%@.]") "_" (State.v_map v)
 
+let rec bpr_go_value b typ = function
+  | Var v ->
+      let is_a_global = (match v with Name(x,_) -> x | Id(x,_) -> x) in
+      if is_a_global then
+        (try
+          let loc = Hashtbl.find global_locations v in
+          bprintf b "Uint(io, %d, 64)" loc
+        with Not_found ->
+          eprintf "global not there %s\n" (govar v);
+          bprintf b "%s" (govar v))
+      else
+        bprintf b "%s" (govar v)
+  | Int x ->
+      bprintf b "Int(io, %s, %d)" (Big_int.string_of_big_int x) (bitwidth typ)
+  | Zero ->
+      bprintf b "Uint(io, 0, %d) /* CAUTION: zero */" (bitwidth typ)
+  | Null ->
+      bprintf b "Uint(io, 0, %d) /* CAUTION: null */" (bitwidth typ)
+  | Undef ->
+      bprintf b "Uint(io, 0, %d) /* CAUTION: undef */" (bitwidth typ)
+  | op ->
+      bpr_value b op
+
 let rec bpr_go_oValue b = function
   | Var v ->
       let is_a_global = (match v with Name(x,_) -> x | Id(x,_) -> x) in
@@ -30,13 +53,6 @@ let rec bpr_go_oValue b = function
       bprintf b "Uint(io, 0, 32) /* CAUTION: null */" (* TODO: need width, assume 32 for now *)
   | Undef ->
       bprintf b "Uint(io, 0, 32) /* CAUTION: undef */" (* TODO: get correct width, we assume 32 for now *)
-(*
-  | Basicblock bl ->
-      bprintf b "Uint(io, %d, %d)" (State.bl_num bl) (State.get_bl_bits())
-  | ConstantExpr(Llvm.Opcode.IntToPtr,[(ty,op)]) ->
-      bprintf b "/* CAUTION: inttoptr */ ";
-      bpr_go_oValue b op
-*)
   | op ->
       bpr_value b op
 
@@ -72,22 +88,23 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
           bprintf b "\t%s := " (govar v);
         VSet.add v declared_vars) in
   (match i with
-  | Call(_,_,_,_,Var(Name(true, "printf")),(_,_,v)::ops,_) ->
-               (try
-                 let s = String.escaped(Hashtbl.find string_constants v) in
-                 if ops = [] then
-                   bprintf b "Printf(io, mask, \"%s\")\n" s
-                 else
-                   bprintf b "Printf(io, mask, \"%s\", %a)\n" s (between ", " bpr_go_oValue) (List.map third ops)
-               with _ ->
-                 failwith "Error: first argument of printf must be a string constant")
+  | Call(_,_,_,_,Var(Name(true, "printf")),(_,_,Getelementptr(_,[(_, v);(_, Int z);(_, Int z')]))::ops,_)
+    when Big_int.eq_big_int Big_int.zero_big_int z && Big_int.eq_big_int Big_int.zero_big_int z' ->
+      (try
+        let s = String.escaped(Hashtbl.find string_constants v) in
+        if ops = [] then
+          bprintf b "Printf(io, mask, \"%s\")\n" s
+        else
+          bprintf b "Printf(io, mask, \"%s\", %a)\n" s (between ", " bpr_go_oValue) (List.map third ops)
+      with _ ->
+        failwith "Error: first argument of printf must be a string constant")
   | Call(_,_,_,_,Var(Name(true, "puts")),[_,_,Getelementptr(_,[(_, v);(_, Int z);(_, Int z')])],_)
-      when Big_int.eq_big_int Big_int.zero_big_int z && Big_int.eq_big_int Big_int.zero_big_int z' ->
-               (try
-                 let s = String.escaped(Hashtbl.find string_constants v) in
-                 bprintf b "Printf(io, mask, \"%s\\n\")\n" s (* puts adds a newline *)
-               with _ ->
-                 failwith "Error: argument of puts must be a string constant")
+    when Big_int.eq_big_int Big_int.zero_big_int z && Big_int.eq_big_int Big_int.zero_big_int z' ->
+      (try
+        let s = String.escaped(Hashtbl.find string_constants v) in
+        bprintf b "Printf(io, mask, \"%s\\n\")\n" s (* puts adds a newline *)
+      with _ ->
+        failwith "Error: argument of puts must be a string constant")
   | Call(_,_,_,_,Var(Name(true, "putchar")),[_,_,value],_) ->
                bprintf b "Printf(io, mask, \"%%c\", %a)\n" bpr_go_oValue value
   | Call(_,_,_,_,Var(Name(true, "gen_int")),_,_) ->
@@ -355,8 +372,8 @@ let bpr_main b f is_gen =
   bprintf b "\n"
 
 let rec bytes_of_value b bytes = function
-  | Int x ->
-      let bytes2 = 4 in (* TODO: get actual width *)
+  | typ, Int x ->
+      let bytes2 = bitwidth typ / 8 in (* TODO: do we care if not a multiple of 8? *)
       let ff = Int64.of_int 255 in
       let y = ref(Int64.of_int(Big_int.int_of_big_int x)) in
       for i = 1 to bytes2 do
@@ -365,26 +382,21 @@ let rec bytes_of_value b bytes = function
         y := Int64.shift_right_logical !y 8
       done;
       bytes - bytes2
-  | Zero ->
-      for i = 1 to bytes do
-        bprintf b "%c" (Char.chr 0)
-      done;
-      0
-  | Null ->
-      bprintf b "%c%c%c%c" (Char.chr 0) (Char.chr 0) (Char.chr 0) (Char.chr 0);
-      (bytes - 4)
-  | Struct(is_packed,ops) ->
+  | typ, Zero
+  | typ, Null ->
+      bytes_of_value b bytes (typ, Int(Big_int.zero_big_int))
+  | typ, Struct(is_packed,ops) ->
       (* TODO: handle packing and alignment issues *)
       List.fold_left
         (fun bytes op -> bytes_of_value b bytes op)
         bytes
-        (List.map snd ops)
-  | Array ops
-  | Vector ops ->
+        ops
+  | typ, Array ops
+  | typ, Vector ops ->
       List.fold_left
         (fun bytes op -> bytes_of_value b bytes op)
         bytes
-        (List.map snd ops)
+        ops
   | _ ->
       failwith "bytes_of_value"
 
@@ -399,12 +411,12 @@ let bpr_globals b m =
   let b1 = Buffer.create 11 in
   let alloc_global = function
     | { gvalue=None } -> ()
-    | {gname; gtyp; gvalue=Some v } ->
+    | { gname; gtyp; gvalue=Some v } ->
     Hashtbl.add global_locations gname !loc;
     let bytes =
       try bytewidth gtyp with _ -> 100 in
     let bytevals = Buffer.create bytes in
-    let written = bytes_of_value bytevals bytes v in
+    let written = bytes_of_value bytevals bytes (gtyp, v) in
     if written != 0 || bytes != Buffer.length bytevals then begin
       let gname = (let b2 = Buffer.create 11 in bpr_var b2 gname; Buffer.contents b2) in
       eprintf "WHOA! expected %d bytes, found %d bytes for global %s\n" bytes (Buffer.length bytevals) gname;
@@ -414,9 +426,10 @@ let bpr_globals b m =
     done;
     (* Look for string constants, might be used by Printf *)
     (match gtyp with
-    | Pointer(Arraytyp(len, Integer 8),_) ->
+    | Arraytyp(len, Integer 8) ->
         if (0 = Char.code (Buffer.nth bytevals (bytes - 1))) then
           let s = Buffer.sub bytevals 0 (len - 1) in
+          Printf.printf "String constant: %s\n" (string_of_var gname);
           Hashtbl.add string_constants (Var gname) s
     | _ -> ());
     loc := !loc + bytes;

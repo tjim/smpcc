@@ -69,32 +69,31 @@ type typ =
   | Pointer of typ * int option      (* element type, address space *)
   | Vector  of int * typ             (* array length, element type *)
 
-let typ_of_var x = Void (* FIX *)
-
 let rec bitwidth = function
-  | Vartyp _ -> 0 (* ??? *)
-  | Void                                         -> 0
-  | Half                                         -> 16 (* ??? *)
-  | Float                                        -> 32
-  | Double                                       -> 64
-  | X86_fp80                                     -> 80
-  | X86_mmx                                      -> 128 (* ??? *)
-  | Fp128                                        -> 128
-  | Ppc_fp128                                    -> 128
-  | Label                                        -> 32 (* ??? *)
-  | Metadata                                     -> -1 (* ??? *)
-  | Integer x                                    -> x
-  | Funtyp(return_ty, param_tys, is_var_arg) -> -1 (* ??? *)
-  | Structtyp(packed, tys)                       ->
+  | Vartyp _                                 -> 0 (* TODO: need type environments *)
+  | Void                                     -> 0
+  | Half                                     -> 16
+  | Float                                    -> 32
+  | Double                                   -> 64
+  | X86_fp80                                 -> 80
+  | X86_mmx                                  -> 64
+  | Fp128                                    -> 128
+  | Ppc_fp128                                -> 128
+  | Label                                    -> 32 (* ??? *)
+  | Metadata                                 -> 0
+  | Integer x                                -> x
+  | Funtyp(return_ty, param_tys, is_var_arg) -> 0
+  | Structtyp(false, tys) (* TODO: not packed struct, depends on datalayout *)
+  | Structtyp(true, tys)                     ->
       List.fold_left (fun x y -> x+y) 0 (List.map bitwidth tys)
-  | Arraytyp(len,element_ty)                        -> len*(bitwidth element_ty)
-  | Pointer(address_space,element_ty)            -> 64
-  | Vector(len,element_ty)                       -> len*(bitwidth element_ty)
+  | Arraytyp(len,element_ty)                 -> len*(bitwidth element_ty)
+  | Pointer(address_space,element_ty)        -> 64 (* TODO: depends on datalayout *)
+  | Vector(len,element_ty)                   -> len*(bitwidth element_ty)
 
 let bytewidth ty =
   let bits = bitwidth ty in
-  if (bits mod 8) <> 0 then failwith "bytewidth: bits are not a multiple of 8";
-  bits/8
+  if (bits mod 8) <> 0 then Printf.eprintf "Warning: bitwidth not divisible by 8";
+  bits/8 + (if (bits mod 8) <> 0 then 1 else 0)
 
 module I = struct
   type t =
@@ -371,7 +370,7 @@ type ginfo = {
     mutable gunnamed_addr: bool;
     mutable gexternally_initialized: bool;
     mutable gconstant: bool;
-    mutable gtyp: typ;
+    mutable gtyp: typ; (* actual type of the global is a pointer to this type *)
     mutable gvalue: value option;
     mutable gsection: string option;
     mutable galign: int option;
@@ -1005,7 +1004,7 @@ let bpr_instr b (nopt, i) =
         (yes "singlthread ") x
         bpr_ordering y
   | Extractvalue(x, y) ->
-      bprintf b "extractvalue %a%a)" bpr_typ_value x bpr_index_list y
+      bprintf b "extractvalue %a%a" bpr_typ_value x bpr_index_list y
   | Insertvalue(x, y, z) ->
       bprintf b "insertvalue %a, %a%a" bpr_typ_value x bpr_typ_value y bpr_index_list z
   | Unreachable ->

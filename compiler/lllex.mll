@@ -304,5 +304,7 @@ let parse ch =
         (Lexing.lexeme lexbuf);
       failwith "Giving up" in
   number_cu cu;
+  State.assign_vartyps cu;
+  State.dump_vartyps();
   cu
 }

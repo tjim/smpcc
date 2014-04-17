@@ -3,6 +3,7 @@ open Printf
 let x_count = ref 0
 let bl_count = ref 0
 let bl_tbl : (Util.var, int) Hashtbl.t = Hashtbl.create 11
+let vartyp_tbl : (Util.var, Util.typ) Hashtbl.t = Hashtbl.create 11
 let initialized = ref false
 let muxes : (Util.var * Util.var * string) list ref = ref []
 let add_mux x = muxes := x::!muxes
@@ -36,10 +37,6 @@ let freshen name =
       !x_count in
   x_count := !x_count + 1;
   x
-let fresh_label() =
-  let x = sprintf "attsrcLabel%d" !x_count in
-  x_count := !x_count + 1;
-  Util.Name(false,x)
 let bl_num bl =
   if Hashtbl.mem bl_tbl bl then Hashtbl.find bl_tbl bl else
   let num = !bl_count in
@@ -58,22 +55,152 @@ let dump() =
     bl_tbl;
   printf "%s" (Buffer.contents b)
 
-module V = struct
-let attsrcIsDone =  Util.Name(false,"attsrcIsDone") (* Util.Integer 1 *)
-let attsrcMemAct =  Util.Name(false,"attsrcMemAct") (* Util.Integer 2 *)
-let attsrcMemLoc =  Util.Name(false,"attsrcMemLoc") (* Util.Integer 64 *)
-let attsrcMemVal =  Util.Name(false,"attsrcMemVal") (* Util.Integer 32 *)
-let attsrcMemRes =  Util.Name(false,"attsrcMemRes") (* Util.Integer 64 *)
-let attsrcMemSize = Util.Name(false,"attsrcMemSize") (* Util.Integer 32 *)
-let attsrcNumElts = Util.Name(false,"attsrcNumElts") (* Util.Integer 32 *)
-let attsrcAnswer =  Util.Name(false,"attsrcAnswer") (* Util.Integer 32 *)
+let typ_of_var var =
+  try Hashtbl.find vartyp_tbl var
+  with Not_found -> failwith("Could not find type of " ^ (Util.string_of_var var))
+let add_vartyp var typ = Hashtbl.add vartyp_tbl var typ; var
 
-let attsrcStateO() = Util.Name(false,"attsrcStateO") (* Util.Integer(get_bl_bits()) *)
+let fresh_label() =
+  let x = sprintf "attsrcLabel%d" !x_count in
+  x_count := !x_count + 1;
+  add_vartyp (Util.Name(false,x)) Util.Label
+
+let dump_vartyps() =
+  let b = Buffer.create 11 in
+  Hashtbl.iter
+    (fun var typ ->
+      bprintf b "%a: %a\n" Util.bpr_var var Util.bpr_typ typ)
+    vartyp_tbl;
+  Printf.printf "%s" (Buffer.contents b)
+
+module V = struct
+let attsrcIsDone =  add_vartyp (Util.Name(false,"attsrcIsDone"))  (Util.Integer 1)
+let attsrcMemAct =  add_vartyp (Util.Name(false,"attsrcMemAct"))  (Util.Integer 2)
+let attsrcMemLoc =  add_vartyp (Util.Name(false,"attsrcMemLoc"))  (Util.Integer 64)
+let attsrcMemVal =  add_vartyp (Util.Name(false,"attsrcMemVal"))  (Util.Integer 32)
+let attsrcMemRes =  add_vartyp (Util.Name(false,"attsrcMemRes"))  (Util.Integer 64)
+let attsrcMemSize = add_vartyp (Util.Name(false,"attsrcMemSize")) (Util.Integer 32)
+let attsrcNumElts = add_vartyp (Util.Name(false,"attsrcNumElts")) (Util.Integer 32)
+let attsrcAnswer =  add_vartyp (Util.Name(false,"attsrcAnswer"))  (Util.Integer 32)
+let attsrcStateO() = Util.Name(false,"attsrcStateO")
 let special = (* NB: Works now because we have hard-coded bl_bits to 32 *)
+  ignore(add_vartyp (Util.Name(false,"attsrcStateO")) (Util.Integer(get_bl_bits())));
   List.fold_right Util.VSet.add
     [attsrcIsDone; attsrcMemAct; attsrcMemLoc; attsrcMemVal; attsrcMemSize; attsrcNumElts; attsrcAnswer;
      attsrcStateO();]
     Util.VSet.empty
 end
 
-let typ_of_var v = failwith "unimplemented"
+let assign_vartyps_instr (nopt, i) =
+  let typ =
+    let typ_of (t,v) = t in
+    (match i with
+    | Util.Add(nuw, nsw, x, y) -> typ_of x
+    | Util.Sub(nuw, nsw, x, y) -> typ_of x
+    | Util.Mul(nuw, nsw, x, y) -> typ_of x
+    | Util.Shl(nuw, nsw, x, y) -> typ_of x
+    | Util.Fadd(fmf, x, y)           -> typ_of x
+    | Util.Fsub(fmf, x, y)           -> typ_of x
+    | Util.Fmul(fmf, x, y)           -> typ_of x
+    | Util.Fdiv(fmf, x, y)           -> typ_of x
+    | Util.Frem(fmf, x, y)           -> typ_of x
+    | Util.Sdiv(e, x, y)           -> typ_of x
+    | Util.Udiv(e, x, y)           -> typ_of x
+    | Util.Lshr(e, x, y)           -> typ_of x
+    | Util.Ashr(e, x, y)           -> typ_of x
+    | Util.Urem(x, y)           -> typ_of x
+    | Util.Srem(x, y)           -> typ_of x
+    | Util.And (x, y)           -> typ_of x
+    | Util.Or  (x, y)           -> typ_of x
+    | Util.Xor (x, y)           -> typ_of x
+    | Util.Icmp(icmp, x, y) -> typ_of x
+    | Util.Fcmp(fcmp, x, y) -> typ_of x
+    | Util.Trunc(x, y)          -> typ_of x
+    | Util.Zext(x, y)           -> typ_of x
+    | Util.Sext(x, y)           -> typ_of x
+    | Util.Fptrunc(x, y)        -> typ_of x
+    | Util.Fpext(x, y)          -> typ_of x
+    | Util.Bitcast(x, y)        -> typ_of x
+    | Util.Addrspacecast(x, y)  -> typ_of x
+    | Util.Uitofp(x, y)         -> typ_of x
+    | Util.Sitofp(x, y)         -> typ_of x
+    | Util.Fptoui(x, y)         -> typ_of x
+    | Util.Fptosi(x, y)         -> typ_of x
+    | Util.Inttoptr(x, y)       -> typ_of x
+    | Util.Ptrtoint(x, y)       -> typ_of x
+    | Util.Va_arg(x, y)         -> typ_of x
+    | Util.Getelementptr(inbounds, x) ->
+        (match x with
+        | (Util.Pointer(ety,_),_)::tl ->
+            let ety = Util.Arraytyp(1,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
+            let rec loop ety = function
+              | [] -> ety
+              | (_,y)::tl ->
+                  (match ety with
+                  | Util.Arraytyp(_,ety') ->
+                      (* assume that y is in-bounds *)
+                      loop ety' tl
+                  | Util.Structtyp(_,field_typs) ->
+                      (match y with
+                      | Util.Int i ->
+                          let ety' =
+                            (try List.nth field_typs (Big_int.int_of_big_int i)
+                            with _ -> failwith "getelementptr: out-of-bounds struct field selection") in
+                          loop ety' tl
+                      | _ -> failwith "getelementptr: non-int selector for struct field")
+                  | _ ->
+                      failwith "getelementptr: pointer does not point into an array or struct") in
+            loop ety tl
+        | _ -> failwith "getelementptr: must be applied to a pointer")
+    | Util.Shufflevector [(Util.Vector(_,typ),_);_;(Util.Vector(m,_),_)] -> Util.Vector(m,typ)
+    | Util.Insertelement [(typ,_);_;_] -> typ
+    | Util.Extractelement [(Util.Vector(_,typ),_);_;_] -> typ
+    | Util.Select[_;(typ,_);_] -> typ
+    | Util.Phi(typ, incoming) -> typ
+    | Util.Landingpad(x, y, z, w) -> x
+    | Util.Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs) -> callee_ty
+    | Util.Alloca(x, y, z, w) -> y
+    | Util.Load(x, y, z, w, v) -> typ_of z
+    | Util.Store(x, y, z, w, v, u) -> typ_of z
+    | Util.Cmpxchg(x, y, z, w, v, u, t) -> typ_of z
+    | Util.Atomicrmw(x, y, z, w, v, u) -> typ_of w
+    | Util.Fence(x, y) -> Util.Void
+    | Util.Extractvalue((typ,_), y) ->
+        let rec loop = function
+          | typ, [] -> typ
+          | Util.Structtyp(_,l), hd::tl ->
+              if hd < 0 || hd >= List.length l then failwith "extractvalue struct index out of range" else
+              let typ = List.nth l hd in
+              loop (typ, tl)
+          | Util.Arraytyp(len,typ), hd::tl ->
+              if hd < 0 || hd >= len then  failwith "extractvalue array index out of range" else
+              loop (typ, tl)
+          | _ -> failwith "extractvalue: not a struct or array" in
+        loop (typ, y)
+    | Util.Insertvalue(x, y, z) -> typ_of x
+    | Util.Unreachable -> Util.Void
+    | Util.Return None -> Util.Void
+    | Util.Return(Some(x, y)) -> Util.Void
+    | Util.Br(x, None) -> Util.Void
+    | Util.Br(x, Some(y, z)) -> Util.Void
+    | Util.Indirectbr(x, y) -> Util.Void
+    | Util.Resume x -> Util.Void
+    | Util.Switch(x, y, z) -> Util.Void
+    | Util.Invoke(x, y, z, w, v, u, t, s) -> z
+    | _ -> failwith "assign_vartyps_instr") in
+  (match nopt with None -> () | Some var -> ignore(add_vartyp var typ))
+
+let assign_vartyps_block b =
+  ignore(add_vartyp b.Util.bname Util.Label);
+  List.iter assign_vartyps_instr b.Util.binstrs
+
+let assign_vartyps cu =
+  List.iter
+    (fun {Util.gname;Util.gtyp} -> ignore(add_vartyp gname (Pointer(gtyp,None))))
+    cu.Util.cglobals;
+  List.iter
+    (fun f ->
+      let ftyp = Util.Pointer(Util.Funtyp(f.Util.freturntyp,fst f.Util.fparams,snd f.Util.fparams), None) in
+      ignore(add_vartyp f.Util.fname ftyp);
+      List.iter assign_vartyps_block f.Util.fblocks)
+    cu.Util.cfuns

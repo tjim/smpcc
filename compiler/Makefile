@@ -3,10 +3,10 @@ CXXFLAGS=-I/usr/lib/ocaml
 CFLAGS=-I/usr/lib/ocaml
 LIBS=nums.cmxa unix.cmxa str.cmxa
 
-smpcc: util.cmx llparse.cmx lllex.cmx state.cmx options.cmx gobe.cmx main.cmx
+smpcc: util.cmx state.cmx llparse.cmx lllex.cmx options.cmx gobe.cmx main.cmx
 	ocamlopt $(LIBS) $^ -o $@
 
-parse: util.cmx llparse.cmx lllex.cmx echo.cmx
+parse: util.cmx state.cmx llparse.cmx lllex.cmx echo.cmx
 	ocamlopt nums.cmxa $^ -o $@
 
 clean:
