@@ -63,6 +63,17 @@ func slot(keys []base.Key) int {
 	return result
 }
 
+func findZeroSlots(a, b []base.Key) (res []bool) {
+	res = make([]bool, len(a))
+	for i := 0; i < len(a); i++ {
+		if a[0]%2 == 0 && b[0]%2 == 0 {
+			res[i] = true
+		} else {
+			res[i] = false
+		}
+	}
+}
+
 func decrypt_nonoptimized(keys []base.Key, ciphertext []byte) []byte {
 	result := ciphertext
 	for i := len(keys); i > 0; i-- {
@@ -159,9 +170,14 @@ func (y GaxState) bitwise_binary_operator(io base.Evalio, a, b []base.Key) []bas
 		panic("Wire mismatch in eval.bitwise_binary_operator()")
 	}
 	result := make([]base.Key, len(a))
+	zeroSlots := findZeroSlots(a, b)
 	for i := 0; i < len(a); i++ {
 		t := io.RecvT()
-		result[i] = y.Decrypt(t, a[i], b[i])
+		if zeroSlots[i] {
+
+		} else {
+			result[i] = y.Decrypt(t, a[i], b[i])
+		}
 	}
 	return result
 }

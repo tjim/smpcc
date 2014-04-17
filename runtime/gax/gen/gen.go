@@ -179,7 +179,7 @@ func (y GaxState) And(a, b []base.Wire) []base.Wire {
 			zeroSlots[i][0]&zeroSlots[i][1])
 		// w := genWire()
 		result[i] = w
-		t := make([]base.Ciphertext, 3)
+		t := make([]base.Ciphertext, 4)
 		for j1 := 0; j1 <= 1; j1++ {
 			for j2 := 0; j2 <= 1; j2++ {
 				if j1 == zeroSlots[i][0] && j2 == zeroSlots[i][1] {
