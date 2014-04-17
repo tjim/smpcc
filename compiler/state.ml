@@ -128,39 +128,39 @@ let assign_vartyps_instr (nopt, i) =
     | Util.Sub(nuw, nsw, x, y) -> typ_of x
     | Util.Mul(nuw, nsw, x, y) -> typ_of x
     | Util.Shl(nuw, nsw, x, y) -> typ_of x
-    | Util.Fadd(fmf, x, y)           -> typ_of x
-    | Util.Fsub(fmf, x, y)           -> typ_of x
-    | Util.Fmul(fmf, x, y)           -> typ_of x
-    | Util.Fdiv(fmf, x, y)           -> typ_of x
-    | Util.Frem(fmf, x, y)           -> typ_of x
-    | Util.Sdiv(e, x, y)           -> typ_of x
-    | Util.Udiv(e, x, y)           -> typ_of x
-    | Util.Lshr(e, x, y)           -> typ_of x
-    | Util.Ashr(e, x, y)           -> typ_of x
-    | Util.Urem(x, y)           -> typ_of x
-    | Util.Srem(x, y)           -> typ_of x
-    | Util.And (x, y)           -> typ_of x
-    | Util.Or  (x, y)           -> typ_of x
-    | Util.Xor (x, y)           -> typ_of x
-    | Util.Icmp(icmp, x, y) -> typ_of x
-    | Util.Fcmp(fcmp, x, y) -> typ_of x
-    | Util.Trunc(x, y)          -> typ_of x
-    | Util.Zext(x, y)           -> typ_of x
-    | Util.Sext(x, y)           -> typ_of x
-    | Util.Fptrunc(x, y)        -> typ_of x
-    | Util.Fpext(x, y)          -> typ_of x
-    | Util.Bitcast(x, y)        -> typ_of x
-    | Util.Addrspacecast(x, y)  -> typ_of x
-    | Util.Uitofp(x, y)         -> typ_of x
-    | Util.Sitofp(x, y)         -> typ_of x
-    | Util.Fptoui(x, y)         -> typ_of x
-    | Util.Fptosi(x, y)         -> typ_of x
-    | Util.Inttoptr(x, y)       -> typ_of x
-    | Util.Ptrtoint(x, y)       -> typ_of x
-    | Util.Va_arg(x, y)         -> typ_of x
+    | Util.Fadd(fmf, x, y)     -> typ_of x
+    | Util.Fsub(fmf, x, y)     -> typ_of x
+    | Util.Fmul(fmf, x, y)     -> typ_of x
+    | Util.Fdiv(fmf, x, y)     -> typ_of x
+    | Util.Frem(fmf, x, y)     -> typ_of x
+    | Util.Sdiv(e, x, y)       -> typ_of x
+    | Util.Udiv(e, x, y)       -> typ_of x
+    | Util.Lshr(e, x, y)       -> typ_of x
+    | Util.Ashr(e, x, y)       -> typ_of x
+    | Util.Urem(x, y)          -> typ_of x
+    | Util.Srem(x, y)          -> typ_of x
+    | Util.And (x, y)          -> typ_of x
+    | Util.Or  (x, y)          -> typ_of x
+    | Util.Xor (x, y)          -> typ_of x
+    | Util.Icmp(icmp, x, y)    -> Util.Integer 1
+    | Util.Fcmp(fcmp, x, y)    -> Util.Integer 1
+    | Util.Trunc(x, y)         -> y
+    | Util.Zext(x, y)          -> y
+    | Util.Sext(x, y)          -> y
+    | Util.Fptrunc(x, y)       -> y
+    | Util.Fpext(x, y)         -> y
+    | Util.Bitcast(x, y)       -> y
+    | Util.Addrspacecast(x, y) -> y
+    | Util.Uitofp(x, y)        -> y
+    | Util.Sitofp(x, y)        -> y
+    | Util.Fptoui(x, y)        -> y
+    | Util.Fptosi(x, y)        -> y
+    | Util.Inttoptr(x, y)      -> y
+    | Util.Ptrtoint(x, y)      -> y
+    | Util.Va_arg(x, y)        -> y
     | Util.Getelementptr(inbounds, x) ->
         (match x with
-        | (Util.Pointer(ety,_),_)::tl ->
+        | (Util.Pointer(ety,aspace),_)::tl ->
             let ety = Util.Arraytyp(1,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
             let rec loop ety = function
               | [] -> ety
@@ -179,7 +179,7 @@ let assign_vartyps_instr (nopt, i) =
                       | _ -> failwith "getelementptr: non-int selector for struct field")
                   | _ ->
                       failwith "getelementptr: pointer does not point into an array or struct") in
-            loop ety tl
+            Pointer(loop ety tl,aspace)
         | _ -> failwith "getelementptr: must be applied to a pointer")
     | Util.Shufflevector [(Util.Vector(_,typ),_);_;(Util.Vector(m,_),_)] -> Util.Vector(m,typ)
     | Util.Insertelement [(typ,_);_;_] -> typ
@@ -189,7 +189,7 @@ let assign_vartyps_instr (nopt, i) =
     | Util.Landingpad(x, y, z, w) -> x
     | Util.Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs) -> callee_ty
     | Util.Alloca(x, y, z, w) -> y
-    | Util.Load(x, y, z, w, v) -> typ_of z
+    | Util.Load(x, y, (Util.Pointer(typ,_), z), w, v) -> typ
     | Util.Store(x, y, z, w, v, u) -> typ_of z
     | Util.Cmpxchg(x, y, z, w, v, u, t) -> typ_of z
     | Util.Atomicrmw(x, y, z, w, v, u) -> typ_of w
