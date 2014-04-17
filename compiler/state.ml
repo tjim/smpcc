@@ -120,7 +120,7 @@ let number_cu cu =
         f.Util.fblocks in
   List.iter number_blocks cu.Util.cfuns
 
-let assign_vartyps_instr (nopt, i) =
+let assign_vartyps_instr ctyps (nopt, i) =
   let typ =
     let typ_of (t,v) = t in
     (match i with
@@ -164,7 +164,7 @@ let assign_vartyps_instr (nopt, i) =
             let ety = Util.Arraytyp(1,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
             let rec loop ety = function
               | [] -> ety
-              | (_,y)::tl ->
+              | (ytyp,y)::tl ->
                   (match ety with
                   | Util.Arraytyp(_,ety') ->
                       (* assume that y is in-bounds *)
@@ -177,6 +177,14 @@ let assign_vartyps_instr (nopt, i) =
                             with _ -> failwith "getelementptr: out-of-bounds struct field selection") in
                           loop ety' tl
                       | _ -> failwith "getelementptr: non-int selector for struct field")
+                  | Util.Vartyp v ->
+                      let ety' =
+                        try 
+                          match List.assoc v ctyps with
+                          | None -> failwith ("getelementptr: opaque type "^(Util.string_of_var v))
+                          | Some typ -> typ
+                        with _ -> failwith ("getelementptr: unknown type "^(Util.string_of_var v)) in
+                      loop ety' ((ytyp,y)::tl)
                   | _ ->
                       failwith "getelementptr: pointer does not point into an array or struct") in
             Util.Pointer(loop ety tl,aspace)
@@ -219,9 +227,9 @@ let assign_vartyps_instr (nopt, i) =
     | _ -> failwith "assign_vartyps_instr") in
   (match nopt with None -> () | Some var -> ignore(add_vartyp var typ))
 
-let assign_vartyps_block b =
+let assign_vartyps_block ctyps b =
   ignore(add_vartyp b.Util.bname Util.Label);
-  List.iter assign_vartyps_instr b.Util.binstrs
+  List.iter (assign_vartyps_instr ctyps) b.Util.binstrs
 
 let assign_vartyps cu =
   List.iter
@@ -231,7 +239,7 @@ let assign_vartyps cu =
     (fun f ->
       let ftyp = Util.Pointer(Util.Funtyp(f.Util.freturntyp,fst f.Util.fparams,snd f.Util.fparams), None) in
       ignore(add_vartyp f.Util.fname ftyp);
-      List.iter assign_vartyps_block f.Util.fblocks)
+      List.iter (assign_vartyps_block cu.Util.ctyps) f.Util.fblocks)
     cu.Util.cfuns;
   List.iter
     (Util.value_map (function

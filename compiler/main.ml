@@ -406,7 +406,7 @@ let phi_elimination f =
 
 (* Replace getelementptr by arithmetic *)
 (* http://www.llvm.org/docs/GetElementPtr.html *)
-let gep_elimination f =
+let gep_elimination ctyps f =
   let elim = function
     | Some n, Getelementptr(_,(Pointer(ety,aspace),x)::tl) ->
         let ety = Arraytyp(1,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
@@ -434,6 +434,14 @@ let gep_elimination f =
                   (Some(new_x),Add(false, false, (Pointer(Integer 32, None), x), b))
                   ::(loop (Var new_x) (Integer 32) tl)
                   (* failwith "TODO: struct in getelementptr" *)
+              | Vartyp v, _ ->
+                  let ety' =
+                    try 
+                      match List.assoc v ctyps with
+                      | None -> failwith ("getelementptr: opaque type "^(Util.string_of_var v))
+                      | Some typ -> typ
+                    with _ -> failwith ("getelementptr: unknown type "^(Util.string_of_var v)) in
+                  loop x ety' ((yty,y)::tl)
               | _ ->
                   let ty_string = let b = Buffer.create 11 in bpr_typ b ety; Buffer.contents b in
                   let y_string = let b = Buffer.create 11 in bpr_value b y; Buffer.contents b in
@@ -576,7 +584,7 @@ let optional_print f flag thunk =
       pr_output_file "" (Buffer.contents b);
       if not options.delta then exit 0
 
-let run_phases f =
+let run_phases ctyps f =
   optional_print f options.prf (fun () ->
     phi_elimination f;
     optional_print f options.phi (fun () ->
@@ -584,7 +592,7 @@ let run_phases f =
       optional_print f options.branch (fun () ->
         load_store_elimination f;
         optional_print f options.load_store (fun () ->
-          gep_elimination f;
+          gep_elimination ctyps f;
           optional_print f options.gep (fun () ->
             State.set_bl_bits (List.length f.fblocks))))))
 
@@ -764,7 +772,7 @@ begin
                     (fun (f:finfo) -> (string_of_var f.fname) = fname)
                     m.cfuns)) in
     if not options.delta then begin
-      run_phases f;
+      run_phases m.ctyps f;
       Gobe.print_function_circuit m f
     end
     else begin
@@ -780,11 +788,11 @@ begin
         else (fun () -> ()) in
       let file_before = Filename.temp_file "mpcc" ".diff" in
       options.output <- Some file_before;
-      run_phases f;
+      run_phases m.ctyps f;
       toggle_before();
       let file_after = Filename.temp_file "mpcc" ".diff" in
       options.output <- Some file_after;
-      run_phases f;
+      run_phases m.ctyps f;
       ignore(Sys.command(sprintf "colordiff -U -1 %s %s | more" file_before file_after));
       Sys.remove file_before;
       Sys.remove file_after;
