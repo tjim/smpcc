@@ -380,7 +380,7 @@ let phi_elimination f =
       let source_bl =
         try List.assoc source_block_name bl_assoc
         with _ -> failwith "Error: PHINode source does not exist" in
-      source_bl.binstrs <- repl_instrs target_block_name (Var fresh_block_name) source_bl.binstrs)
+      source_bl.binstrs <- repl_instrs target_block_name (Basicblock fresh_block_name) source_bl.binstrs)
     tbl;
   (* Add the new blocks *)
   let new_blocks = ref [] in
@@ -397,7 +397,7 @@ let phi_elimination f =
             (before,after))
           !assignments in
       let (befores, afters) = List.split before_and_afters in
-      let branch = (None, Br((Label, Var target_block_name), None)) in
+      let branch = (None, Br((Label, Basicblock target_block_name), None)) in
       let binstrs = befores @ afters @ [branch] in
       new_blocks := {bname;binstrs}::!new_blocks)
     tbl;

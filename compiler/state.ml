@@ -179,7 +179,7 @@ let assign_vartyps_instr (nopt, i) =
                       | _ -> failwith "getelementptr: non-int selector for struct field")
                   | _ ->
                       failwith "getelementptr: pointer does not point into an array or struct") in
-            Pointer(loop ety tl,aspace)
+            Util.Pointer(loop ety tl,aspace)
         | _ -> failwith "getelementptr: must be applied to a pointer")
     | Util.Shufflevector [(Util.Vector(_,typ),_);_;(Util.Vector(m,_),_)] -> Util.Vector(m,typ)
     | Util.Insertelement [(typ,_);_;_] -> typ
