@@ -12,7 +12,8 @@ let string_constants = Hashtbl.create 10
 let govar v =
   Str.global_replace (Str.regexp "[%@.]") "_" (State.v_map v)
 
-let rec bpr_go_value b typ = function
+let rec bpr_go_value b (typ, value) =
+  match value with
   | Var v ->
       let is_a_global = (match v with Name(x,_) -> x | Id(x,_) -> x) in
       if is_a_global then
@@ -24,6 +25,8 @@ let rec bpr_go_value b typ = function
           bprintf b "%s" (govar v))
       else
         bprintf b "%s" (govar v)
+  | Basicblock bl ->
+      bprintf b "Uint(io, %d, %d)" (State.bl_num bl) (State.get_bl_bits())
   | Int x ->
       bprintf b "Int(io, %s, %d)" (Big_int.string_of_big_int x) (bitwidth typ)
   | Zero ->
@@ -32,27 +35,9 @@ let rec bpr_go_value b typ = function
       bprintf b "Uint(io, 0, %d) /* CAUTION: null */" (bitwidth typ)
   | Undef ->
       bprintf b "Uint(io, 0, %d) /* CAUTION: undef */" (bitwidth typ)
-  | op ->
-      bpr_value b op
-
-let rec bpr_go_oValue b = function
-  | Var v ->
-      let is_a_global = (match v with Name(x,_) -> x | Id(x,_) -> x) in
-      if is_a_global then
-        (try
-          let loc = Hashtbl.find global_locations v in
-          bprintf b "Uint(io, %d, 64)" loc
-        with Not_found ->
-          eprintf "global not there %s\n" (govar v);
-          bprintf b "%s" (govar v))
-      else
-        bprintf b "%s" (govar v)
-  | Int x ->
-      bprintf b "Int(io, %s, %d)" (Big_int.string_of_big_int x) 32 (* TODO: need width, assume 32 for now *)
-  | Null ->
-      bprintf b "Uint(io, 0, 32) /* CAUTION: null */" (* TODO: need width, assume 32 for now *)
-  | Undef ->
-      bprintf b "Uint(io, 0, 32) /* CAUTION: undef */" (* TODO: get correct width, we assume 32 for now *)
+  | Inttoptr(x, y) -> 
+      bprintf b "/* CAUTION: inttoptr */ ";
+      bpr_go_value b x
   | op ->
       bpr_value b op
 
@@ -95,7 +80,7 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         if ops = [] then
           bprintf b "Printf(io, mask, \"%s\")\n" s
         else
-          bprintf b "Printf(io, mask, \"%s\", %a)\n" s (between ", " bpr_go_oValue) (List.map third ops)
+          bprintf b "Printf(io, mask, \"%s\", %a)\n" s (between ", " bpr_go_value) (List.map (fun (a,b,c) -> (a,c)) ops)
       with _ ->
         failwith "Error: first argument of printf must be a string constant")
   | Call(_,_,_,_,Var(Name(true, "puts")),[_,_,Getelementptr(_,[(_, v);(_, Int z);(_, Int z')])],_)
@@ -105,8 +90,8 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         bprintf b "Printf(io, mask, \"%s\\n\")\n" s (* puts adds a newline *)
       with _ ->
         failwith "Error: argument of puts must be a string constant")
-  | Call(_,_,_,_,Var(Name(true, "putchar")),[_,_,value],_) ->
-               bprintf b "Printf(io, mask, \"%%c\", %a)\n" bpr_go_oValue value
+  | Call(_,_,_,_,Var(Name(true, "putchar")),[typ,_,value],_) ->
+               bprintf b "Printf(io, mask, \"%%c\", %a)\n" bpr_go_value (typ, value)
   | Call(_,_,_,_,Var(Name(true, "gen_int")),_,_) ->
       if is_gen then
         bprintf b "Gen_int(io, mask, next_arg)\n"
@@ -117,17 +102,17 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         bprintf b "Eval_int(io, mask)\n"
       else
         bprintf b "Eval_int(io, mask, next_arg)\n"
-  | Load(_,_,(_,addr),_,_) -> (* in case we are debugging loads *)
-      bprintf b "LoadDebug(io, mask, %a)\n" bpr_go_oValue addr
-  | Store(_,_,(_,x),(_,addr),_,_) -> (* in case we are debugging stores*)
-      bprintf b "StoreDebug(io, mask, %a, %a)\n" bpr_go_oValue addr bpr_go_oValue x
-  | Bitcast((_,v),_) ->
-      bprintf b "%a\n" bpr_go_oValue v
-  | Sext((_,v),t) ->
-      bprintf b "Sext(io, %a, %d)\n" bpr_go_oValue v (bitwidth t)
-  | Zext((_,v),t) ->
-      bprintf b "Zext(io, %a, %d)\n" bpr_go_oValue v (bitwidth t)
-  | Mul(_,_,(_,x),Int y) ->
+  | Load(_,_,x,_,_) -> (* in case we are debugging loads *)
+      bprintf b "LoadDebug(io, mask, %a)\n" bpr_go_value x
+  | Store(_,_,x,addr,_,_) -> (* in case we are debugging stores*)
+      bprintf b "StoreDebug(io, mask, %a, %a)\n" bpr_go_value addr bpr_go_value x
+  | Bitcast(x,_) ->
+      bprintf b "%a\n" bpr_go_value x
+  | Sext(tv,t) ->
+      bprintf b "Sext(io, %a, %d)\n" bpr_go_value tv (bitwidth t)
+  | Zext(tv,t) ->
+      bprintf b "Zext(io, %a, %d)\n" bpr_go_value tv (bitwidth t)
+  | Mul(_,_,tv,Int y) ->
       (* It would be better to do this strength reduction in LLVM *)
       let shift_bits =
         match Big_int.int_of_big_int y with
@@ -141,44 +126,44 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         | 128 -> 7
         | 256 -> 8
         | _   -> failwith "the go back end does not support Mul" in
-      bprintf b "Shl(io, %a, %d)\n" bpr_go_oValue x shift_bits
-  | Lshr(_,(_,x),Int y) ->
+      bprintf b "Shl(io, %a, %d)\n" bpr_go_value tv shift_bits
+  | Lshr(_,tv,Int y) ->
       let shift_bits = Big_int.int_of_big_int y in
-      bprintf b "Lshr(io, %a, %d)\n" bpr_go_oValue x shift_bits
-  | Ashr(_,(_,x),Int y) ->
+      bprintf b "Lshr(io, %a, %d)\n" bpr_go_value tv shift_bits
+  | Ashr(_,tv,Int y) ->
       let shift_bits = Big_int.int_of_big_int y in
-      bprintf b "Ashr(io, %a, %d)\n" bpr_go_oValue x shift_bits
-  | Shl(_,_,(_,x),Int y) ->
+      bprintf b "Ashr(io, %a, %d)\n" bpr_go_value tv shift_bits
+  | Shl(_,_,tv,Int y) ->
       let shift_bits = Big_int.int_of_big_int y in
-      bprintf b "Shl(io, %a, %d)\n" bpr_go_oValue x shift_bits
-  | Add(_,_,(_,x),y) ->
-      bprintf b "Add(io, %a, %a)\n" bpr_go_oValue x bpr_go_oValue y
-  | Sub(_,_,(_,x),y) ->
-      bprintf b "Sub(io, %a, %a)\n" bpr_go_oValue x bpr_go_oValue y
-  | And((_,x),y) ->
-      bprintf b "And(io, %a, %a)\n" bpr_go_oValue x bpr_go_oValue y
-  | Or((_,x),y) ->
-      bprintf b "Or(io, %a, %a)\n" bpr_go_oValue x bpr_go_oValue y
-  | Xor((_,x),y) ->
-      bprintf b "Xor(io, %a, %a)\n" bpr_go_oValue x bpr_go_oValue y
-  | Icmp(pred,(_,x),y) ->
+      bprintf b "Shl(io, %a, %d)\n" bpr_go_value tv shift_bits
+  | Add(_,_,(typ,x),y) ->
+      bprintf b "Add(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
+  | Sub(_,_,(typ,x),y) ->
+      bprintf b "Sub(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
+  | And((typ,x),y) ->
+      bprintf b "And(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
+  | Or((typ,x),y) ->
+      bprintf b "Or(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
+  | Xor((typ,x),y) ->
+      bprintf b "Xor(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
+  | Icmp(pred,(typ,x),y) ->
       bprintf b "Icmp_%a(io, %a, %a)\n"
         bpr_icmp pred
-        bpr_go_oValue x bpr_go_oValue y
+        bpr_go_value (typ,x) bpr_go_value (typ,y)
 (*  | AssignInst(result_ty, [(ty,op)]) (* special instruction inserted by our compiler *) *)
   | Inttoptr((ty,op), result_ty) ->
       let bits_result = bitwidth result_ty in
       let bits_op = bitwidth ty in
       if bits_result = bits_op then
-        bprintf b "%a\n" bpr_go_oValue op
+        bprintf b "%a\n" bpr_go_value (ty,op)
       else if bits_result > bits_op then
         (* NB our oTypes do not have signed/unsigned versions so we zextend for now *)
-        bprintf b "Zext(io, %a, %d)\n" bpr_go_oValue op bits_result
+        bprintf b "Zext(io, %a, %d)\n" bpr_go_value (ty,op) bits_result
       else (* bits_result < bits_op *)
-        bprintf b "%a[:%d]\n" bpr_go_oValue op bits_result;
+        bprintf b "%a[:%d]\n" bpr_go_value (ty,op) bits_result;
   | Select([x;y;z]) -> (* TODO: maybe enforce 3 args in datatype? *)
-      bprintf b "Select(io, %a, %a, %a)\n" bpr_go_oValue (snd x) bpr_go_oValue (snd y) bpr_go_oValue (snd z)
-  | Switch((ty0,op0),(ty1,op1),ops) ->
+      bprintf b "Select(io, %a, %a, %a)\n" bpr_go_value x bpr_go_value y bpr_go_value z
+  | Switch(op0,op1,ops) ->
       (* op0 is the value to switch on.
          op1 is the default target.
          ops is a list of pairs; the first element of each pair should be an
@@ -186,10 +171,10 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
          NB: We assume that the cases are 0, 1, ... in order!
        *)
       let cases = List.map snd ops in (* throw away the 0, 1, ... part of the pairs *)
-      bprintf b "Switch(io, %a, %a, %a)\n" bpr_go_oValue op0 bpr_go_oValue op1
-        (between ", " bpr_go_oValue) (List.map snd cases)
-  | Trunc((_,x), ty) ->
-      bprintf b "%a[:%d]\n" bpr_go_oValue x (bitwidth ty)
+      bprintf b "Switch(io, %a, %a, %a)\n" bpr_go_value op0 bpr_go_value op1
+        (between ", " bpr_go_value) cases
+  | Trunc(x, ty) ->
+      bprintf b "%a[:%d]\n" bpr_go_value x (bitwidth ty)
   | _ -> begin
       eprintf "Error: unsupported %s\n" (let b = Buffer.create 11 in bpr_instr b (nopt,i); Buffer.contents b);
       bprintf b "Unsupported(\"UNSUPPORTED %a\")\n" bpr_instr (nopt,i)
@@ -264,7 +249,7 @@ let bpr_go_block b blocks_fv is_gen bl =
     VSet.iter
       (fun var ->
         let value = Var var in
-        bprintf b "\tch <- Mask(io, mask, %a)\n" bpr_go_oValue value)
+        bprintf b "\tch <- Mask(io, mask, %a)\n" bpr_go_value (State.typ_of_var var, value))
       outputs
   end;
   bprintf b "}\n\n"
@@ -429,7 +414,6 @@ let bpr_globals b m =
     | Arraytyp(len, Integer 8) ->
         if (0 = Char.code (Buffer.nth bytevals (bytes - 1))) then
           let s = Buffer.sub bytevals 0 (len - 1) in
-          Printf.printf "String constant: %s\n" (string_of_var gname);
           Hashtbl.add string_constants (Var gname) s
     | _ -> ());
     loc := !loc + bytes;
@@ -444,7 +428,7 @@ let bpr_globals b m =
   bprintf b "}\n";
   bprintf b "\n"
 
-let gep_elim_ovalue =
+let gep_elim_value =
   value_map (function
     | Getelementptr(_, (Pointer(ety,s),Var v)::tl) as c ->
         if Hashtbl.mem string_constants (Var v) || not(Hashtbl.mem global_locations v) then c else
@@ -464,12 +448,12 @@ let gep_elim_ovalue =
                       (Big_int.mult_big_int i (Big_int.big_int_of_int 4))
                       (Big_int.big_int_of_int(Hashtbl.find global_locations v))
                   else
-                    failwith "gep_elim_ovalue: struct"
+                    failwith "gep_elim_value: struct"
               | _ ->
                   let b = Buffer.create 11 in
-                  bprintf b "gep_elim_ovalue error: type is %a, value is %a\n" bpr_typ ety bpr_value y;
+                  bprintf b "gep_elim_value error: type is %a, value is %a\n" bpr_typ ety bpr_value y;
                   eprintf "%s" (Buffer.contents b);
-                  failwith "gep_elim_ovalue") in
+                  failwith "gep_elim_value") in
         let sum = loop ety tl in
         Int sum
     | c -> c)
@@ -484,7 +468,7 @@ let print_function_circuit m f =
   bprintf b "import \"fmt\"\n";
   bprintf b "\n";
   bpr_globals b m;
-  gep_elim_ovalue f;
+  gep_elim_value f;
   bpr_main b f true;
   let blocks_fv = List.fold_left VSet.union VSet.empty (* TODO: eliminate duplicate code *)
       (List.map free_of_block f.fblocks) in

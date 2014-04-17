@@ -320,109 +320,6 @@ let repl_instrs var replacement instrs =
             (Some x, replaced)::(loop tl)) in
   loop instrs
 
-(* wow this is ugly *)
-(*
-let rec repl_oValue var replacement x =
-  match x with
-  | Variable var2   -> if var=var2 then replacement else x
-  | Argument var2   -> if var=var2 then replacement else x
-  | BasicBlock var2 -> if var=var2 then replacement else x
-  | InlineAsm       -> x
-  | MDNode          -> x
-  | NullValue       -> x
-  | MDString _      -> x
-  | BlockAddress x           -> BlockAddress(repl_oValue var replacement x)
-  | ConstantAggregateZero    -> x
-  | ConstantArray vals       -> ConstantArray(List.map (repl_oValue var replacement) vals)
-  | ConstantDataArray vals   -> ConstantDataArray(List.map (repl_oValue var replacement) vals)
-  | ConstantDataVector vals  -> ConstantDataVector(List.map (repl_oValue var replacement) vals)
-  | ConstantExpr(opcode,ops) -> ConstantExpr(opcode,repl_ops var replacement ops)
-  | ConstantFP               -> x
-  | ConstantInt _            -> x
-  | ConstantPointerNull _    -> x
-  | ConstantStruct(y,vals)   -> ConstantStruct(y,List.map (repl_oValue var replacement) vals)
-  | ConstantVector vals      -> ConstantVector(List.map (repl_oValue var replacement) vals)
-  | Function       _ -> x (* doesn't make sense to replace with oValue *)
-  | GlobalAlias    _ -> x (* doesn't make sense to replace with oValue *)
-  | GlobalVariable _ -> x (* doesn't make sense to replace with oValue *)
-  | UndefValue               -> x
-  | Instruction x   -> Instruction (repl_oInstruction var replacement x)
-and repl_ops var replacement = function
-  | [] -> []
-  | (ty,op)::tl -> (ty, repl_oValue var replacement op)::(repl_ops var replacement tl)
-and repl_oInstruction var replacement x =
-  match x with
-  | BinaryOperator     (ty,ops,opcode) -> BinaryOperator     (ty, repl_ops var replacement ops, opcode)
-  | CallInst           (y,z,ty,w,ops)  -> CallInst           (y,z,ty,w, repl_ops var replacement ops)
-  | FCmpInst           (ty,ops)        -> FCmpInst           (ty,repl_ops var replacement ops)
-  | ICmpInst           (icmp,ops)      -> ICmpInst           (icmp,repl_ops var replacement ops)
-  | AssignInst         (ty,ops)        -> AssignInst         (ty, repl_ops var replacement ops)
-  | ExtractElementInst (ty,ops)        -> ExtractElementInst (ty, repl_ops var replacement ops)
-  | GetElementPtrInst  (ty,ops)        -> GetElementPtrInst  (ty, repl_ops var replacement ops)
-  | InsertElementInst  (ty,ops)        -> InsertElementInst  (ty, repl_ops var replacement ops)
-  | InsertValueInst    (ty,ops)        -> InsertValueInst    (ty, repl_ops var replacement ops)
-  | LandingPadInst     (ty,ops)        -> LandingPadInst     (ty, repl_ops var replacement ops)
-  | PHINode            (ty,incoming)   -> PHINode            (ty, List.map
-                                                                (fun (op,block_name) -> (repl_oValue var replacement op, block_name))
-                                                                incoming)
-  | SelectInst         (ty,ops)        -> SelectInst         (ty, repl_ops var replacement ops)
-  | ShuffleVectorInst  (ty,ops)        -> ShuffleVectorInst  (ty, repl_ops var replacement ops)
-  | StoreInst          (a,ty,ops)      -> StoreInst          (a, ty, repl_ops var replacement ops)
-  | BranchInst         (ty,ops)        -> BranchInst         (ty,repl_ops var replacement ops)
-  | IndirectBrInst     (ty,ops)        -> IndirectBrInst     (ty,repl_ops var replacement ops)
-  | InvokeInst         (ty,ops)        -> InvokeInst         (ty,repl_ops var replacement ops)
-  | ReturnInst         (ty,ops)        -> ReturnInst         (ty,repl_ops var replacement ops)
-  | SwitchInst         (ty,ops)        -> SwitchInst         (ty,repl_ops var replacement ops)
-  | UnreachableInst    (ty,ops)        -> UnreachableInst    (ty,repl_ops var replacement ops)
-  | ResumeInst         (ty,ops)        -> ResumeInst         (ty,repl_ops var replacement ops)
-  | AllocaInst         (a,ty,ops)      -> AllocaInst         (a,ty,repl_ops var replacement ops)
-  | BitCastInst        (ty,ops)        -> BitCastInst        (ty,repl_ops var replacement ops)
-  | FPExtInst          (ty,ops)        -> FPExtInst          (ty,repl_ops var replacement ops)
-  | FPToSIInst         (ty,ops)        -> FPToSIInst         (ty,repl_ops var replacement ops)
-  | FPToUIInst         (ty,ops)        -> FPToUIInst         (ty,repl_ops var replacement ops)
-  | FPTruncInst        (ty,ops)        -> FPTruncInst        (ty,repl_ops var replacement ops)
-  | IntToPtrInst       (ty,ops)        -> IntToPtrInst       (ty,repl_ops var replacement ops)
-  | PtrToIntInst       (ty,ops)        -> PtrToIntInst       (ty,repl_ops var replacement ops)
-  | SExtInst           (ty,ops)        -> SExtInst           (ty,repl_ops var replacement ops)
-  | SIToFPInst         (ty,ops)        -> SIToFPInst         (ty,repl_ops var replacement ops)
-  | TruncInst          (ty,ops)        -> TruncInst          (ty,repl_ops var replacement ops)
-  | UIToFPInst         (ty,ops)        -> UIToFPInst         (ty,repl_ops var replacement ops)
-  | ZExtInst           (ty,ops)        -> ZExtInst           (ty,repl_ops var replacement ops)
-  | ExtractValueInst   (ty,ops)        -> ExtractValueInst   (ty,repl_ops var replacement ops)
-  | LoadInst           (a,ty,ops)      -> LoadInst           (a,ty,repl_ops var replacement ops)
-  | VAArgInst          (ty,ops)        -> VAArgInst          (ty,repl_ops var replacement ops)
-  | FenceInst          (ty,ops)        -> FenceInst          (ty, repl_ops var replacement ops)
-  | AtomicCmpXchgInst  (ty,ops)        -> AtomicCmpXchgInst  (ty, repl_ops var replacement ops)
-  | AtomicRMWInst      (ty,ops)        -> AtomicRMWInst      (ty, repl_ops var replacement ops)
-and repl_oCallInst var replacement x =
-  match x with
-  | IntrinsicInst x -> repl_oIntrinsicInst var replacement x
-and repl_oIntrinsicInst var replacement x =
-  match x with
-  | DbgInfoIntrinsic x -> DbgInfoIntrinsic (repl_oDbgInfoIntrinsic var replacement x)
-  | MemIntrinsic     x -> MemIntrinsic     (repl_oMemIntrinsic var replacement x)
-and repl_oDbgInfoIntrinsic var replacement x =
-  match x with
-  | DbgDeclareInst -> x
-and repl_oMemIntrinsic var replacement x =
-  match x with
-  | MemCpyInst  -> x
-  | MemMoveInst -> x
-  | MemSetInst  -> x
-
-let repl_instrs var replacement instrs =
-  let rec loop = function
-    | [] -> []
-    | (nopt,instr)::tl ->
-        let replaced = repl_oInstruction var replacement instr in
-        (match nopt with
-        | None -> (nopt, replaced)::(loop tl)
-        | Some x ->
-            if x=var then (Some x,replaced)::tl else
-            (Some x, replaced)::(loop tl)) in
-  loop instrs
-*)
-
 let assign_instr n result_ty ty op =
   (Some n, Inttoptr((ty, op), result_ty)) (* unlike LLVM we will not force result_ty to be a ptr or ty to be an int typ *)
 
@@ -431,14 +328,12 @@ let assign_instr n result_ty ty op =
   record means
     tbl[(bl_target, bl_source)] = bl_fresh, [(var,value)]
 
-
   each (bl_target, bl_source) -->
     fresh block bl_fresh
     replace bl_target by bl_fresh in bl_source
   build bl_fresh
-    
-
 *)
+
 let unopt = function
   | None -> failwith "unopt"
   | Some x -> x
@@ -458,7 +353,7 @@ let phi_elimination f =
           | (Some var,Phi(_, incoming)) ->
               List.iter
                 (fun (value,source_block) ->
-                  let source_block_name = (match source_block with Var v -> v | _ -> failwith "phi elimination") in
+                  let source_block_name = (match source_block with Var v -> v | Basicblock v -> v | _ -> failwith "phi elimination") in
                   let (_, assignments) =
                     if not(Hashtbl.mem tbl (bl.bname, source_block_name)) then
                       Hashtbl.add tbl (bl.bname, source_block_name) (State.fresh_label(), ref []);
@@ -514,11 +409,6 @@ let phi_elimination f =
 let gep_elimination f =
   let elim = function
     | Some n, Getelementptr(_,(Pointer(ety,aspace),x)::tl) ->
-        (* begin *)
-        (*   let pty_string = let b = Buffer.create 11 in bpr_oType b (Pointer(aspace,ety)); Buffer.contents b in *)
-        (*   let x_string = let b = Buffer.create 11 in bpr_oValue b x; Buffer.contents b in *)
-        (*   eprintf "getelementptr working on %s, %s\n" pty_string x_string *)
-        (* end; *)
         let ety = Arraytyp(1,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
         let rec loop x ety = function
           | [] -> [assign_instr n (Pointer(ety,aspace)) (Pointer(ety,aspace)) x]

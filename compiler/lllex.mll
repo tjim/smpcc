@@ -303,8 +303,7 @@ let parse ch =
         (p.Lexing.pos_cnum - p.Lexing.pos_bol)
         (Lexing.lexeme lexbuf);
       failwith "Giving up" in
-  number_cu cu;
+  State.number_cu cu;
   State.assign_vartyps cu;
-  State.dump_vartyps();
   cu
 }

@@ -403,35 +403,6 @@ type cunit = {
     mutable cmdnodes: mdinfo list;
   }
 
-(* Blocks may not have explicit names (labels) when parsed.
-   Any unnamed block is assigned name Id(false,-1) by the parser.
-   This function finds a correct name. *)
-let number_cu cu =
-  let number_blocks f =
-    let number_block n (name, instrs) =
-      let rec max n = function
-        | [] -> n
-        | hd::tl -> if n>hd then max n tl else max hd tl in
-      let instr_numbers =
-        List.concat
-          (List.map
-             (function
-               | (Some(Id(false, x)), _) -> [x]
-               | _ -> [])
-             instrs) in
-      match name with
-      | Id(false,-1) -> Id(false, n), max n instr_numbers + 1
-      | _ -> name, if instr_numbers = [] then n else max n instr_numbers + 1 in
-    let num = ref 0 in
-    f.fblocks <-
-      List.map
-        (fun {bname=name; binstrs=instrs} ->
-          let name', num' = number_block !num (name, instrs) in
-          num := num';
-          {bname=name'; binstrs=instrs})
-        f.fblocks in
-  List.iter number_blocks cu.cfuns
-
 open Printf
 
 let between s bpr b =

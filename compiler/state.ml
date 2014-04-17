@@ -91,6 +91,35 @@ let special = (* NB: Works now because we have hard-coded bl_bits to 32 *)
     Util.VSet.empty
 end
 
+(* Blocks may not have explicit names (labels) when parsed.
+   Any unnamed block is assigned name Id(false,-1) by the parser.
+   This function finds a correct name. *)
+let number_cu cu =
+  let number_blocks f =
+    let number_block n (name, instrs) =
+      let rec max n = function
+        | [] -> n
+        | hd::tl -> if n>hd then max n tl else max hd tl in
+      let instr_numbers =
+        List.concat
+          (List.map
+             (function
+               | (Some(Util.Id(false, x)), _) -> [x]
+               | _ -> [])
+             instrs) in
+      match name with
+      | Util.Id(false,-1) -> Util.Id(false, n), max n instr_numbers + 1
+      | _ -> name, if instr_numbers = [] then n else max n instr_numbers + 1 in
+    let num = ref 0 in
+    f.Util.fblocks <-
+      List.map
+        (fun {Util.bname=name; Util.binstrs=instrs} ->
+          let name', num' = number_block !num (name, instrs) in
+          num := num';
+          {Util.bname=name'; Util.binstrs=instrs})
+        f.Util.fblocks in
+  List.iter number_blocks cu.Util.cfuns
+
 let assign_vartyps_instr (nopt, i) =
   let typ =
     let typ_of (t,v) = t in
@@ -196,11 +225,17 @@ let assign_vartyps_block b =
 
 let assign_vartyps cu =
   List.iter
-    (fun {Util.gname;Util.gtyp} -> ignore(add_vartyp gname (Pointer(gtyp,None))))
+    (fun {Util.gname;Util.gtyp} -> ignore(add_vartyp gname (Util.Pointer(gtyp,None))))
     cu.Util.cglobals;
   List.iter
     (fun f ->
       let ftyp = Util.Pointer(Util.Funtyp(f.Util.freturntyp,fst f.Util.fparams,snd f.Util.fparams), None) in
       ignore(add_vartyp f.Util.fname ftyp);
       List.iter assign_vartyps_block f.Util.fblocks)
+    cu.Util.cfuns;
+  List.iter
+    (Util.value_map (function
+      | Util.Var v ->
+          if typ_of_var v = Util.Label then Util.Basicblock v else Util.Var v
+      | x -> x))
     cu.Util.cfuns
