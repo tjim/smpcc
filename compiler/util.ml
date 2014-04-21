@@ -1,3 +1,5 @@
+let third (a,b,c) = c
+
 type var =
   | Id   of bool * int    (* global?, index *)
   | Name of bool * string (* global?, name *)
@@ -67,6 +69,32 @@ type typ =
   | Pointer of typ * int option      (* element type, address space *)
   | Vector  of int * typ             (* array length, element type *)
 
+let rec bitwidth = function
+  | Vartyp _                                 -> 0 (* TODO: need type environments *)
+  | Void                                     -> 0
+  | Half                                     -> 16
+  | Float                                    -> 32
+  | Double                                   -> 64
+  | X86_fp80                                 -> 80
+  | X86_mmx                                  -> 64
+  | Fp128                                    -> 128
+  | Ppc_fp128                                -> 128
+  | Label                                    -> 32 (* ??? *)
+  | Metadata                                 -> 0
+  | Integer x                                -> x
+  | Funtyp(return_ty, param_tys, is_var_arg) -> 0
+  | Structtyp(false, tys) (* TODO: not packed struct, depends on datalayout *)
+  | Structtyp(true, tys)                     ->
+      List.fold_left (fun x y -> x+y) 0 (List.map bitwidth tys)
+  | Arraytyp(len,element_ty)                 -> len*(bitwidth element_ty)
+  | Pointer(address_space,element_ty)        -> 64 (* TODO: depends on datalayout *)
+  | Vector(len,element_ty)                   -> len*(bitwidth element_ty)
+
+let bytewidth ty =
+  let bits = bitwidth ty in
+  if (bits mod 8) <> 0 then Printf.eprintf "Warning: bitwidth not divisible by 8";
+  bits/8 + (if (bits mod 8) <> 0 then 1 else 0)
+
 module I = struct
   type t =
     | Eq
@@ -103,6 +131,7 @@ end
 
 type value =
   | Var            of var
+  | Basicblock     of var
   | Mdnode         of int
   | Mdstring       of string
   | Mdnodevector   of (typ * value) option list
@@ -303,6 +332,11 @@ type instr =
   | Switch of (typ * value) * (typ * value) * ((typ * value) * (typ * value)) list
   | Invoke of callingconv option * return_attribute list * typ * value * ((typ * param_attribute list * value) list) * function_attribute list * (typ * value) * (typ * value)
 
+type binfo = {
+    mutable bname: var;
+    mutable binstrs: (var option * instr) list
+  }      
+
 type finfo = {
     mutable flinkage: linkage option;
     mutable fvisibility: visibility option;
@@ -318,7 +352,7 @@ type finfo = {
     mutable falign: int option;
     mutable fgc: string option;
     mutable fprefix: (typ * value) option;
-    mutable fblocks: (var option * (var option * instr) list) list;
+    mutable fblocks: binfo list;
   }
 
 type thread_local =
@@ -336,7 +370,7 @@ type ginfo = {
     mutable gunnamed_addr: bool;
     mutable gexternally_initialized: bool;
     mutable gconstant: bool;
-    mutable gtyp: typ;
+    mutable gtyp: typ; (* actual type of the global is a pointer to this type *)
     mutable gvalue: value option;
     mutable gsection: string option;
     mutable galign: int option;
@@ -368,32 +402,6 @@ type cunit = {
     mutable cmdvars: (string * int list) list;
     mutable cmdnodes: mdinfo list;
   }
-
-let number_cu cu =
-  let number_blocks f =
-    let number_block n (name, instrs) =
-      let rec max n = function
-        | [] -> n
-        | hd::tl -> if n>hd then max n tl else max hd tl in
-      let instr_numbers =
-        List.concat
-          (List.map
-             (function
-               | (Some(Id(false, x)), _) -> [x]
-               | _ -> [])
-             instrs) in
-      match name with
-      | None -> Some(Id(false, n)), max n instr_numbers + 1
-      | Some _ -> name, if instr_numbers = [] then n else max n instr_numbers + 1 in
-    let num = ref 0 in
-    f.fblocks <-
-      List.map
-        (fun (name, instrs) ->
-          let name', num' = number_block !num (name, instrs) in
-          num := num';
-          (name', instrs))
-        f.fblocks in
-  List.iter number_blocks cu.cfuns
 
 open Printf
 
@@ -585,6 +593,11 @@ let bpr_var b = function
   | Name(true, name) -> bprintf b "@%s" name
   | Name(false, name) -> bprintf b "%%%s" name
 
+let string_of_var v =
+  let b = Buffer.create 11 in
+  bpr_var b v;
+  Buffer.contents b
+
 let rec bpr_typ b typ =
   let rec pr = function
     | Void      -> bprintf b "void"
@@ -661,6 +674,7 @@ let bpr_index_list b l =
 
 let rec bpr_value b op = match op with
   | Var x          -> bpr_var b x
+  | Basicblock x   -> bpr_var b x
   | Mdnode x       -> bprintf b "!%d" x
   | Mdnodevector x -> bpr_mdnodevector b x
   | Mdstring x     -> bprintf b "!%s" x
@@ -769,7 +783,7 @@ and bpr_mdnodevector b x =
   let bpr b = function
     | None -> bprintf b "null"
     | Some y -> bpr_typ_value b y in
-  bprintf b "{%a}" (between " " bpr) x
+  bprintf b "{%a}" (between ", " bpr) x
 
 let bpr_global b g =
   bprintf b "%a = %a%a%a%a%a%a%a%a%a%a%a%a\n"
@@ -961,7 +975,7 @@ let bpr_instr b (nopt, i) =
         (yes "singlthread ") x
         bpr_ordering y
   | Extractvalue(x, y) ->
-      bprintf b "extractvalue %a%a)" bpr_typ_value x bpr_index_list y
+      bprintf b "extractvalue %a%a" bpr_typ_value x bpr_index_list y
   | Insertvalue(x, y, z) ->
       bprintf b "insertvalue %a, %a%a" bpr_typ_value x bpr_typ_value y bpr_index_list z
   | Unreachable ->
@@ -994,14 +1008,13 @@ let bpr_instr b (nopt, i) =
         bpr_typ_value s);
   bprintf b "\n"
 
-let bpr_block b (nameopt, instrs) =
+let bpr_block b {bname; binstrs} =
   (* TODO: predecessor blocks *)
-  (match nameopt with
-    | Some(Id(false, 0)) -> ()
-    | Some(Name(_, x)) -> bprintf b "; <label>:%s%a\n" x pad_to_column 50
-    | Some(Id(_, x)) -> bprintf b "; <label>:%d%a\n" x pad_to_column 50
-    | None -> bprintf b "; <label>:<<UNNAMED>>%a\n" pad_to_column 50);
-  List.iter (bpr_instr b) instrs
+  (match bname with
+    | Id(false, 0) -> () (* llvm does not print a label comment for block 0 *)
+    | Id(_, x) -> bprintf b "; <label>:%d%a\n" x pad_to_column 50
+    | Name(_, x) -> bprintf b "; <label>:%s%a\n" x pad_to_column 50);
+  List.iter (bpr_instr b) binstrs
 
 let bpr_function b f =
   bprintf b "\n";
@@ -1059,3 +1072,263 @@ let bpr_cu b cu =
     cu.cmdvars;
   if cu.cmdnodes <> [] then bprintf b "\n";
   List.iter (bpr_mdnode b) cu.cmdnodes
+
+module VSet = Set.Make(
+  struct
+    type t = var
+    let compare = compare
+  end)
+
+let free_of_var = function
+| Name(true,_) -> VSet.empty (* globals are not free *)
+| Id(true,_) -> VSet.empty (* globals are not free *)
+| x -> VSet.singleton x
+
+let rec free_of_value = function
+| Var x -> free_of_var x
+| Basicblock x -> VSet.empty
+| Struct(_,ops)
+| Vector ops
+| Array ops ->
+    List.fold_left VSet.union VSet.empty
+      (List.map free_of_value (List.map snd ops))
+| Blockaddress _
+| Null
+| True
+| False
+| Zero
+| Float _
+| Int _
+| Undef -> VSet.empty
+| Asm _
+| Mdnode _
+| Mdstring _
+| Mdnodevector _     -> VSet.empty
+| Trunc          ((_,v),_)
+| Zext           ((_,v),_)
+| Sext           ((_,v),_)
+| Fptrunc        ((_,v),_)
+| Fpext          ((_,v),_)
+| Bitcast        ((_,v),_)
+| Addrspacecast  ((_,v),_)
+| Uitofp         ((_,v),_)
+| Sitofp         ((_,v),_)
+| Fptoui         ((_,v),_)
+| Fptosi         ((_,v),_)
+| Inttoptr       ((_,v),_)
+| Ptrtoint       ((_,v),_)
+| Extractvalue   ((_,v),_) ->
+    free_of_value v
+| Insertvalue    ((_,v1),(_,v2),_)
+| Icmp           (_,(_,v1),(_,v2))
+| Fcmp           (_,(_,v1),(_,v2))
+| Sdiv           (_,(_,v1),(_,v2))
+| Udiv           (_,(_,v1),(_,v2))
+| Lshr           (_,(_,v1),(_,v2))
+| Ashr           (_,(_,v1),(_,v2))
+| Fadd           ((_,v1),(_,v2))
+| Fsub           ((_,v1),(_,v2))
+| Fmul           ((_,v1),(_,v2))
+| Fdiv           ((_,v1),(_,v2))
+| Urem           ((_,v1),(_,v2))
+| Srem           ((_,v1),(_,v2))
+| Frem           ((_,v1),(_,v2))
+| And            ((_,v1),(_,v2))
+| Or             ((_,v1),(_,v2))
+| Xor            ((_,v1),(_,v2))
+| Add            (_,_,(_,v1),(_,v2))
+| Sub            (_,_,(_,v1),(_,v2))
+| Mul            (_,_,(_,v1),(_,v2))
+| Shl            (_,_,(_,v1),(_,v2)) ->
+    VSet.union (free_of_value v1) (free_of_value v2)
+| Getelementptr  (_,vs)
+| Shufflevector  vs
+| Insertelement  vs
+| Extractelement vs
+| Select         vs ->
+    List.fold_left VSet.union VSet.empty
+      (List.map free_of_value (List.map snd vs))
+
+let free_of_instruction = function
+| Va_arg         ((_,v),_)
+| Trunc          ((_,v),_)
+| Zext           ((_,v),_)
+| Sext           ((_,v),_)
+| Fptrunc        ((_,v),_)
+| Fpext          ((_,v),_)
+| Bitcast        ((_,v),_)
+| Addrspacecast  ((_,v),_)
+| Uitofp         ((_,v),_)
+| Sitofp         ((_,v),_)
+| Fptoui         ((_,v),_)
+| Fptosi         ((_,v),_)
+| Inttoptr       ((_,v),_)
+| Ptrtoint       ((_,v),_)
+| Extractvalue   ((_,v),_) ->
+    free_of_value v
+| Insertvalue    ((_,v1),(_,v2),_)
+| Icmp           (_,(_,v1),v2)
+| Fcmp           (_,(_,v1),v2)
+| Sdiv           (_,(_,v1),v2)
+| Udiv           (_,(_,v1),v2)
+| Lshr           (_,(_,v1),v2)
+| Ashr           (_,(_,v1),v2)
+| Fadd           (_,(_,v1),v2)
+| Fsub           (_,(_,v1),v2)
+| Fmul           (_,(_,v1),v2)
+| Fdiv           (_,(_,v1),v2)
+| Frem           (_,(_,v1),v2)
+| Urem           ((_,v1),v2)
+| Srem           ((_,v1),v2)
+| And            ((_,v1),v2)
+| Or             ((_,v1),v2)
+| Xor            ((_,v1),v2)
+| Add            (_,_,(_,v1),v2)
+| Sub            (_,_,(_,v1),v2)
+| Mul            (_,_,(_,v1),v2)
+| Shl            (_,_,(_,v1),v2) ->
+    VSet.union (free_of_value v1) (free_of_value v2)
+| Getelementptr  (_,vs)
+| Shufflevector  vs
+| Insertelement  vs
+| Extractelement vs
+| Select         vs ->
+    List.fold_left VSet.union VSet.empty
+      (List.map free_of_value (List.map snd vs))
+| Phi(_,l) ->
+    List.fold_left VSet.union VSet.empty
+      (List.map (fun (v1, v2) -> VSet.union (free_of_value v1) (free_of_value v2)) l)
+| Alloca(_,_,None,_) -> VSet.empty
+| Alloca(_,_,Some(_,v),_)
+| Load(_,_,(_,v),_,_) -> free_of_value v
+| Store(_,_,(_,v1),(_,v2),_,_)
+| Atomicrmw(_,_,(_,v1),(_,v2),_,_) -> VSet.union (free_of_value v1) (free_of_value v2)
+| Cmpxchg(_,(_,v1),(_,v2),(_,v3),_,_,_) -> VSet.union (VSet.union (free_of_value v1) (free_of_value v2)) (free_of_value v3)
+| Fence _
+| Unreachable
+| Return None -> VSet.empty
+| Return Some(_,v)
+| Resume(_,v) -> free_of_value v
+| Br((_,v),None) -> free_of_value v
+| Br((_,v1),Some((_,v2),(_,v3))) -> VSet.union (VSet.union (free_of_value v1) (free_of_value v2)) (free_of_value v3)
+| Indirectbr((_,v),vs) ->
+    VSet.union (free_of_value v) 
+      (List.fold_left VSet.union VSet.empty
+         (List.map free_of_value (List.map snd vs)))
+| Switch(tv1,tv2,tvs) ->
+    (List.fold_left VSet.union VSet.empty
+       (List.map free_of_value (List.map snd (tv1::tv2::(List.map snd tvs)))))
+| Landingpad(_,(_,v),_,lps) ->
+    (List.fold_left VSet.union VSet.empty
+       (List.map free_of_value (v::(List.map (function Catch(_,v) -> v | Filter(_,v) -> v) lps))))
+| Call(_,_,_,_,v,params,_) ->
+    let vs = v::(List.map third params) in
+    List.fold_left VSet.union VSet.empty (List.map free_of_value vs)
+| Invoke(_,_,_,v,params,_,tv1,tv2) ->
+    let vs = v::(snd tv1)::(snd tv2)::(List.map third params) in
+    List.fold_left VSet.union VSet.empty (List.map free_of_value vs)
+
+(*
+  | Landingpad of typ * (typ * value) * bool * landingpad list
+*)
+
+
+let free_of_block bl =
+  let rec loop = function
+    | [] -> VSet.empty
+    | (None,i)::tl ->
+        VSet.union
+          (free_of_instruction i)
+          (loop tl)
+    | (Some x,i)::tl ->
+        VSet.union
+          (free_of_instruction i)
+          (VSet.remove x (loop tl)) in
+  loop bl.binstrs
+
+let assigned_of_block bl =
+  let rec loop = function
+    | [] -> VSet.empty
+    | (None,i)::tl -> loop tl
+    | (Some x,i)::tl -> VSet.union (VSet.singleton x) (loop tl) in
+  loop bl.binstrs
+
+let value_map g f =
+  let h = List.map (fun (ty,op) -> (ty, g op)) in
+  let imap = function
+    | Va_arg         ((t,v),t2) -> Va_arg         ((t,g v),t2)
+    | Trunc          ((t,v),t2) -> Trunc          ((t,g v),t2)
+    | Zext           ((t,v),t2) -> Zext           ((t,g v),t2)
+    | Sext           ((t,v),t2) -> Sext           ((t,g v),t2)
+    | Fptrunc        ((t,v),t2) -> Fptrunc        ((t,g v),t2)
+    | Fpext          ((t,v),t2) -> Fpext          ((t,g v),t2)
+    | Bitcast        ((t,v),t2) -> Bitcast        ((t,g v),t2)
+    | Addrspacecast  ((t,v),t2) -> Addrspacecast  ((t,g v),t2)
+    | Uitofp         ((t,v),t2) -> Uitofp         ((t,g v),t2)
+    | Sitofp         ((t,v),t2) -> Sitofp         ((t,g v),t2)
+    | Fptoui         ((t,v),t2) -> Fptoui         ((t,g v),t2)
+    | Fptosi         ((t,v),t2) -> Fptosi         ((t,g v),t2)
+    | Inttoptr       ((t,v),t2) -> Inttoptr       ((t,g v),t2)
+    | Ptrtoint       ((t,v),t2) -> Ptrtoint       ((t,g v),t2)
+    | Extractvalue   ((t,v),t2) -> Extractvalue   ((t,g v),t2)
+    | Insertvalue    ((t1,v1),(t2,v2),il) -> Insertvalue    ((t1,g v1),(t2,g v2),il)
+    | Icmp           (a,(t,v1),v2) -> Icmp           (a,(t,g v1),v2)
+    | Fcmp           (a,(t,v1),v2) -> Fcmp           (a,(t,g v1),v2)
+    | Sdiv           (a,(t,v1),v2) -> Sdiv           (a,(t,g v1),v2)
+    | Udiv           (a,(t,v1),v2) -> Udiv           (a,(t,g v1),v2)
+    | Lshr           (a,(t,v1),v2) -> Lshr           (a,(t,g v1),v2)
+    | Ashr           (a,(t,v1),v2) -> Ashr           (a,(t,g v1),v2)
+    | Fadd           (a,(t,v1),v2) -> Fadd           (a,(t,g v1),v2)
+    | Fsub           (a,(t,v1),v2) -> Fsub           (a,(t,g v1),v2)
+    | Fmul           (a,(t,v1),v2) -> Fmul           (a,(t,g v1),v2)
+    | Fdiv           (a,(t,v1),v2) -> Fdiv           (a,(t,g v1),v2)
+    | Frem           (a,(t,v1),v2) -> Frem           (a,(t,g v1),v2)
+    | Urem           ((t,v1),v2)   -> Urem           ((t,g v1),g v2)
+    | Srem           ((t,v1),v2)   -> Srem           ((t,g v1),g v2)
+    | And            ((t,v1),v2)   -> And            ((t,g v1),g v2)
+    | Or             ((t,v1),v2)   -> Or             ((t,g v1),g v2)
+    | Xor            ((t,v1),v2)   -> Xor            ((t,g v1),g v2)
+    | Add            (a,b,(t,v1),v2) -> Add            (a,b,(t,g v1),g v2)
+    | Sub            (a,b,(t,v1),v2) -> Sub            (a,b,(t,g v1),g v2)
+    | Mul            (a,b,(t,v1),v2) -> Mul            (a,b,(t,g v1),g v2)
+    | Shl            (a,b,(t,v1),v2) -> Shl            (a,b,(t,g v1),g v2)
+    | Getelementptr  (a,vs) -> Getelementptr  (a,h vs)
+    | Shufflevector  vs -> Shufflevector  (h vs)
+    | Insertelement  vs -> Insertelement  (h vs)
+    | Extractelement vs -> Extractelement (h vs)
+    | Select         vs -> Select         (h vs)
+    | Phi(t,l) -> Phi(t, List.map (fun (v1,v2) -> (g v1, g v2)) l)
+    | Alloca(a,b,None,c) -> Alloca(a,b,None,c)
+    | Alloca(a,b,Some(t,v),c) -> Alloca(a,b,Some(t,g v),c)
+    | Load(a,b,(t,v),c,d) -> Load(a,b,(t,g v),c,d)
+    | Store(a,b,(t1,v1),(t2,v2),c,d) -> Store(a,b,(t1,g v1),(t2,g v2),c,d)
+    | Atomicrmw(a,b,(t1,v1),(t2,v2),c,d) -> Atomicrmw(a,b,(t1,g v1),(t2,g v2),c,d)
+    | Cmpxchg(a,(t1,v1),(t2,v2),(t3,v3),b,c,d) -> Cmpxchg(a,(t1,g v1),(t2,g v2),(t3,g v3),b,c,d)
+    | Fence(a,b) -> Fence(a,b)
+    | Unreachable -> Unreachable
+    | Return None -> Return None
+    | Return(Some(t,v)) -> Return(Some(t,g v))
+    | Resume(t,v) -> Resume(t,g v)
+    | Br((t,v),None) -> Br((t,g v),None)
+    | Br((t1,v1),Some((t2,v2),(t3,v3))) -> Br((t1,g v1),Some((t2,g v2),(t3,g v3)))
+    | Indirectbr((t,v),vs) -> Indirectbr((t,g v),h vs)
+    | Switch((t1,v1),(t2,v2),tvs) ->
+        Switch((t1,g v1),(t2,g v2),
+               List.map (fun ((t1,v1),(t2,v2)) -> ((t1,g v1),(t2,g v2))) tvs)
+    | Landingpad(a,(t,v),b,lps) ->
+        Landingpad(a,(t,g v),b,
+                   List.map (function Catch(t,v) -> Catch(t,g v) | Filter(t,v) -> Filter(t,g v)) lps)
+    | Call(a,b,c,d,v,params,e) ->
+        Call(a,b,c,d,g v,
+             List.map (fun (a,b,v) -> (a,b,g v)) params,
+             e)
+    | Invoke(a,b,c,v,params,d,(t1,v1),(t2,v2)) ->
+        Invoke(a,b,c,g v,
+               List.map (fun (a,b,v) -> (a,b,g v)) params,
+               d,(t1,g v1),(t2,g v2)) in
+  (f.fblocks <-
+    (List.map
+      (fun bl ->
+        {bname=bl.bname; binstrs=List.map (fun (nopt,i) -> (nopt, imap i)) bl.binstrs})
+      f.fblocks));
+  ()

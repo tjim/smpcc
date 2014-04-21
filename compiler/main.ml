@@ -6,7 +6,7 @@
  *
  *)
 
-open Oli
+open Util
 open Printf
 open Options
 module V = State.V
@@ -154,100 +154,165 @@ module V = State.V
 
  *)
 
-(* wow this is ugly *)
-let rec repl_oValue var replacement x =
+let rec repl_typ_value var replacement (typ,value) =
+  (typ, repl_value var replacement value)
+and repl_value var replacement x =
+  let rv = repl_value var replacement in
+  let rtv (typ,value) = (typ, rv value) in
   match x with
-  | Variable var2   -> if var=var2 then replacement else x
-  | Argument var2   -> if var=var2 then replacement else x
-  | BasicBlock var2 -> if var=var2 then replacement else x
-  | InlineAsm       -> x
-  | MDNode          -> x
-  | NullValue       -> x
-  | MDString _      -> x
-  | BlockAddress x           -> BlockAddress(repl_oValue var replacement x)
-  | ConstantAggregateZero    -> x
-  | ConstantArray vals       -> ConstantArray(List.map (repl_oValue var replacement) vals)
-  | ConstantDataArray vals   -> ConstantDataArray(List.map (repl_oValue var replacement) vals)
-  | ConstantDataVector vals  -> ConstantDataVector(List.map (repl_oValue var replacement) vals)
-  | ConstantExpr(opcode,ops) -> ConstantExpr(opcode,repl_ops var replacement ops)
-  | ConstantFP               -> x
-  | ConstantInt _            -> x
-  | ConstantPointerNull _    -> x
-  | ConstantStruct(y,vals)   -> ConstantStruct(y,List.map (repl_oValue var replacement) vals)
-  | ConstantVector vals      -> ConstantVector(List.map (repl_oValue var replacement) vals)
-  | Function       _ -> x (* doesn't make sense to replace with oValue *)
-  | GlobalAlias    _ -> x (* doesn't make sense to replace with oValue *)
-  | GlobalVariable _ -> x (* doesn't make sense to replace with oValue *)
-  | UndefValue               -> x
-  | Instruction x   -> Instruction (repl_oInstruction var replacement x)
-and repl_ops var replacement = function
-  | [] -> []
-  | (ty,op)::tl -> (ty, repl_oValue var replacement op)::(repl_ops var replacement tl)
-and repl_oInstruction var replacement x =
-  match x with
-  | BinaryOperator     (ty,ops,opcode) -> BinaryOperator     (ty, repl_ops var replacement ops, opcode)
-  | CallInst           (y,z,ty,w,ops)  -> CallInst           (y,z,ty,w, repl_ops var replacement ops)
-  | FCmpInst           (ty,ops)        -> FCmpInst           (ty,repl_ops var replacement ops)
-  | ICmpInst           (icmp,ops)      -> ICmpInst           (icmp,repl_ops var replacement ops)
-  | AssignInst         (ty,ops)        -> AssignInst         (ty, repl_ops var replacement ops)
-  | ExtractElementInst (ty,ops)        -> ExtractElementInst (ty, repl_ops var replacement ops)
-  | GetElementPtrInst  (ty,ops)        -> GetElementPtrInst  (ty, repl_ops var replacement ops)
-  | InsertElementInst  (ty,ops)        -> InsertElementInst  (ty, repl_ops var replacement ops)
-  | InsertValueInst    (ty,ops)        -> InsertValueInst    (ty, repl_ops var replacement ops)
-  | LandingPadInst     (ty,ops)        -> LandingPadInst     (ty, repl_ops var replacement ops)
-  | PHINode            (ty,incoming)   -> PHINode            (ty, List.map
-                                                                (fun (op,block_name) -> (repl_oValue var replacement op, block_name))
-                                                                incoming)
-  | SelectInst         (ty,ops)        -> SelectInst         (ty, repl_ops var replacement ops)
-  | ShuffleVectorInst  (ty,ops)        -> ShuffleVectorInst  (ty, repl_ops var replacement ops)
-  | StoreInst          (a,ty,ops)      -> StoreInst          (a, ty, repl_ops var replacement ops)
-  | BranchInst         (ty,ops)        -> BranchInst         (ty,repl_ops var replacement ops)
-  | IndirectBrInst     (ty,ops)        -> IndirectBrInst     (ty,repl_ops var replacement ops)
-  | InvokeInst         (ty,ops)        -> InvokeInst         (ty,repl_ops var replacement ops)
-  | ReturnInst         (ty,ops)        -> ReturnInst         (ty,repl_ops var replacement ops)
-  | SwitchInst         (ty,ops)        -> SwitchInst         (ty,repl_ops var replacement ops)
-  | UnreachableInst    (ty,ops)        -> UnreachableInst    (ty,repl_ops var replacement ops)
-  | ResumeInst         (ty,ops)        -> ResumeInst         (ty,repl_ops var replacement ops)
-  | AllocaInst         (a,ty,ops)      -> AllocaInst         (a,ty,repl_ops var replacement ops)
-  | BitCastInst        (ty,ops)        -> BitCastInst        (ty,repl_ops var replacement ops)
-  | FPExtInst          (ty,ops)        -> FPExtInst          (ty,repl_ops var replacement ops)
-  | FPToSIInst         (ty,ops)        -> FPToSIInst         (ty,repl_ops var replacement ops)
-  | FPToUIInst         (ty,ops)        -> FPToUIInst         (ty,repl_ops var replacement ops)
-  | FPTruncInst        (ty,ops)        -> FPTruncInst        (ty,repl_ops var replacement ops)
-  | IntToPtrInst       (ty,ops)        -> IntToPtrInst       (ty,repl_ops var replacement ops)
-  | PtrToIntInst       (ty,ops)        -> PtrToIntInst       (ty,repl_ops var replacement ops)
-  | SExtInst           (ty,ops)        -> SExtInst           (ty,repl_ops var replacement ops)
-  | SIToFPInst         (ty,ops)        -> SIToFPInst         (ty,repl_ops var replacement ops)
-  | TruncInst          (ty,ops)        -> TruncInst          (ty,repl_ops var replacement ops)
-  | UIToFPInst         (ty,ops)        -> UIToFPInst         (ty,repl_ops var replacement ops)
-  | ZExtInst           (ty,ops)        -> ZExtInst           (ty,repl_ops var replacement ops)
-  | ExtractValueInst   (ty,ops)        -> ExtractValueInst   (ty,repl_ops var replacement ops)
-  | LoadInst           (a,ty,ops)      -> LoadInst           (a,ty,repl_ops var replacement ops)
-  | VAArgInst          (ty,ops)        -> VAArgInst          (ty,repl_ops var replacement ops)
-  | FenceInst          (ty,ops)        -> FenceInst          (ty, repl_ops var replacement ops)
-  | AtomicCmpXchgInst  (ty,ops)        -> AtomicCmpXchgInst  (ty, repl_ops var replacement ops)
-  | AtomicRMWInst      (ty,ops)        -> AtomicRMWInst      (ty, repl_ops var replacement ops)
-and repl_oCallInst var replacement x =
-  match x with
-  | IntrinsicInst x -> repl_oIntrinsicInst var replacement x
-and repl_oIntrinsicInst var replacement x =
-  match x with
-  | DbgInfoIntrinsic x -> DbgInfoIntrinsic (repl_oDbgInfoIntrinsic var replacement x)
-  | MemIntrinsic     x -> MemIntrinsic     (repl_oMemIntrinsic var replacement x)
-and repl_oDbgInfoIntrinsic var replacement x =
-  match x with
-  | DbgDeclareInst -> x
-and repl_oMemIntrinsic var replacement x =
-  match x with
-  | MemCpyInst  -> x
-  | MemMoveInst -> x
-  | MemSetInst  -> x
+  | Var var2                   -> if var=var2 then replacement else x
+  | Basicblock var2            -> if var=var2 then replacement else x
+  | Mdnode _                   -> x
+  | Mdstring _                 -> x
+  | Null                       -> x
+  | Undef                      -> x
+  | Zero                       -> x
+  | True                       -> x
+  | False                      -> x
+  | Int _                      -> x
+  | Float _                    -> x
+  | Asm _                      -> x
+  | Mdnodevector l             -> Mdnodevector (List.map (function None -> None | Some(typ, value) -> Some(typ, rv value)) l)
+  | Blockaddress(x, y)         -> Blockaddress(rv x, rv y)
+  | Array ops                  -> Array(List.map rtv ops)
+  | Vector ops                 -> Vector(List.map rtv ops)
+  | Struct(is_packed, ops)     -> Struct(is_packed, List.map rtv ops)
+  | Trunc(x, y)                -> Trunc(rtv x, y)
+  | Zext(x, y)                 -> Zext(rtv x, y)         
+  | Sext(x, y)                 -> Sext(rtv x, y)         
+  | Fptrunc(x, y)              -> Fptrunc(rtv x, y)      
+  | Fpext(x, y)                -> Fpext(rtv x, y)        
+  | Bitcast(x, y)              -> Bitcast(rtv x, y)      
+  | Addrspacecast(x, y)        -> Addrspacecast(rtv x, y)
+  | Uitofp(x, y)               -> Uitofp(rtv x, y)       
+  | Sitofp(x, y)               -> Sitofp(rtv x, y)       
+  | Fptoui(x, y)               -> Fptoui(rtv x, y)       
+  | Fptosi(x, y)               -> Fptosi(rtv x, y)       
+  | Inttoptr(x, y)             -> Inttoptr(rtv x, y)     
+  | Ptrtoint(x, y)             -> Ptrtoint(rtv x, y)     
+  | Extractvalue(x, y)         -> Extractvalue(rtv x, y)
+  | Insertvalue(x, y, z)       -> Insertvalue(rtv x, rtv y, z)
+  | Icmp(cmp, x, y)            -> Icmp(cmp, rtv x, rtv y)
+  | Fcmp(cmp, x, y)            -> Fcmp(cmp, rtv x, rtv y)
+  | Sdiv(e, x, y)              -> Sdiv(e, rtv x, rtv y)  
+  | Udiv(e, x, y)              -> Udiv(e, rtv x, rtv y)  
+  | Lshr(e, x, y)              -> Lshr(e, rtv x, rtv y)  
+  | Ashr(e, x, y)              -> Ashr(e, rtv x, rtv y)  
+  | Fadd(x, y)                 -> Fadd(rtv x, rtv y)     
+  | Fsub(x, y)                 -> Fsub(rtv x, rtv y)     
+  | Fmul(x, y)                 -> Fmul(rtv x, rtv y)     
+  | Fdiv(x, y)                 -> Fdiv(rtv x, rtv y)     
+  | Frem(x, y)                 -> Frem(rtv x, rtv y)     
+  | Urem(x, y)                 -> Urem(rtv x, rtv y)     
+  | Srem(x, y)                 -> Srem(rtv x, rtv y)     
+  | And (x, y)                 -> And (rtv x, rtv y)     
+  | Or  (x, y)                 -> Or  (rtv x, rtv y)     
+  | Xor (x, y)                 -> Xor (rtv x, rtv y)     
+  | Getelementptr(inbounds, x) -> Getelementptr(inbounds, List.map rtv x)
+  | Shufflevector x            -> Shufflevector(List.map rtv x)
+  | Insertelement x            -> Insertelement(List.map rtv x) 
+  | Extractelement x           -> Extractelement(List.map rtv x)
+  | Select x                   -> Select(List.map rtv x)
+  | Add(nuw, nsw, x, y)        -> Add(nuw, nsw, rtv x, rtv y)
+  | Sub(nuw, nsw, x, y)        -> Sub(nuw, nsw, rtv x, rtv y)
+  | Mul(nuw, nsw, x, y)        -> Mul(nuw, nsw, rtv x, rtv y)
+  | Shl(nuw, nsw, x, y)        -> Shl(nuw, nsw, rtv x, rtv y)
+and repl_instr var replacement x =
+  let rv = repl_value var replacement in
+  let rtv = repl_typ_value var replacement in
+  let rtvl = List.map (repl_typ_value var replacement) in
+  match x with 
+  | Add(nuw, nsw, x, y) -> Add(nuw, nsw, rtv x, rv y)
+  | Sub(nuw, nsw, x, y) -> Sub(nuw, nsw, rtv x, rv y)
+  | Mul(nuw, nsw, x, y) -> Mul(nuw, nsw, rtv x, rv y)
+  | Shl(nuw, nsw, x, y) -> Shl(nuw, nsw, rtv x, rv y)
+  | Fadd(fmf, x, y)           -> Fadd(fmf, rtv x, rv y)
+  | Fsub(fmf, x, y)           -> Fsub(fmf, rtv x, rv y)
+  | Fmul(fmf, x, y)           -> Fmul(fmf, rtv x, rv y)
+  | Fdiv(fmf, x, y)           -> Fdiv(fmf, rtv x, rv y)
+  | Frem(fmf, x, y)           -> Frem(fmf, rtv x, rv y)
+  | Sdiv(e, x, y)           -> Sdiv(e, rtv x, rv y)
+  | Udiv(e, x, y)           -> Udiv(e, rtv x, rv y)
+  | Lshr(e, x, y)           -> Lshr(e, rtv x, rv y)
+  | Ashr(e, x, y)           -> Ashr(e, rtv x, rv y)
+  | Urem(x, y)           -> Urem(rtv x, rv y)
+  | Srem(x, y)           -> Srem(rtv x, rv y)
+  | And (x, y)           -> And (rtv x, rv y)
+  | Or  (x, y)           -> Or  (rtv x, rv y)
+  | Xor (x, y)           -> Xor (rtv x, rv y)
+  | Icmp(icmp, x, y) -> Icmp(icmp, rtv x, rv y)
+  | Fcmp(fcmp, x, y) -> Fcmp(fcmp, rtv x, rv y)
+  | Trunc(x, y)          -> Trunc(rtv x, y)        
+  | Zext(x, y)           -> Zext(rtv x, y)         
+  | Sext(x, y)           -> Sext(rtv x, y)         
+  | Fptrunc(x, y)        -> Fptrunc(rtv x, y)      
+  | Fpext(x, y)          -> Fpext(rtv x, y)        
+  | Bitcast(x, y)        -> Bitcast(rtv x, y)      
+  | Addrspacecast(x, y)  -> Addrspacecast(rtv x, y)
+  | Uitofp(x, y)         -> Uitofp(rtv x, y)       
+  | Sitofp(x, y)         -> Sitofp(rtv x, y)       
+  | Fptoui(x, y)         -> Fptoui(rtv x, y)       
+  | Fptosi(x, y)         -> Fptosi(rtv x, y)       
+  | Inttoptr(x, y)       -> Inttoptr(rtv x, y)     
+  | Ptrtoint(x, y)       -> Ptrtoint(rtv x, y)     
+  | Va_arg(x, y)         -> Va_arg(rtv x, y)       
+  | Getelementptr(inbounds, x) -> Getelementptr(inbounds, x)
+  | Shufflevector x -> Shufflevector(rtvl x)
+  | Insertelement x -> Insertelement(rtvl x)
+  | Extractelement x -> Extractelement(rtvl x)
+  | Select x -> Select(rtvl x)
+  | Phi(ty, incoming) -> Phi(ty,
+                             List.map (fun (v1,v2) -> (rv v1, rv v2)) incoming)
+  | Landingpad(x, y, z, w) ->
+      Landingpad(x, rtv y, z,
+                 List.map (function
+                   | Catch(typ, value) -> Catch(typ, rv value)
+                   | Filter(typ, value) ->Filter(typ, rv value)) w)
+  | Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs) ->
+      Call(is_tail_call, callconv, retattrs, callee_ty, rv callee_name,
+           List.map (fun (typ,attrs,value) -> (typ,attrs,rv value)) operands,
+           callattrs)
+  | Alloca(x, y, z, w) ->
+      Alloca(x, y,
+             (match z with None -> None | Some q -> Some(rtv q)),
+             w)
+  | Load(x, y, z, w, v) ->
+      Load(x, y, rtv z, w, v)
+  | Store(x, y, z, w, v, u) ->
+      Store(x, y, rtv z, rtv w, v, u)
+  | Cmpxchg(x, y, z, w, v, u, t) ->
+      Cmpxchg(x, rtv y, rtv z, rtv w, v, u, t)
+  | Atomicrmw(x, y, z, w, v, u) ->
+      Atomicrmw(x, y, rtv z, rtv w, v, u)
+  | Fence(x, y) -> Fence(x, y)
+  | Extractvalue(x, y) ->
+      Extractvalue(rtv x, y)
+  | Insertvalue(x, y, z) ->
+      Insertvalue(rtv x, rtv y, z)
+  | Unreachable ->
+      Unreachable
+  | Return None ->
+      Return None
+  | Return(Some tv) ->
+      Return(Some(rtv tv))
+  | Br(x, None) ->
+      Br(rtv x, None)
+  | Br(x, Some(y, z)) ->
+      Br(rtv x, Some(rtv y, rtv z))
+  | Indirectbr(x, y) ->
+      Indirectbr(rtv x, rtvl y)
+  | Resume x ->
+      Resume(rtv x)
+  | Switch(x, y, z) ->
+      Switch(rtv x, rtv y, List.map (fun (a,b) -> (rtv a, rtv b)) z)
+  | Invoke(x, y, z, w, v, u, t, s) ->
+      Invoke(x, y, z, rv w, List.map (fun (typ,attrs,value) -> (typ,attrs,rv value)) v, u, rtv t, rtv s)
 
 let repl_instrs var replacement instrs =
   let rec loop = function
     | [] -> []
     | (nopt,instr)::tl ->
-        let replaced = repl_oInstruction var replacement instr in
+        let replaced = repl_instr var replacement instr in
         (match nopt with
         | None -> (nopt, replaced)::(loop tl)
         | Some x ->
@@ -255,27 +320,29 @@ let repl_instrs var replacement instrs =
             (Some x, replaced)::(loop tl)) in
   loop instrs
 
-let assign_instr nopt result_ty ty op =
-  (nopt,AssignInst(result_ty, [(ty,op)]))
+let assign_instr n result_ty ty op =
+  (Some n, Inttoptr((ty, op), result_ty)) (* unlike LLVM we will not force result_ty to be a ptr or ty to be an int typ *)
 
 (*
   bl_target has var = phi (value,bl_source) --> record and remove
   record means
     tbl[(bl_target, bl_source)] = bl_fresh, [(var,value)]
 
-
   each (bl_target, bl_source) -->
     fresh block bl_fresh
     replace bl_target by bl_fresh in bl_source
   build bl_fresh
-    
-
 *)
+
+let unopt = function
+  | None -> failwith "unopt"
+  | Some x -> x
+
 let phi_elimination f =
-  let bl_assoc =
+  let bl_assoc : (var * binfo) list =
     (* maps block name to block *)
-    List.map (fun bl -> bl.b_name, bl) f.f_blocks in
-  let tbl =
+    List.map (fun bl -> bl.bname, bl) f.fblocks in
+  let tbl : ((var * var), (var * (var * value) list ref)) Hashtbl.t =
     (* maps a (target_block_name, source_block_name) to (fresh_block_name, assignments) *)
     Hashtbl.create 11 in
   (* Gather PHI information *)
@@ -283,121 +350,114 @@ let phi_elimination f =
     (fun bl ->
       List.iter
         (function
-          | (Some var,PHINode(_, incoming)) ->
+          | (Some var,Phi(_, incoming)) ->
               List.iter
-                (fun (value,source_block_name) ->
+                (fun (value,source_block) ->
+                  let source_block_name = (match source_block with Var v -> v | Basicblock v -> v | _ -> failwith "phi elimination") in
                   let (_, assignments) =
-                    if not(Hashtbl.mem tbl (bl.b_name, source_block_name)) then
-                      Hashtbl.add tbl (bl.b_name, source_block_name) (State.fresh_label(), ref []);
-                    Hashtbl.find tbl (bl.b_name, source_block_name) in
+                    if not(Hashtbl.mem tbl (bl.bname, source_block_name)) then
+                      Hashtbl.add tbl (bl.bname, source_block_name) (State.fresh_label(), ref []);
+                    Hashtbl.find tbl (bl.bname, source_block_name) in
                   assignments := (var,value)::!assignments)
                 incoming
-          | (None, PHINode _) -> failwith "Error: PHINode without variable"
+          | (None, Phi _) -> failwith "Error: PHINode without variable"
           | _ -> ())
-        bl.b_instrs)
-    f.f_blocks;
+        bl.binstrs)
+    f.fblocks;
   (* Remove PHI nodes *)
   List.iter
     (fun bl ->
       let non_phi =
         List.filter
-          (function (_,PHINode(_, _)) -> false
+          (function (_,Phi(_, _)) -> false
             | _ -> true)
-          bl.b_instrs in
-      bl.b_instrs <- non_phi)
-    f.f_blocks;
+          bl.binstrs in
+      bl.binstrs <- non_phi)
+    f.fblocks;
   (* Retarget branches *)
   Hashtbl.iter
     (fun (target_block_name, source_block_name) (fresh_block_name, _) ->
       let source_bl =
         try List.assoc source_block_name bl_assoc
         with _ -> failwith "Error: PHINode source does not exist" in
-      source_bl.b_instrs <- repl_instrs target_block_name (BasicBlock fresh_block_name) source_bl.b_instrs)
+      source_bl.binstrs <- repl_instrs target_block_name (Basicblock fresh_block_name) source_bl.binstrs)
     tbl;
   (* Add the new blocks *)
   let new_blocks = ref [] in
   Hashtbl.iter
     (fun (target_block_name, _) (fresh_block_name, assignments) ->
-      let b_name = fresh_block_name in
+      let bname = fresh_block_name in
       let before_and_afters =
         List.map
           (fun (var, value) ->
-            let (_,_,ty) = var in
-            let temp_var = (false, State.fresh(), ty) in
-            let before = assign_instr (Some temp_var) ty ty value in
-            let after = assign_instr (Some var) ty ty (Variable temp_var) in
+            let ty = State.typ_of_var var in
+            let temp_var = Name(false, State.fresh()) in
+            let before = assign_instr temp_var ty ty value in
+            let after = assign_instr var ty ty (Var temp_var) in
             (before,after))
           !assignments in
       let (befores, afters) = List.split before_and_afters in
-      let branch = (None, BranchInst(Label,[(Label, BasicBlock target_block_name)])) in
-      let b_instrs = befores @ afters @ [branch] in
-      new_blocks := {b_name;b_instrs}::!new_blocks)
+      let branch = (None, Br((Label, Basicblock target_block_name), None)) in
+      let binstrs = befores @ afters @ [branch] in
+      new_blocks := {bname;binstrs}::!new_blocks)
     tbl;
-  f.f_blocks <- f.f_blocks @ !new_blocks;
+  f.fblocks <- f.fblocks @ !new_blocks;
   ()
 
 (* Replace getelementptr by arithmetic *)
 (* http://www.llvm.org/docs/GetElementPtr.html *)
-let gep_elimination f =
-  let elim (nopt,i) =
-    (match i with
-    | GetElementPtrInst(ty,(Pointer(s,ety),x)::tl) ->
-        (* begin *)
-        (*   let pty_string = let b = Buffer.create 11 in bpr_oType b (Pointer(s,ety)); Buffer.contents b in *)
-        (*   let x_string = let b = Buffer.create 11 in bpr_oValue b x; Buffer.contents b in *)
-        (*   eprintf "getelementptr working on %s, %s\n" pty_string x_string *)
-        (* end; *)
-        let ety = Array(0,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
+let gep_elimination ctyps f =
+  let elim = function
+    | Some n, Getelementptr(_,(Pointer(ety,aspace),x)::tl) ->
+        let ety = Arraytyp(1,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
         let rec loop x ety = function
-          | [] -> [assign_instr nopt (Pointer(s,ety)) (Pointer(s,ety)) x]
+          | [] -> [assign_instr n (Pointer(ety,aspace)) (Pointer(ety,aspace)) x]
           | (yty,y)::tl ->
               (match ety,y with
-              | Array(_,ety'),(ConstantInt(_,Some(i))) -> (* NB we ignore the bitwidth of the constant *)
+              | Arraytyp(_,ety'),Int(i) -> (* NB we ignore the bitwidth of the constant *)
                   (* invariant: yty = i64 *)
-                  let b = (ConstantInt(64,Some(Int64.mul i (Int64.of_int(bytewidth ety'))))) in
-                  let new_x = (false,State.fresh(),Pointer(s,ety')) in
-                  (Some(new_x),BinaryOperator(Pointer(s,ety'),     (* the types here involve casting *)
-                                              [(Pointer(s,ety),x);
-                                               (Integer 64,b)],
-                                              Llvm.Opcode.Add))
-                  ::(loop (Variable new_x) ety' tl)
-              | Array(_,ety'),Variable _ ->
+                  let b = Int(Big_int.mult_big_int i (Big_int.big_int_of_int(bytewidth ety'))) in
+                  let new_x = Name(false,State.fresh()) in (* typ is Pointer(aspace,ety') *)
+                  (Some(new_x),Add(false, false, (Integer 64,b), x))
+                  ::(loop (Var new_x) ety' tl)
+              | Arraytyp(_,ety'),Var _ ->
                   (* invariant: yty = i64 *)
-                  let b = (false,State.fresh(),Integer 64) in
-                  let new_x = (false,State.fresh(),Pointer(s,ety')) in
-                  (Some(b),BinaryOperator(Integer 64,
-                                          [(yty,y);
-                                           (Integer 64,(ConstantInt(64,Some(Int64.of_int(bytewidth ety')))))],
-                                          Llvm.Opcode.Mul))
-                  ::(Some(new_x),BinaryOperator(Pointer(s,ety'),     (* the types here involve casting *)
-                                                [(Pointer(s,ety),x);
-                                                 (Integer 64,Variable b)],
-                                                Llvm.Opcode.Add))
-                  ::(loop (Variable new_x) ety' tl)
-              | Struct(_),(ConstantInt(32,Some(i))) ->
+                  let b = Name(false,State.fresh()) in
+                  let new_x = Name(false,State.fresh()) in (* type is Pointer(ety',aspace) *)
+                  (Some(b),Mul(false, false, (Integer 64,y), Int(Big_int.big_int_of_int(bytewidth ety'))))
+                  ::(Some(new_x),Add(false, false, (Pointer(ety',aspace),x), Var b))
+                  ::(loop (Var new_x) ety' tl)
+              | Structtyp(_),Int(i) ->
                   (* TEMPORARY HACK *)
-                  let b = (ConstantInt(64,Some(Int64.mul i (Int64.of_int 4)))) in
-                  let new_x = (false,State.fresh(),Pointer(0,Integer 32)) in
-                  (Some(new_x),BinaryOperator(Pointer(0,Integer 32),     (* the types here involve casting *)
-                                              [(Pointer(0,Integer 32),x);
-                                               (Integer 64,b)],
-                                              Llvm.Opcode.Add))
-                  ::(loop (Variable new_x) (Integer 32) tl)
+                  let b = Int(Big_int.mult_big_int i (Big_int.big_int_of_int 4)) in
+                  let new_x = Name(false,State.fresh()) in (* type is Pointer(Integer 32, None) *)
+                  (Some(new_x),Add(false, false, (Pointer(Integer 32, None), x), b))
+                  ::(loop (Var new_x) (Integer 32) tl)
                   (* failwith "TODO: struct in getelementptr" *)
+              | Vartyp v, _ ->
+                  let ety' =
+                    try 
+                      match List.assoc v ctyps with
+                      | None -> failwith ("getelementptr: opaque type "^(Util.string_of_var v))
+                      | Some typ -> typ
+                    with _ -> failwith ("getelementptr: unknown type "^(Util.string_of_var v)) in
+                  loop x ety' ((yty,y)::tl)
               | _ ->
-                  let ty_string = let b = Buffer.create 11 in bpr_oType b ety; Buffer.contents b in
-                  let y_string = let b = Buffer.create 11 in bpr_oValue b y; Buffer.contents b in
+                  let ty_string = let b = Buffer.create 11 in bpr_typ b ety; Buffer.contents b in
+                  let y_string = let b = Buffer.create 11 in bpr_value b y; Buffer.contents b in
                   failwith (sprintf "getelementptr: %s, %s" ty_string y_string)) in
         loop x ety tl
-    | i -> [(nopt,i)]) in
-  (f.f_blocks <-
+    | (nopt,i) -> [(nopt,i)] in
+  (f.fblocks <-
     (List.map
       (fun bl ->
-        { b_name = bl.b_name;
-          b_instrs = List.concat (List.map elim bl.b_instrs);
+        { bname = bl.bname;
+          binstrs = List.concat (List.map elim bl.binstrs);
         })
-      f.f_blocks));
+      f.fblocks));
   ()
+
+let big d = Int(Big_int.big_int_of_int d)
 
 (* If a block contains a load or store, we split the block into two.  The second block should
    expect the result of the load/store in attsrcMemRes. *)
@@ -407,45 +467,38 @@ let load_store_elimination f =
       let rec split = function
         | [] ->
             ([],[])
-        | (nopt,(LoadInst(a,result_ty,[(ty,x)])))::tl ->
+        | (Some nopt,Load(_,_,(Pointer(result_ty,aspace),x),_,_))::tl ->
             (*TODO:alignment*)
-            let b_name = State.fresh_label() in
-            let b_instrs, bl_list = split tl in
-            let b_instrs =
-              (assign_instr nopt result_ty ty (Variable V.attsrcMemRes))::b_instrs in
+            let bname = State.fresh_label() in
+            let binstrs, bl_list = split tl in
+            let binstrs =
+              (assign_instr nopt result_ty (Integer 64) (Var V.attsrcMemRes))::binstrs in
             [
 (*              assign_instr (Some(V.attsrcIsDone)) (Integer 1) (Integer 1) (ConstantInt(1, Some Int64.zero));*)
-              assign_instr (Some(V.attsrcMemAct)) (Integer 2) (Integer 2) (ConstantInt(2, Some Int64.one));
-              assign_instr (Some(V.attsrcNumElts)) (Integer 32) (Integer 32) (ConstantInt(32, Some Int64.one));
+              assign_instr V.attsrcMemAct (Integer 2) (Integer 2) (big 1);
+              assign_instr V.attsrcNumElts (Integer 32) (Integer 32) (big 1);
 (*FIX: look at type for MemSize, on assign_instr you might have to select subset of bits*)
-              assign_instr (Some(V.attsrcMemSize)) (Integer 32) (Integer 32) (ConstantInt(32, Some(Int64.of_int 4)));
-              assign_instr (Some(V.attsrcMemLoc)) (Integer 64) (Integer 64) x;
-              assign_instr (Some(V.attsrcStateO())) Label Label (BasicBlock b_name) ],
-            {b_name;b_instrs}::bl_list
-        | (nopt,StoreInst(a,ty,[(_,x);(_,addr)]))::tl ->
+              assign_instr V.attsrcMemSize (Integer 32) (Integer 32) (big 4);
+              assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) x;
+              assign_instr (V.attsrcStateO()) Label Label (Basicblock bname) ],
+            {bname;binstrs}::bl_list
+        | (Some nopt,Store(_,_,(_,x),(_,addr),_,_))::tl ->
             (*TODO:alignment*)
-(*
-            (match addr with
-              ConstantExpr(opcode,_) ->
-                if opcode = Llvm.Opcode.GetElementPtr then eprintf "Yep\n"
-            | _ -> ());
-*)
-            let b_name = State.fresh_label() in
-            let b_instrs, bl_list = split tl in
-            [ assign_instr (Some(V.attsrcIsDone)) (Integer 1) (Integer 1) (ConstantInt(1, Some Int64.zero));
-              assign_instr (Some(V.attsrcMemAct)) (Integer 2) (Integer 2) (ConstantInt(2, Some(Int64.of_int 2)));
-              assign_instr (Some(V.attsrcNumElts)) (Integer 32) (Integer 32) (ConstantInt(32, Some Int64.one));
-              assign_instr (Some(V.attsrcMemSize)) (Integer 32) (Integer 32) (ConstantInt(32, Some(Int64.of_int 4)));
-              assign_instr (Some(V.attsrcMemLoc)) (Integer 64) (Integer 64) addr;
-              assign_instr (Some(V.attsrcMemVal)) (Integer 32) (Integer 32) x;
-              assign_instr (Some(V.attsrcStateO())) Label Label (BasicBlock b_name) ],
-            {b_name;b_instrs}::bl_list
-
+            let bname = State.fresh_label() in
+            let binstrs, bl_list = split tl in
+            [ assign_instr V.attsrcIsDone (Integer 1) (Integer 1) (big 0);
+              assign_instr V.attsrcMemAct (Integer 2) (Integer 2) (big 2);
+              assign_instr V.attsrcNumElts (Integer 32) (Integer 32) (big 1);
+              assign_instr V.attsrcMemSize (Integer 32) (Integer 32) (big 4);
+              assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) addr;
+              assign_instr V.attsrcMemVal (Integer 32) (Integer 32) x;
+              assign_instr (V.attsrcStateO()) Label Label (Basicblock bname) ],
+            {bname;binstrs}::bl_list
         | hd::tl ->
-            let b_instrs, bl_list = split tl in
-            (hd::b_instrs, bl_list) in
-      let b_instrs, bl_list = split bl.b_instrs in
-      let blocks = {b_name=bl.b_name;b_instrs}::bl_list in
+            let binstrs, bl_list = split tl in
+            (hd::binstrs, bl_list) in
+      let binstrs, bl_list = split bl.binstrs in
+      let blocks = {bname=bl.bname;binstrs}::bl_list in
       blocks in
     let rec loop = function
       | [] -> []
@@ -453,7 +506,7 @@ let load_store_elimination f =
           (split_block hd)@(loop tl) in
     loop in
   if not options.debug_load_store then
-    f.f_blocks <- split_memory_accesses f.f_blocks
+    f.fblocks <- split_memory_accesses f.fblocks
 
 let cfg f =
   let pr_escape s =
@@ -470,29 +523,29 @@ let cfg f =
   List.iter
     (fun bl ->
       let add_target = function
-        | _, BasicBlock target -> Hashtbl.add tbl bl.b_name target
+        | _, Basicblock target -> Hashtbl.add tbl bl.bname target
         | _ -> () in
-      match List.rev bl.b_instrs with
-      | (_,SwitchInst(ty, _::ops))::_ -> (* first arg determines which of remaining args to branch to *)
-          List.iter add_target ops
-      | (_,BranchInst(_, [target]))::_ -> (* unconditional branch *)
+      match List.rev bl.binstrs with
+      | (_,Switch(_,_,ops))::_ -> (* first arg determines which of remaining args to branch to *)
+          List.iter add_target (List.map snd ops)
+      | (_,Br(target, None))::_ -> (* unconditional branch *)
           add_target target
-      | (_,BranchInst(_, [_; target; target2]))::_ -> (* conditional branch *)
+      | (_,Br(_, Some(target, target2)))::_ -> (* conditional branch *)
           add_target target;
           add_target target2;
-      | (_,IndirectBrInst(ty, _::ops))::_ -> (* indirect branch computed by first arg, remaining list the possible targets *)
+      | (_,Indirectbr(_, ops))::_ -> (* indirect branch computed by first arg, remaining list the possible targets *)
           failwith "Error: indirectbr is unsupported"
-      | (_,ReturnInst _)::_ -> ()
+      | (_,Return _)::_ -> ()
       | _ ->
           failwith "Error: block does not end in branch")
-    f.f_blocks;
-  printf "digraph \"%s\" {\n" (string_of_variable f.f_name);
-  (match f.f_blocks with [] -> () | hd::_ -> pr_escape (string_of_variable hd.b_name); printf "\n"); (* root will be layed out in rank 0 *)
+    f.fblocks;
+  printf "digraph \"%s\" {\n" (string_of_var f.fname);
+  (match f.fblocks with [] -> () | hd::_ -> pr_escape (string_of_var hd.bname); printf "\n"); (* root will be layed out in rank 0 *)
   Hashtbl.iter
     (fun source target ->
-      pr_escape (string_of_variable source);
+      pr_escape (string_of_var source);
       printf " -> ";
-      pr_escape (string_of_variable target);
+      pr_escape (string_of_var target);
       printf "\n")
     tbl;
   printf "}\n"
@@ -502,32 +555,25 @@ let branch_elimination f =
     (fun bl ->
       let elim (nopt,instr) =
         match instr with
-        | (SwitchInst(ty, ops)) ->
+        | Switch _ ->
             (* Ought to deal with switch better here but see gobe.ml instead *)
             [(Some(V.attsrcStateO()), instr)]
-        | (BranchInst(ty, ops))
-        | (IndirectBrInst(ty, ops)) ->
+        | Br((ty,op), None) ->
+            [assign_instr (V.attsrcStateO()) ty ty op]
+        | Br(x, Some(y,z)) ->
+            [Some(V.attsrcStateO()), Select([x;y;z])] (* NB do NOT swap order of y,z *)
+        | Indirectbr _ ->
+            failwith "branch elimination: indirectbr is unsupported"
+        | Return None ->
+            [(assign_instr V.attsrcIsDone (Integer 1) (Integer 1) (big 1))]
+        | Return(Some(ty, v)) ->
             [
-(*
-             (assign_instr (Some(V.attsrcIsDone)) (Integer 1) (Integer 1) (ConstantInt(1, Some Int64.zero)));
-             (assign_instr (Some(V.attsrcMemAct)) (Integer 2) (Integer 2) (ConstantInt(2, Some Int64.zero)));
-*)
-             (match ops with
-             | [x;y;z] ->
-                 (Some(V.attsrcStateO()), SelectInst(ty,[x;z;y])) (* NB swap order of y,z *)
-             | [(ty,op)] ->
-                 assign_instr (Some(V.attsrcStateO())) ty ty op
-             | _ ->
-                 failwith "unanticipated branch type")
-           ]
-        | (ReturnInst(ty, ops)) ->
-            [
-             (assign_instr (Some(V.attsrcAnswer)) (Integer 32) (Integer 32) (snd(List.hd ops)));
-             (assign_instr (Some(V.attsrcIsDone)) (Integer 1) (Integer 1) (ConstantInt(1, Some Int64.one)))
+             (assign_instr V.attsrcAnswer (Integer 32) ty v);
+             (assign_instr V.attsrcIsDone (Integer 1) (Integer 1) (big 1))
            ]
         | i -> [(nopt,i)] in
-      bl.b_instrs <- List.concat(List.map elim bl.b_instrs))
-    f.f_blocks
+      bl.binstrs <- List.concat(List.map elim bl.binstrs))
+    f.fblocks
 
 let optional_print f flag thunk =
   match flag with
@@ -538,7 +584,7 @@ let optional_print f flag thunk =
       pr_output_file "" (Buffer.contents b);
       if not options.delta then exit 0
 
-let run_phases f =
+let run_phases ctyps f =
   optional_print f options.prf (fun () ->
     phi_elimination f;
     optional_print f options.phi (fun () ->
@@ -546,11 +592,11 @@ let run_phases f =
       optional_print f options.branch (fun () ->
         load_store_elimination f;
         optional_print f options.load_store (fun () ->
-          gep_elimination f;
+          gep_elimination ctyps f;
           optional_print f options.gep (fun () ->
-            State.set_bl_bits (List.length f.f_blocks))))))
+            State.set_bl_bits (List.length f.fblocks))))))
 
-let file2module cil_extra_args file =
+let file2cu cil_extra_args file =
   if Filename.check_suffix file ".c" then
     (* TODO: clean up temp files in case of error *)
     let src_file =
@@ -593,17 +639,25 @@ let file2module cil_extra_args file =
           failwith(sprintf "Error: failed to remove temporary directory %s, exit code %d" (Filename.quote temp_dir) ret);
         cil_file in
     (* Run clang *)
-    let obj_file = Filename.temp_file "mpcc" ".o" in
+    let ll_file = Filename.temp_file "mpcc" ".ll" in
     let cmd =
-      sprintf "clang -c %s -emit-llvm %s -o %s" options.optflag (Filename.quote src_file) (Filename.quote obj_file) in
+      sprintf "clang -S %s -emit-llvm %s -o %s" options.optflag (Filename.quote src_file) (Filename.quote ll_file) in
+    printf "running: %s\n" cmd;
     let ret = Sys.command(cmd) in
     if ret <> 0 then
       failwith(sprintf "Error: clang failed with exit code %d" ret);
     (* Obtain clang output *)
-    let m = get_module obj_file in
-    (Sys.remove obj_file; m)
-  else if Filename.check_suffix file ".o" then
-    get_module file
+    let ch = open_in ll_file in
+    let cu =
+      try
+        Lllex.parse ch
+      with e ->
+        close_in ch;
+        Sys.remove ll_file;
+        raise e in
+    close_in ch;
+    Sys.remove ll_file;
+    cu
   else
     failwith(sprintf "Error: unrecognized file extension (%s)" file)
 
@@ -631,7 +685,7 @@ begin
   let (x,args) = getopt "-help" args             in options.help <- x;
   let (x,args) = getopt "-debug-blocks" args     in options.debug_blocks <- x;
   let (x,args) = getopt "-debug-load-store" args in options.debug_load_store <- x;
-  let (x,args) = getopt "-no-cil" args           in if x then options.delta <- false;
+  let (x,args) = getopt "-no-cil" args           in options.cil <- not x;
   let (x,args) = getopt "-delta" args            in options.delta <- x;
   let (x,args) = getopt1 "-circuitlib" args      in options.circuitlib <- x;
   let (x,args) = getopt1 "-fname" args           in options.fname <- x;
@@ -654,8 +708,10 @@ begin
   let (x,args) = getopt "-O4" args               in if x then options.optflag <- "-O4";
   let (cil_extra_args,args) = getallopts args    in
   if options.help then
-    (printf "Usage: ./mpcc.byte foo.o [options]\n";
+    (printf "Usage: ./smpcc foo.c [options]\n";
      printf "Options: -help                       Print this help message\n";
+     printf "         -debug-blocks               Print the active block during execution\n";
+     printf "         -debug-load-store           Execute loads and stores inside blocks (without splitting)\n";
      printf "         -no-cil                     Do not run cil transformation (flattening)\n";
      printf "         -delta                      Delta printing\n";
      printf "         -circuitlib <lib>           Specify the circuit library (default is yao)\n";
@@ -669,58 +725,54 @@ begin
      printf "         -branch                     Stop after branch elimination\n";
      printf "         -load-store                 Stop after load-store elimination\n";
      printf "         -gep                        Stop after getelementptr elimination\n";
-     printf "         -O0|-O1|-O2|-Os|-Ofast|-O4  Set clang optimization level";
+     printf "         -O0|-O1|-O2|-Os|-Ofast|-O4  Set clang optimization level\n";
      exit 0)
   else if options.fv then
     List.iter
       (fun file ->
-        let m = file2module cil_extra_args file in
+        let m = file2cu cil_extra_args file in
         printf "****FREE VARIABLE ANALYSIS**************************************\n";
         List.iter
-          (fun f ->
-            let (gl,f_name,_) = f.f_name in
-            printf "Function %s()\n" (if gl then "@"^f_name else "%"^f_name);
+          (fun (f:finfo) ->
+            printf "Function %s()\n" (string_of_var f.fname);
             List.iter
               (fun bl ->
-                let (_,b_name,_) = bl.b_name in
-                printf " Free in block %s:" b_name;
+                printf " Free in block %s:" (string_of_var bl.bname);
                 let fv = free_of_block bl in
-                VSet.iter (fun var -> printf " %s" (string_of_variable var)) fv;
+                VSet.iter (fun var -> printf " %s" (string_of_var var)) fv;
                 printf "\n")
-              f.f_blocks)
-          m.functions)
+              f.fblocks)
+          m.cfuns)
       args
   else if options.pr then
     List.iter
       (fun file ->
-        let m = file2module cil_extra_args file in
+        let m = file2cu cil_extra_args file in
         let b = Buffer.create 11 in
-        bpr_module b m;
+        bpr_cu b m;
         printf "%s" (Buffer.contents b))
       args
   else if options.cfg then
     List.iter
       (fun file ->
-        let m = file2module cil_extra_args file in
-        cfg (List.hd m.functions))
+        let m = file2cu cil_extra_args file in
+        cfg (List.hd m.cfuns))
       args
   else
     let file = List.hd args in
-    let m = file2module cil_extra_args file in
+    let m = file2cu cil_extra_args file in
     if options.output = None then
       options.output <- Some(Filename.basename (Filename.chop_suffix file ".c"));
     let f =
       (match options.fname with
       | None ->
-          List.hd(m.functions)
+          List.hd(m.cfuns)
       | Some fname ->
           List.hd(List.filter
-                    (fun f ->
-                      let (_,f_name,_) = f.f_name in
-                      f_name = fname)
-                    m.functions)) in
+                    (fun (f:finfo) -> (string_of_var f.fname) = fname)
+                    m.cfuns)) in
     if not options.delta then begin
-      run_phases f;
+      run_phases m.ctyps f;
       Gobe.print_function_circuit m f
     end
     else begin
@@ -736,11 +788,11 @@ begin
         else (fun () -> ()) in
       let file_before = Filename.temp_file "mpcc" ".diff" in
       options.output <- Some file_before;
-      run_phases f;
+      run_phases m.ctyps f;
       toggle_before();
       let file_after = Filename.temp_file "mpcc" ".diff" in
       options.output <- Some file_after;
-      run_phases f;
+      run_phases m.ctyps f;
       ignore(Sys.command(sprintf "colordiff -U -1 %s %s | more" file_before file_after));
       Sys.remove file_before;
       Sys.remove file_after;
