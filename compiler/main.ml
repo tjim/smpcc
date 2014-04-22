@@ -416,7 +416,7 @@ let gep_elimination ctyps f =
               (match ety,y with
               | Arraytyp(_,ety'),Int(i) -> (* NB we ignore the bitwidth of the constant *)
                   (* invariant: yty = i64 *)
-                  let b = Int(Big_int.mult_big_int i (Big_int.big_int_of_int(bytewidth ety'))) in
+                  let b = Int(Big_int.mult_big_int i (Big_int.big_int_of_int(State.bytewidth ety'))) in
                   let new_x = Name(false,State.fresh()) in (* typ is Pointer(aspace,ety') *)
                   (Some(new_x),Add(false, false, (Integer 64,b), x))
                   ::(loop (Var new_x) ety' tl)
@@ -424,7 +424,7 @@ let gep_elimination ctyps f =
                   (* invariant: yty = i64 *)
                   let b = Name(false,State.fresh()) in
                   let new_x = Name(false,State.fresh()) in (* type is Pointer(ety',aspace) *)
-                  (Some(b),Mul(false, false, (Integer 64,y), Int(Big_int.big_int_of_int(bytewidth ety'))))
+                  (Some(b),Mul(false, false, (Integer 64,y), Int(Big_int.big_int_of_int(State.bytewidth ety'))))
                   ::(Some(new_x),Add(false, false, (Pointer(ety',aspace),x), Var b))
                   ::(loop (Var new_x) ety' tl)
               | Structtyp(_),Int(i) ->

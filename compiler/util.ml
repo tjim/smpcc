@@ -69,32 +69,6 @@ type typ =
   | Pointer of typ * int option      (* element type, address space *)
   | Vector  of int * typ             (* array length, element type *)
 
-let rec bitwidth = function
-  | Vartyp _                                 -> 0 (* TODO: need type environments *)
-  | Void                                     -> 0
-  | Half                                     -> 16
-  | Float                                    -> 32
-  | Double                                   -> 64
-  | X86_fp80                                 -> 80
-  | X86_mmx                                  -> 64
-  | Fp128                                    -> 128
-  | Ppc_fp128                                -> 128
-  | Label                                    -> 32 (* ??? *)
-  | Metadata                                 -> 0
-  | Integer x                                -> x
-  | Funtyp(return_ty, param_tys, is_var_arg) -> 0
-  | Structtyp(false, tys) (* TODO: not packed struct, depends on datalayout *)
-  | Structtyp(true, tys)                     ->
-      List.fold_left (fun x y -> x+y) 0 (List.map bitwidth tys)
-  | Arraytyp(len,element_ty)                 -> len*(bitwidth element_ty)
-  | Pointer(address_space,element_ty)        -> 64 (* TODO: depends on datalayout *)
-  | Vector(len,element_ty)                   -> len*(bitwidth element_ty)
-
-let bytewidth ty =
-  let bits = bitwidth ty in
-  if (bits mod 8) <> 0 then Printf.eprintf "Warning: bitwidth not divisible by 8";
-  bits/8 + (if (bits mod 8) <> 0 then 1 else 0)
-
 module I = struct
   type t =
     | Eq

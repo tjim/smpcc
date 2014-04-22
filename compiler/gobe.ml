@@ -28,13 +28,13 @@ let rec bpr_go_value b (typ, value) =
   | Basicblock bl ->
       bprintf b "Uint(io, %d, %d)" (State.bl_num bl) (State.get_bl_bits())
   | Int x ->
-      bprintf b "Int(io, %s, %d)" (Big_int.string_of_big_int x) (bitwidth typ)
+      bprintf b "Int(io, %s, %d)" (Big_int.string_of_big_int x) (State.bitwidth typ)
   | Zero ->
-      bprintf b "Uint(io, 0, %d) /* CAUTION: zero */" (bitwidth typ)
+      bprintf b "Uint(io, 0, %d) /* CAUTION: zero */" (State.bitwidth typ)
   | Null ->
-      bprintf b "Uint(io, 0, %d) /* CAUTION: null */" (bitwidth typ)
+      bprintf b "Uint(io, 0, %d) /* CAUTION: null */" (State.bitwidth typ)
   | Undef ->
-      bprintf b "Uint(io, 0, %d) /* CAUTION: undef */" (bitwidth typ)
+      bprintf b "Uint(io, 0, %d) /* CAUTION: undef */" (State.bitwidth typ)
   | Inttoptr(x, y) -> 
       bprintf b "/* CAUTION: inttoptr */ ";
       bpr_go_value b x
@@ -109,9 +109,9 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
   | Bitcast(x,_) ->
       bprintf b "%a\n" bpr_go_value x
   | Sext(tv,t) ->
-      bprintf b "Sext(io, %a, %d)\n" bpr_go_value tv (bitwidth t)
+      bprintf b "Sext(io, %a, %d)\n" bpr_go_value tv (State.bitwidth t)
   | Zext(tv,t) ->
-      bprintf b "Zext(io, %a, %d)\n" bpr_go_value tv (bitwidth t)
+      bprintf b "Zext(io, %a, %d)\n" bpr_go_value tv (State.bitwidth t)
   | Mul(_,_,tv,Int y) ->
       (* It would be better to do this strength reduction in LLVM *)
       let shift_bits =
@@ -152,8 +152,8 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         bpr_go_value (typ,x) bpr_go_value (typ,y)
 (*  | AssignInst(result_ty, [(ty,op)]) (* special instruction inserted by our compiler *) *)
   | Inttoptr((ty,op), result_ty) ->
-      let bits_result = bitwidth result_ty in
-      let bits_op = bitwidth ty in
+      let bits_result = State.bitwidth result_ty in
+      let bits_op = State.bitwidth ty in
       if bits_result = bits_op then
         bprintf b "%a\n" bpr_go_value (ty,op)
       else if bits_result > bits_op then
@@ -174,7 +174,7 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
       bprintf b "Switch(io, %a, %a, %a)\n" bpr_go_value op0 bpr_go_value op1
         (between ", " bpr_go_value) cases
   | Trunc(x, ty) ->
-      bprintf b "%a[:%d]\n" bpr_go_value x (bitwidth ty)
+      bprintf b "%a[:%d]\n" bpr_go_value x (State.bitwidth ty)
   | _ -> begin
       eprintf "Error: unsupported %s\n" (let b = Buffer.create 11 in bpr_instr b (nopt,i); Buffer.contents b);
       bprintf b "Unsupported(\"UNSUPPORTED %a\")\n" bpr_instr (nopt,i)
@@ -274,7 +274,7 @@ let bpr_main b f is_gen =
   bprintf b "\t/* special variables */\n";
   VSet.iter
     (fun var ->
-      bprintf b "\t%s := Uint(io, 0, %d)\n" (govar var) (bitwidth (State.typ_of_var var));
+      bprintf b "\t%s := Uint(io, 0, %d)\n" (govar var) (State.bitwidth (State.typ_of_var var));
     )
     (VSet.add (State.V.attsrcStateO()) (* if there is only one block this is used but not assigned *)
        (VSet.inter State.V.special (assigned_of_blocks blocks)));
@@ -282,7 +282,7 @@ let bpr_main b f is_gen =
   bprintf b "\t/* block free variables */\n";
   VSet.iter
     (fun var ->
-      bprintf b "\t%s := Uint(io, 0, %d)\n" (govar var) (bitwidth (State.typ_of_var var));
+      bprintf b "\t%s := Uint(io, 0, %d)\n" (govar var) (State.bitwidth (State.typ_of_var var));
     )
     blocks_fv;
   bprintf b "\n";
@@ -358,7 +358,7 @@ let bpr_main b f is_gen =
 
 let rec bytes_of_value b bytes = function
   | typ, Int x ->
-      let bytes2 = bitwidth typ / 8 in (* TODO: do we care if not a multiple of 8? *)
+      let bytes2 = State.bitwidth typ / 8 in (* TODO: do we care if not a multiple of 8? *)
       let ff = Int64.of_int 255 in
       let y = ref(Int64.of_int(Big_int.int_of_big_int x)) in
       for i = 1 to bytes2 do
@@ -399,7 +399,7 @@ let bpr_globals b m =
     | { gname; gtyp; gvalue=Some v } ->
     Hashtbl.add global_locations gname !loc;
     let bytes =
-      try bytewidth gtyp with _ -> 100 in
+      try State.bytewidth gtyp with _ -> 100 in
     let bytevals = Buffer.create bytes in
     let written = bytes_of_value bytevals bytes (gtyp, v) in
     if written != 0 || bytes != Buffer.length bytevals then begin
@@ -435,11 +435,11 @@ let gep_elim_value =
         let ety = Arraytyp(0,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
         let rec loop ety = function
           | [] -> Big_int.big_int_of_int(Hashtbl.find global_locations v)
-          | (_,y)::tl ->
+          | (y_typ,y)::tl ->
               (match ety,y with
               | Arraytyp(_,ety'),(Int(i)) -> (* NB we ignore the bitwidth of the constant *)
                   Big_int.add_big_int
-                    (Big_int.mult_big_int i (Big_int.big_int_of_int(bytewidth ety')))
+                    (Big_int.mult_big_int i (Big_int.big_int_of_int(State.bytewidth ety')))
                     (loop ety' tl)
               | Structtyp(_),(Int(i)) ->
                   (* TEMPORARY HACK, assume all fields have width 4 *)
@@ -449,6 +449,8 @@ let gep_elim_value =
                       (Big_int.big_int_of_int(Hashtbl.find global_locations v))
                   else
                     failwith "gep_elim_value: struct"
+              | Vartyp v, _ ->
+                  loop (State.typ_of_var v) ((y_typ,y)::tl)
               | _ ->
                   let b = Buffer.create 11 in
                   bprintf b "gep_elim_value error: type is %a, value is %a\n" bpr_typ ety bpr_value y;

@@ -58,7 +58,11 @@ let dump() =
 let typ_of_var var =
   try Hashtbl.find vartyp_tbl var
   with Not_found -> failwith("Could not find type of " ^ (Util.string_of_var var))
-let add_vartyp var typ = Hashtbl.add vartyp_tbl var typ; var
+let add_vartyp var typ =
+  if Hashtbl.mem vartyp_tbl var then
+    eprintf "Warning: more than one value for %s in vartyp_tbl\n%!" (Util.string_of_var var);
+  Hashtbl.add vartyp_tbl var typ;
+  var
 
 let fresh_label() =
   let x = sprintf "attsrcLabel%d" !x_count in
@@ -233,6 +237,11 @@ let assign_vartyps_block ctyps b =
 
 let assign_vartyps cu =
   List.iter
+    (function
+      | (x, None)   -> ()
+      | (x, Some t) -> ignore(add_vartyp x t))
+    cu.Util.ctyps;
+  List.iter
     (fun {Util.gname;Util.gtyp} -> ignore(add_vartyp gname (Util.Pointer(gtyp,None))))
     cu.Util.cglobals;
   List.iter
@@ -247,3 +256,32 @@ let assign_vartyps cu =
           if typ_of_var v = Util.Label then Util.Basicblock v else Util.Var v
       | x -> x))
     cu.Util.cfuns
+
+open Util
+
+let rec bitwidth = function
+  | Vartyp v                                 -> (bitwidth (typ_of_var v))
+  | Void                                     -> 0
+  | Half                                     -> 16
+  | Float                                    -> 32
+  | Double                                   -> 64
+  | X86_fp80                                 -> 80
+  | X86_mmx                                  -> 64
+  | Fp128                                    -> 128
+  | Ppc_fp128                                -> 128
+  | Label                                    -> 32 (* ??? *)
+  | Metadata                                 -> 0
+  | Integer x                                -> x
+  | Funtyp(return_ty, param_tys, is_var_arg) -> 0
+  | Structtyp(false, tys) (* TODO: not packed struct, depends on datalayout *)
+  | Structtyp(true, tys)                     ->
+      List.fold_left (fun x y -> x+y) 0 (List.map bitwidth tys)
+  | Arraytyp(len,element_ty)                 -> len*(bitwidth element_ty)
+  | Pointer(address_space,element_ty)        -> 64 (* TODO: depends on datalayout *)
+  | Vector(len,element_ty)                   -> len*(bitwidth element_ty)
+
+let bytewidth ty =
+  let bits = bitwidth ty in
+  if (bits mod 8) <> 0 then Printf.eprintf "Warning: bitwidth not divisible by 8";
+  bits/8 + (if (bits mod 8) <> 0 then 1 else 0)
+
