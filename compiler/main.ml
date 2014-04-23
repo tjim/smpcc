@@ -606,7 +606,16 @@ let run_phases ctyps f =
             State.set_bl_bits (List.length f.fblocks))))))
 
 let file2cu cil_extra_args file =
-  if Filename.check_suffix file ".c" then
+  if Filename.check_suffix file ".ll" then
+    let ch = open_in file in
+    let cu =
+      try
+        Lllex.parse ch
+      with e ->
+        close_in ch;
+        raise e in
+    (close_in ch; cu)
+  else if Filename.check_suffix file ".c" then
     (* TODO: clean up temp files in case of error *)
     let src_file =
       if not options.cil then
