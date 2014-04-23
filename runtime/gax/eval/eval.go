@@ -1,6 +1,8 @@
 package eval
 
 import (
+	"crypto/aes"
+
 	"github.com/tjim/smpcc/runtime/base"
 )
 
@@ -19,8 +21,13 @@ type GaxState struct {
 	gateId       uint16
 }
 
+const (
+	KEY_SIZE = aes.BlockSize
+)
+
 var (
-	AESCount uint = 0
+	AESCount  uint     = 0
+	ALL_ZEROS base.Key = make([]byte, KEY_SIZE)
 )
 
 func IO(id int64) (gen.GaxState, GaxState) {
@@ -66,12 +73,13 @@ func slot(keys []base.Key) int {
 func findZeroSlots(a, b []base.Key) (res []bool) {
 	res = make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
-		if a[0]%2 == 0 && b[0]%2 == 0 {
+		if a[i][0]%2 == 0 && b[i][0]%2 == 0 {
 			res[i] = true
 		} else {
 			res[i] = false
 		}
 	}
+	return
 }
 
 func decrypt_nonoptimized(keys []base.Key, ciphertext []byte) []byte {
@@ -165,6 +173,17 @@ func (y GaxState) Sub(a, b []base.Key) []base.Key {
 	return result
 }
 
+func (gax *GaxState) computeTweak() base.Key {
+	tweak := make([]byte, base.KEY_SIZE)
+	tweak[0] = byte(gax.gateId)
+	tweak[1] = byte(gax.gateId >> 8)
+	var i uint
+	for i = 0; i < 8; i++ {
+		tweak[i+2] = byte(gax.concurrentId >> (8 * i))
+	}
+	return tweak
+}
+
 func (y GaxState) bitwise_binary_operator(io base.Evalio, a, b []base.Key) []base.Key {
 	if len(a) != len(b) {
 		panic("Wire mismatch in eval.bitwise_binary_operator()")
@@ -174,7 +193,7 @@ func (y GaxState) bitwise_binary_operator(io base.Evalio, a, b []base.Key) []bas
 	for i := 0; i < len(a); i++ {
 		t := io.RecvT()
 		if zeroSlots[i] {
-
+			result[i] = base.GaXDKC_E(a[i], b[i], y.computeTweak(), ALL_ZEROS)
 		} else {
 			result[i] = y.Decrypt(t, a[i], b[i])
 		}
