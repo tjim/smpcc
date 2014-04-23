@@ -407,12 +407,14 @@ let phi_elimination f =
 (* Replace getelementptr by arithmetic *)
 (* http://www.llvm.org/docs/GetElementPtr.html *)
 let gep_elimination ctyps f =
-  let elim = function
+  let elim (nopt, i) = match (nopt, i) with
     | Some n, Getelementptr(_,(Pointer(ety,aspace),x)::tl) ->
+        let buf = Buffer.create 11 in
         let ety = Arraytyp(1,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
         let rec loop x ety = function
           | [] -> [assign_instr n (Pointer(ety,aspace)) (Pointer(ety,aspace)) x]
           | (yty,y)::tl ->
+              bprintf buf "(%a, %a)\n" bpr_typ yty bpr_value y;
               (match ety,y with
               | Arraytyp(_,ety'),Int(i) -> (* NB we ignore the bitwidth of the constant *)
                   (* invariant: yty = i64 *)
@@ -427,13 +429,16 @@ let gep_elimination ctyps f =
                   (Some(b),Mul(false, false, (Integer 64,y), Int(Big_int.big_int_of_int(State.bytewidth ety'))))
                   ::(Some(new_x),Add(false, false, (Pointer(ety',aspace),x), Var b))
                   ::(loop (Var new_x) ety' tl)
-              | Structtyp(_),Int(i) ->
-                  (* TEMPORARY HACK *)
-                  let b = Int(Big_int.mult_big_int i (Big_int.big_int_of_int 4)) in
-                  let new_x = Name(false,State.fresh()) in (* type is Pointer(Integer 32, None) *)
-                  (Some(new_x),Add(false, false, (Pointer(Integer 32, None), x), b))
-                  ::(loop (Var new_x) (Integer 32) tl)
-                  (* failwith "TODO: struct in getelementptr" *)
+              | Structtyp(_,typs),Int(i) ->
+                  let ety' = List.nth typs (Big_int.int_of_big_int i) in
+                  let skip_bytes =
+                    let rec skip n = function
+                      | [] -> failwith "getelementptr: insufficient fields"
+                      | hd::tl -> if n = 0 then 0 else State.bytewidth hd + skip (n-1) tl in
+                    skip (Big_int.int_of_big_int i) typs in
+                  let new_x = Name(false,State.fresh()) in
+                  (Some(new_x),Add(false, false, (Pointer(ety', None), x), Int(Big_int.big_int_of_int skip_bytes)))
+                  ::(loop (Var new_x) ety' tl)
               | Vartyp v, _ ->
                   let ety' =
                     try 
@@ -443,9 +448,13 @@ let gep_elimination ctyps f =
                     with _ -> failwith ("getelementptr: unknown type "^(Util.string_of_var v)) in
                   loop x ety' ((yty,y)::tl)
               | _ ->
+(*
                   let ty_string = let b = Buffer.create 11 in bpr_typ b ety; Buffer.contents b in
                   let y_string = let b = Buffer.create 11 in bpr_value b y; Buffer.contents b in
                   failwith (sprintf "getelementptr: %s, %s" ty_string y_string)) in
+*)
+                  bpr_instr buf (nopt, i);
+                  failwith (sprintf "getelementptr failed: %s" (Buffer.contents buf))) in
         loop x ety tl
     | (nopt,i) -> [(nopt,i)] in
   (f.fblocks <-
@@ -482,7 +491,7 @@ let load_store_elimination f =
               assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) x;
               assign_instr (V.attsrcStateO()) Label Label (Basicblock bname) ],
             {bname;binstrs}::bl_list
-        | (Some nopt,Store(_,_,(_,x),(_,addr),_,_))::tl ->
+        | (None, Store(_,_,(_,x),(_,addr),_,_))::tl ->
             (*TODO:alignment*)
             let bname = State.fresh_label() in
             let binstrs, bl_list = split tl in
