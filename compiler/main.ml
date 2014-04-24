@@ -491,7 +491,7 @@ let load_store_elimination f =
               assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) x;
               assign_instr (V.attsrcStateO()) Label Label (Basicblock bname) ],
             {bname;binstrs}::bl_list
-        | (None, Store(_,_,(_,x),(_,addr),_,_))::tl ->
+        | (None, Store(_,_,(typ,x),(_,addr),_,_))::tl ->
             (*TODO:alignment*)
             let bname = State.fresh_label() in
             let binstrs, bl_list = split tl in
@@ -500,7 +500,7 @@ let load_store_elimination f =
               assign_instr V.attsrcNumElts (Integer 32) (Integer 32) (big 1);
               assign_instr V.attsrcMemSize (Integer 32) (Integer 32) (big 4);
               assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) addr;
-              assign_instr V.attsrcMemVal (Integer 32) (Integer 32) x;
+              assign_instr V.attsrcMemVal (Integer 32) typ x;
               assign_instr (V.attsrcStateO()) Label Label (Basicblock bname) ],
             {bname;binstrs}::bl_list
         | hd::tl ->
