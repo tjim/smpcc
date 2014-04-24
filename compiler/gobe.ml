@@ -73,20 +73,18 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
           bprintf b "\t%s := " (govar v);
         VSet.add v declared_vars) in
   (match i with
-  | Call(_,_,_,_,Var(Name(true, "printf")),(_,_,Getelementptr(_,[(_, v);(_, Int z);(_, Int z')]))::ops,_)
-    when Big_int.eq_big_int Big_int.zero_big_int z && Big_int.eq_big_int Big_int.zero_big_int z' ->
+  | Call(_,_,_,_,Var(Name(true, "printf")),(_,_,Int x)::ops,_) ->
       (try
-        let s = String.escaped(Hashtbl.find string_constants v) in
+        let s = String.escaped(Hashtbl.find string_constants (Big_int.int_of_big_int x)) in
         if ops = [] then
           bprintf b "Printf(io, mask, \"%s\")\n" s
         else
           bprintf b "Printf(io, mask, \"%s\", %a)\n" s (between ", " bpr_go_value) (List.map (fun (a,b,c) -> (a,c)) ops)
       with _ ->
         failwith "Error: first argument of printf must be a string constant")
-  | Call(_,_,_,_,Var(Name(true, "puts")),[_,_,Getelementptr(_,[(_, v);(_, Int z);(_, Int z')])],_)
-    when Big_int.eq_big_int Big_int.zero_big_int z && Big_int.eq_big_int Big_int.zero_big_int z' ->
+  | Call(_,_,_,_,Var(Name(true, "puts")),[_,_,Int x],_) ->
       (try
-        let s = String.escaped(Hashtbl.find string_constants v) in
+        let s = String.escaped(Hashtbl.find string_constants  (Big_int.int_of_big_int x)) in
         bprintf b "Printf(io, mask, \"%s\\n\")\n" s (* puts adds a newline *)
       with _ ->
         failwith "Error: argument of puts must be a string constant")
@@ -414,7 +412,7 @@ let bpr_globals b m =
     | Arraytyp(len, Integer 8) ->
         if (0 = Char.code (Buffer.nth bytevals (bytes - 1))) then
           let s = Buffer.sub bytevals 0 (len - 1) in
-          Hashtbl.add string_constants (Var gname) s
+          Hashtbl.add string_constants !loc s
     | _ -> ());
     loc := !loc + bytes;
     align 4 in
@@ -431,7 +429,11 @@ let bpr_globals b m =
 let gep_elim_value =
   value_map (function
     | Getelementptr(_, (Pointer(ety,s),Var v)::tl) as c ->
-        if Hashtbl.mem string_constants (Var v) || not(Hashtbl.mem global_locations v) then c else
+        if not(Hashtbl.mem global_locations v) then
+          (let b = Buffer.create 11 in
+          bpr_value b c;
+          eprintf "Warning: unable to eliminate '%s'\n" (Buffer.contents b);
+          c) else
         let ety = Arraytyp(0,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
         let rec loop ety = function
           | [] -> Big_int.big_int_of_int(Hashtbl.find global_locations v)
