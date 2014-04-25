@@ -475,29 +475,24 @@ let load_store_elimination f =
       let rec split = function
         | [] ->
             ([],[])
-        | (Some nopt,Load(_,_,(Pointer(result_ty,aspace),x),_,_))::tl ->
-            (*TODO:alignment*)
+        | (Some nopt,Load(_,_,(Pointer(result_ty,_),addr),_,_))::tl ->
+            (* TODO: alignment *)
             let bname = State.fresh_label() in
             let binstrs, bl_list = split tl in
-            let binstrs =
-              (assign_instr nopt result_ty (Integer 64) (Var V.attsrcMemRes))::binstrs in
-            [
-(*              assign_instr (Some(V.attsrcIsDone)) (Integer 1) (Integer 1) (ConstantInt(1, Some Int64.zero));*)
-              assign_instr V.attsrcMemAct (Integer 2) (Integer 2) (big 1);
-(*FIX: look at type for MemSize, on assign_instr you might have to select subset of bits*)
-              assign_instr V.attsrcMemSize (Integer 32) (Integer 32) (big 4);
-              assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) x;
+            let binstrs = (assign_instr nopt result_ty (Integer 64) (Var V.attsrcMemRes))::binstrs in
+            [ assign_instr V.attsrcMemAct (Integer 2) (Integer 2) (big 1);
+              assign_instr V.attsrcMemSize (Integer 32) (Integer 32) (big (State.bytewidth result_ty));
+              assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) addr;
               assign_instr (V.attsrcStateO()) Label Label (Basicblock bname) ],
             {bname;binstrs}::bl_list
         | (None, Store(_,_,(typ,x),(_,addr),_,_))::tl ->
-            (*TODO:alignment*)
+            (* TODO: alignment *)
             let bname = State.fresh_label() in
             let binstrs, bl_list = split tl in
-            [ assign_instr V.attsrcIsDone (Integer 1) (Integer 1) (big 0);
-              assign_instr V.attsrcMemAct (Integer 2) (Integer 2) (big 2);
-              assign_instr V.attsrcMemSize (Integer 32) (Integer 32) (big 4);
+            [ assign_instr V.attsrcMemAct (Integer 2) (Integer 2) (big 2);
+              assign_instr V.attsrcMemSize (Integer 32) (Integer 32) (big (State.bytewidth typ));
               assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) addr;
-              assign_instr V.attsrcMemVal (Integer 32) typ x;
+              assign_instr V.attsrcMemVal (Integer 32) typ x; (* TODO: memval should be 64 bits *)
               assign_instr (V.attsrcStateO()) Label Label (Basicblock bname) ],
             {bname;binstrs}::bl_list
         | hd::tl ->
