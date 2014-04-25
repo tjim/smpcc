@@ -179,24 +179,25 @@ func Mask(io EvalVM, s, a []base.Key) []base.Key {
 	panic("unreachable")
 }
 
-func LoadDebug(io EvalVM, mask, loc []base.Key) []base.Key {
+func LoadDebug(io EvalVM, mask, loc, eltsize []base.Key) []base.Key {
 	if len(mask) != 1 {
 		panic("LoadDebug")
 	}
+	r_eltsize := int(RevealUint32(io, eltsize))
 	if !Reveal(io, mask)[0] {
-		return Uint(io, 0, 32)
+		return Uint(io, 0, r_eltsize)
 	}
-	return Load(io, loc, Uint(io, 4, 32))
+	return Load(io, loc, eltsize)[:r_eltsize]
 }
 
-func StoreDebug(io EvalVM, mask, loc, val []base.Key) {
+func StoreDebug(io EvalVM, mask, loc, eltsize, val []base.Key) {
 	if len(mask) != 1 {
 		panic("StoreDebug")
 	}
 	if !Reveal(io, mask)[0] {
 		return
 	}
-	Store(io, loc, Uint(io, 4, 32), val)
+	Store(io, loc, eltsize, val)
 }
 
 func Unsupported(x string) []base.Key {

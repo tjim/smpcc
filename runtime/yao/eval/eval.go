@@ -296,7 +296,7 @@ func (y YaoState) Load(loc, eltsize []base.Key) []base.Key {
 		panic(fmt.Sprintf("Load: bad element size %d", v_eltsize))
 	case 1, 2, 4, 8:
 	}
-	return y.BT(v_eltsize * 8)
+	return y.BT(64)
 }
 
 /* Gen-side store */

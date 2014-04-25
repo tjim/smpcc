@@ -183,24 +183,25 @@ func Mask(io GenVM, s, a []base.Wire) []base.Wire {
 	panic("unreachable")
 }
 
-func LoadDebug(io GenVM, mask, loc []base.Wire) []base.Wire {
+func LoadDebug(io GenVM, mask, loc, eltsize []base.Wire) []base.Wire {
 	if len(mask) != 1 {
 		panic("LoadDebug")
 	}
+	r_eltsize := int(RevealUint32(io, eltsize))
 	if !Reveal(io, mask)[0] {
-		return Uint(io, 0, 32)
+		return Uint(io, 0, r_eltsize)
 	}
-	return Load(io, loc, Uint(io, 4, 32))
+	return Load(io, loc, eltsize)[:r_eltsize]
 }
 
-func StoreDebug(io GenVM, mask, loc, val []base.Wire) {
+func StoreDebug(io GenVM, mask, loc, eltsize, val []base.Wire) {
 	if len(mask) != 1 {
 		panic("StoreDebug")
 	}
 	if !Reveal(io, mask)[0] {
 		return
 	}
-	Store(io, loc, Uint(io, 4, 32), val)
+	Store(io, loc, eltsize, val)
 }
 
 func Unsupported(x string) []base.Wire {

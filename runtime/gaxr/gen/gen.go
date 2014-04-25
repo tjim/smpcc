@@ -562,7 +562,7 @@ func (y GaxState) Load(loc, eltsize []base.Wire) []base.Wire {
 		x += byte_j << uint(j*8)
 	}
 	//	fmt.Printf("Ram[0x%x]<%d> = 0x%x\n", address, v_eltsize, x)
-	return y.BT(x, v_eltsize*8)
+	return y.BT(x, 64)
 }
 
 /* Gen-side store */

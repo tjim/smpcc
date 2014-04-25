@@ -100,10 +100,10 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         bprintf b "Eval_int(io, mask)\n"
       else
         bprintf b "Eval_int(io, mask, next_arg)\n"
-  | Load(_,_,x,_,_) -> (* in case we are debugging loads *)
-      bprintf b "LoadDebug(io, mask, %a)\n" bpr_go_value x
+  | Load(_,_,(Pointer(ety,_),_ as x),_,_) -> (* in case we are debugging loads *)
+      bprintf b "LoadDebug(io, mask, %a, Uint(io, %d, 32))\n" bpr_go_value x (State.bytewidth ety)
   | Store(_,_,x,addr,_,_) -> (* in case we are debugging stores*)
-      bprintf b "StoreDebug(io, mask, %a, %a)\n" bpr_go_value addr bpr_go_value x
+      bprintf b "StoreDebug(io, mask, %a, Uint(io, %d, 32), %a)\n" bpr_go_value addr (State.bytewidth (fst x)) bpr_go_value x
   | Bitcast(x,_) ->
       bprintf b "%a\n" bpr_go_value x
   | Sext(tv,t) ->
