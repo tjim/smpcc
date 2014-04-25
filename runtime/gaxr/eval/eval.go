@@ -1,10 +1,12 @@
 package eval
 
 import (
+	"crypto/aes"
+
 	"github.com/tjim/smpcc/runtime/base"
 )
 
-import "github.com/tjim/smpcc/runtime/gax/gen"
+import "github.com/tjim/smpcc/runtime/gaxr/gen"
 import "fmt"
 import "math"
 import "github.com/tjim/smpcc/runtime/ot"
@@ -19,8 +21,13 @@ type GaxState struct {
 	gateId       uint16
 }
 
+const (
+	KEY_SIZE = aes.BlockSize
+)
+
 var (
-	AESCount uint = 0
+	AESCount  uint     = 0
+	ALL_ZEROS base.Key = make([]byte, KEY_SIZE)
 )
 
 func IO(id int64) (gen.GaxState, GaxState) {
@@ -63,6 +70,18 @@ func slot(keys []base.Key) int {
 	return result
 }
 
+func findZeroSlots(a, b []base.Key) (res []bool) {
+	res = make([]bool, len(a))
+	for i := 0; i < len(a); i++ {
+		if a[i][0]%2 == 0 && b[i][0]%2 == 0 {
+			res[i] = true
+		} else {
+			res[i] = false
+		}
+	}
+	return
+}
+
 func decrypt_nonoptimized(keys []base.Key, ciphertext []byte) []byte {
 	result := ciphertext
 	for i := len(keys); i > 0; i-- {
@@ -72,6 +91,7 @@ func decrypt_nonoptimized(keys []base.Key, ciphertext []byte) []byte {
 	// log.Printf("Decrypt_nonoptimized, result = %v\n", result)
 	return result
 }
+
 func Decrypt_nonoptimized(t base.GarbledTable, keys []base.Key) []byte {
 	return decrypt_nonoptimized(keys, t[slot(keys)])
 }
@@ -153,6 +173,17 @@ func (y GaxState) Sub(a, b []base.Key) []base.Key {
 	return result
 }
 
+func (gax *GaxState) computeTweak() base.Key {
+	tweak := make([]byte, base.KEY_SIZE)
+	tweak[0] = byte(gax.gateId)
+	tweak[1] = byte(gax.gateId >> 8)
+	var i uint
+	for i = 0; i < 8; i++ {
+		tweak[i+2] = byte(gax.concurrentId >> (8 * i))
+	}
+	return tweak
+}
+
 func (y GaxState) bitwise_binary_operator(io base.Evalio, a, b []base.Key) []base.Key {
 	if len(a) != len(b) {
 		panic("Wire mismatch in eval.bitwise_binary_operator()")
@@ -160,7 +191,14 @@ func (y GaxState) bitwise_binary_operator(io base.Evalio, a, b []base.Key) []bas
 	result := make([]base.Key, len(a))
 	for i := 0; i < len(a); i++ {
 		t := io.RecvT()
-		result[i] = y.Decrypt(t, a[i], b[i])
+		aa := a[i][0] % 2
+		bb := b[i][0] % 2
+		if aa == 0 && bb == 0 {
+			result[i] = base.GaXDKC_E(a[i], b[i], y.computeTweak(), ALL_ZEROS)
+		} else {
+			tweak := y.computeTweak()
+			result[i] = decrypt([]base.Key{a[i], b[i]}, t[bb*2+aa-1], tweak)
+		}
 	}
 	return result
 }
