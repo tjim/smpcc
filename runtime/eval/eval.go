@@ -185,9 +185,9 @@ func LoadDebug(io EvalVM, mask, loc, eltsize []base.Key) []base.Key {
 	}
 	r_eltsize := int(RevealUint32(io, eltsize))
 	if !Reveal(io, mask)[0] {
-		return Uint(io, 0, r_eltsize)
+		return Uint(io, 0, r_eltsize*8)
 	}
-	return Load(io, loc, eltsize)[:r_eltsize]
+	return Load(io, loc, eltsize)[:r_eltsize*8]
 }
 
 func StoreDebug(io EvalVM, mask, loc, eltsize, val []base.Key) {

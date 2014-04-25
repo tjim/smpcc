@@ -189,9 +189,9 @@ func LoadDebug(io GenVM, mask, loc, eltsize []base.Wire) []base.Wire {
 	}
 	r_eltsize := int(RevealUint32(io, eltsize))
 	if !Reveal(io, mask)[0] {
-		return Uint(io, 0, r_eltsize)
+		return Uint(io, 0, r_eltsize*8)
 	}
-	return Load(io, loc, eltsize)[:r_eltsize]
+	return Load(io, loc, eltsize)[:r_eltsize*8]
 }
 
 func StoreDebug(io GenVM, mask, loc, eltsize, val []base.Wire) {
