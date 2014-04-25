@@ -189,13 +189,15 @@ func (y GaxState) bitwise_binary_operator(io base.Evalio, a, b []base.Key) []bas
 		panic("Wire mismatch in eval.bitwise_binary_operator()")
 	}
 	result := make([]base.Key, len(a))
-	zeroSlots := findZeroSlots(a, b)
 	for i := 0; i < len(a); i++ {
 		t := io.RecvT()
-		if zeroSlots[i] {
+		aa := a[i][0] % 2
+		bb := b[i][0] % 2
+		if aa == 0 && bb == 0 {
 			result[i] = base.GaXDKC_E(a[i], b[i], y.computeTweak(), ALL_ZEROS)
 		} else {
-			result[i] = y.Decrypt(t, a[i], b[i])
+			tweak := y.computeTweak()
+			result[i] = decrypt([]base.Key{a[i], b[i]}, t[bb*2+aa-1], tweak)
 		}
 	}
 	return result

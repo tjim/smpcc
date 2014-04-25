@@ -137,7 +137,7 @@ func genWire() base.Wire {
 	return []base.Key{k0, k1}
 }
 
-func (g *GaxState) genWireRR(inKey0, inKey1 base.Key, gateVal int) base.Wire {
+func (g *GaxState) genWireRR(inKey0, inKey1 base.Key, gateVal byte) base.Wire {
 	init_key0()
 	var k0, k1 base.Key
 	if gateVal == 0 {
@@ -173,21 +173,27 @@ func (y GaxState) And(a, b []base.Wire) []base.Wire {
 		panic("Wire mismatch in gen.And()")
 	}
 	result := make([]base.Wire, len(a))
-	zeroSlots := findZeroSlots(a, b)
+
+	var w base.Wire
+
 	for i := 0; i < len(a); i++ {
-		w := y.genWireRR(a[i][zeroSlots[i][0]], b[i][zeroSlots[i][1]],
-			zeroSlots[i][0]&zeroSlots[i][1])
-		// w := genWire()
+		t := make([]base.Ciphertext, 3)
+
+		ii := a[i][0][0] % 2
+		jj := b[i][0][0] % 2
+		r := ii & jj
+		w = y.genWireRR(a[i][ii], b[i][jj], r)
 		result[i] = w
-		t := make([]base.Ciphertext, 4)
-		for j1 := 0; j1 <= 1; j1++ {
-			for j2 := 0; j2 <= 1; j2++ {
-				if j1 == zeroSlots[i][0] && j2 == zeroSlots[i][1] {
-					continue
-				}
-				y.encrypt_slot(t, w[j1&j2], a[i][j1], b[i][j2])
-			}
+		for counter := 1; counter < 4; counter++ {
+			aa := byte(counter % 2)
+			bb := byte(counter / 2)
+			ii := aa ^ (a[i][0][0] % 2)
+			jj := bb ^ (b[i][0][0] % 2)
+
+			tweak := y.computeTweak()
+			t[counter-1] = encrypt([]base.Key{a[i][ii], b[i][jj]}, w[ii&jj], tweak)
 		}
+
 		y.io.SendT(t)
 	}
 	return result
@@ -195,20 +201,30 @@ func (y GaxState) And(a, b []base.Wire) []base.Wire {
 
 func (y GaxState) Or(a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
-		panic("Wire mismatch in gen.Or()")
+		panic("Wire mismatch in gen.And()")
 	}
 	result := make([]base.Wire, len(a))
-	zeroSlots := findZeroSlots(a, b)
+
+	var w base.Wire
+
 	for i := 0; i < len(a); i++ {
-		w := y.genWireRR(a[i][zeroSlots[i][0]], b[i][zeroSlots[i][1]],
-			zeroSlots[i][0]|zeroSlots[i][1])
-		// w := genWire()
+		t := make([]base.Ciphertext, 3)
+		// fmt.Printf("==== %d, %d \n", len(a), len(a[i]))
+		ii := a[i][0][0] % 2
+		jj := b[i][0][0] % 2
+		r := ii | jj
+		w = y.genWireRR(a[i][ii], b[i][jj], r)
 		result[i] = w
-		t := make([]base.Ciphertext, 4)
-		y.encrypt_slot(t, w[0], a[i][0], b[i][0])
-		y.encrypt_slot(t, w[1], a[i][0], b[i][1])
-		y.encrypt_slot(t, w[1], a[i][1], b[i][0])
-		y.encrypt_slot(t, w[1], a[i][1], b[i][1])
+		for counter := 1; counter < 4; counter++ {
+			aa := byte(counter % 2)
+			bb := byte(counter / 2)
+			ii := aa ^ (a[i][0][0] % 2)
+			jj := bb ^ (b[i][0][0] % 2)
+
+			tweak := y.computeTweak()
+			t[counter-1] = encrypt([]base.Key{a[i][ii], b[i][jj]}, w[ii|jj], tweak)
+		}
+
 		y.io.SendT(t)
 	}
 	return result
@@ -317,24 +333,34 @@ func (y GaxState) Uint(a uint64, width int) []base.Wire {
 
 func (y GaxState) Nand(a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
-		panic("Wire mismatch in gen.Nand()")
+		panic("Wire mismatch in gen.And()")
 	}
 	result := make([]base.Wire, len(a))
-	zeroSlots := findZeroSlots(a, b)
+
+	var w base.Wire
 
 	for i := 0; i < len(a); i++ {
-		w := y.genWireRR(a[i][zeroSlots[i][0]], b[i][zeroSlots[i][1]],
-			1-zeroSlots[i][0]&zeroSlots[i][1])
-		// w := genWire()
+		t := make([]base.Ciphertext, 3)
+
+		ii := a[i][0][0] % 2
+		jj := b[i][0][0] % 2
+		r := ii & jj
+		w = y.genWireRR(a[i][ii], b[i][jj], r)
 		result[i] = w
-		t := make([]base.Ciphertext, 4)
-		y.encrypt_slot(t, w[1], a[i][0], b[i][0])
-		y.encrypt_slot(t, w[1], a[i][0], b[i][1])
-		y.encrypt_slot(t, w[1], a[i][1], b[i][0])
-		y.encrypt_slot(t, w[0], a[i][1], b[i][1])
+		for counter := 1; counter < 4; counter++ {
+			aa := byte(counter % 2)
+			bb := byte(counter / 2)
+			ii := aa ^ (a[i][0][0] % 2)
+			jj := bb ^ (b[i][0][0] % 2)
+
+			tweak := y.computeTweak()
+			t[counter-1] = encrypt([]base.Key{a[i][ii], b[i][jj]}, w[^(ii&jj)], tweak)
+		}
+
 		y.io.SendT(t)
 	}
 	return result
+
 }
 
 // Gates built by composing other gates
