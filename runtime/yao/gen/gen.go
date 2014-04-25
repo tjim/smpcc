@@ -475,7 +475,7 @@ func (y YaoState) Load(loc, numelts, eltsize []base.Wire) []base.Wire {
 /* Gen-side store that ignores numelts */
 func (y YaoState) Store(loc, numelts, eltsize, val []base.Wire) {
 	if len(loc) < 8 {
-		panic("Load: bad address")
+		panic("Store: bad address")
 	}
 	loc_len := int(math.Min(25, (float64(len(loc)))))
 	loc = loc[:loc_len]
@@ -492,7 +492,7 @@ func (y YaoState) Store(loc, numelts, eltsize, val []base.Wire) {
 	}
 	switch v_eltsize {
 	default:
-		panic(fmt.Sprintf("Load: bad element size %d", v_eltsize))
+		panic(fmt.Sprintf("Store: bad element size %d", v_eltsize))
 	case 1, 2, 4, 8:
 	}
 	x := 0

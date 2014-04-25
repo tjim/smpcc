@@ -374,7 +374,7 @@ func (y GaxState) Load(loc, numelts, eltsize []base.Key) []base.Key {
 /* Gen-side store that ignores numelts */
 func (y GaxState) Store(loc, numelts, eltsize, val []base.Key) {
 	if len(loc) < 8 {
-		panic("Load: bad address")
+		panic("Store: bad address")
 	}
 	loc_len := int(math.Min(25, (float64(len(loc)))))
 	loc = loc[:loc_len]
@@ -390,7 +390,7 @@ func (y GaxState) Store(loc, numelts, eltsize, val []base.Key) {
 	}
 	switch v_eltsize {
 	default:
-		panic(fmt.Sprintf("Load: bad element size %d", v_eltsize))
+		panic(fmt.Sprintf("Store: bad element size %d", v_eltsize))
 	case 1, 2, 4, 8:
 	}
 	for i := 0; i < len(val); i++ {
