@@ -333,7 +333,7 @@ let bpr_main b f is_gen =
     bprintf b "\n";
     bprintf b "\t\t/* load from memory if necessary */\n";
     bprintf b "\t\tif Reveal(io, Icmp_eq(io, _attsrcMemAct, Uint(io, 1, 2)))[0] {\n";
-    bprintf b "\t\t\t_attsrcMemRes = Load(io, _attsrcMemLoc, _attsrcNumElts, _attsrcMemSize)\n";
+    bprintf b "\t\t\t_attsrcMemRes = Load(io, _attsrcMemLoc, _attsrcMemSize)\n";
     bprintf b "\t\t}\n";
   end;
   if VSet.mem State.V.attsrcMemVal (outputs_of_blocks blocks) then begin
@@ -341,7 +341,7 @@ let bpr_main b f is_gen =
     bprintf b "\n";
     bprintf b "\t\t/* store to memory if necessary */\n";
     bprintf b "\t\tif Reveal(io, Icmp_eq(io, _attsrcMemAct, Uint(io, 2, 2)))[0] {\n";
-    bprintf b "\t\t\tStore(io, _attsrcMemLoc, _attsrcNumElts, _attsrcMemSize, _attsrcMemVal)\n";
+    bprintf b "\t\t\tStore(io, _attsrcMemLoc, _attsrcMemSize, _attsrcMemVal)\n";
     bprintf b "\t\t}\n";
   end;
   bprintf b "\n";

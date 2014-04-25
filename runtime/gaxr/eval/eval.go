@@ -384,8 +384,8 @@ func (y GaxState) BT(bits int) []base.Key {
 	return result
 }
 
-/* Gen-side load that ignores numelts */
-func (y GaxState) Load(loc, numelts, eltsize []base.Key) []base.Key {
+/* Gen-side load */
+func (y GaxState) Load(loc, eltsize []base.Key) []base.Key {
 	if len(loc) < 8 {
 		panic("Load: bad address")
 	}
@@ -409,8 +409,8 @@ func (y GaxState) Load(loc, numelts, eltsize []base.Key) []base.Key {
 	return y.BT(v_eltsize * 8)
 }
 
-/* Gen-side store that ignores numelts */
-func (y GaxState) Store(loc, numelts, eltsize, val []base.Key) {
+/* Gen-side store */
+func (y GaxState) Store(loc, eltsize, val []base.Key) {
 	if len(loc) < 8 {
 		panic("Store: bad address")
 	}

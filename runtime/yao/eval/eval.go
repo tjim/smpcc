@@ -274,8 +274,8 @@ func (y YaoState) BT(bits int) []base.Key {
 	return result
 }
 
-/* Gen-side load that ignores numelts */
-func (y YaoState) Load(loc, numelts, eltsize []base.Key) []base.Key {
+/* Gen-side load */
+func (y YaoState) Load(loc, eltsize []base.Key) []base.Key {
 	if len(loc) < 8 {
 		panic("Load: bad address")
 	}
@@ -299,8 +299,8 @@ func (y YaoState) Load(loc, numelts, eltsize []base.Key) []base.Key {
 	return y.BT(v_eltsize * 8)
 }
 
-/* Gen-side store that ignores numelts */
-func (y YaoState) Store(loc, numelts, eltsize, val []base.Key) {
+/* Gen-side store */
+func (y YaoState) Store(loc, eltsize, val []base.Key) {
 	if len(loc) < 8 {
 		panic("Store: bad address")
 	}

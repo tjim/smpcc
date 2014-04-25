@@ -99,7 +99,6 @@ module V = State.V
   becomes
 
       attsrcMemAct = 2  // load
-      attsrcNumElts = 1 // ... 1 element
       attsrcMemSize = 4 // ... of 4 bytes
       attsrcMemLoc = %2 // ... from memory at location %2
       attsrcIsDone = 1  // ... and continue after the load
@@ -485,7 +484,6 @@ let load_store_elimination f =
             [
 (*              assign_instr (Some(V.attsrcIsDone)) (Integer 1) (Integer 1) (ConstantInt(1, Some Int64.zero));*)
               assign_instr V.attsrcMemAct (Integer 2) (Integer 2) (big 1);
-              assign_instr V.attsrcNumElts (Integer 32) (Integer 32) (big 1);
 (*FIX: look at type for MemSize, on assign_instr you might have to select subset of bits*)
               assign_instr V.attsrcMemSize (Integer 32) (Integer 32) (big 4);
               assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) x;
@@ -497,7 +495,6 @@ let load_store_elimination f =
             let binstrs, bl_list = split tl in
             [ assign_instr V.attsrcIsDone (Integer 1) (Integer 1) (big 0);
               assign_instr V.attsrcMemAct (Integer 2) (Integer 2) (big 2);
-              assign_instr V.attsrcNumElts (Integer 32) (Integer 32) (big 1);
               assign_instr V.attsrcMemSize (Integer 32) (Integer 32) (big 4);
               assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) addr;
               assign_instr V.attsrcMemVal (Integer 32) typ x;

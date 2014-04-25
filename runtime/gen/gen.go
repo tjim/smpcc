@@ -23,8 +23,8 @@ type GenVM interface {
 	OT(bits int) []base.Wire
 	BT(a uint64, bits int) []base.Wire
 	Random(bits int) []base.Wire
-	Load(loc, numelts, eltsize []base.Wire) []base.Wire
-	Store(loc, numelts, eltsize, val []base.Wire)
+	Load(loc, eltsize []base.Wire) []base.Wire
+	Store(loc, eltsize, val []base.Wire)
 }
 
 func Add(io GenVM, a, b []base.Wire) []base.Wire {
@@ -190,7 +190,7 @@ func LoadDebug(io GenVM, mask, loc []base.Wire) []base.Wire {
 	if !Reveal(io, mask)[0] {
 		return Uint(io, 0, 32)
 	}
-	return Load(io, loc, Const(io, 1), Uint(io, 4, 32))
+	return Load(io, loc, Uint(io, 4, 32))
 }
 
 func StoreDebug(io GenVM, mask, loc, val []base.Wire) {
@@ -200,7 +200,7 @@ func StoreDebug(io GenVM, mask, loc, val []base.Wire) {
 	if !Reveal(io, mask)[0] {
 		return
 	}
-	Store(io, loc, Const(io, 1), Uint(io, 4, 32), val)
+	Store(io, loc, Uint(io, 4, 32), val)
 }
 
 func Unsupported(x string) []base.Wire {
@@ -403,10 +403,10 @@ func Random(io GenVM, bits int) []base.Wire {
 	return io.Random(bits)
 }
 
-func Load(io GenVM, loc, numelts, eltsize []base.Wire) []base.Wire {
-	return io.Load(loc, numelts, eltsize)
+func Load(io GenVM, loc, eltsize []base.Wire) []base.Wire {
+	return io.Load(loc, eltsize)
 }
 
-func Store(io GenVM, loc, numelts, eltsize, val []base.Wire) {
-	io.Store(loc, numelts, eltsize, val)
+func Store(io GenVM, loc, eltsize, val []base.Wire) {
+	io.Store(loc, eltsize, val)
 }

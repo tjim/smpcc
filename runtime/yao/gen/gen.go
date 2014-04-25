@@ -440,8 +440,8 @@ func (y YaoState) InitRam(contents []byte) {
 	Ram = contents
 }
 
-/* Gen-side load that ignores numelts */
-func (y YaoState) Load(loc, numelts, eltsize []base.Wire) []base.Wire {
+/* Gen-side load */
+func (y YaoState) Load(loc, eltsize []base.Wire) []base.Wire {
 	if len(loc) < 8 {
 		panic("Load: bad address")
 	}
@@ -472,8 +472,8 @@ func (y YaoState) Load(loc, numelts, eltsize []base.Wire) []base.Wire {
 	return y.BT(x, v_eltsize*8)
 }
 
-/* Gen-side store that ignores numelts */
-func (y YaoState) Store(loc, numelts, eltsize, val []base.Wire) {
+/* Gen-side store */
+func (y YaoState) Store(loc, eltsize, val []base.Wire) {
 	if len(loc) < 8 {
 		panic("Store: bad address")
 	}

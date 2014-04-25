@@ -84,13 +84,12 @@ let attsrcMemLoc =  add_vartyp (Util.Name(false,"attsrcMemLoc"))  (Util.Integer 
 let attsrcMemVal =  add_vartyp (Util.Name(false,"attsrcMemVal"))  (Util.Integer 32)
 let attsrcMemRes =  add_vartyp (Util.Name(false,"attsrcMemRes"))  (Util.Integer 64)
 let attsrcMemSize = add_vartyp (Util.Name(false,"attsrcMemSize")) (Util.Integer 32)
-let attsrcNumElts = add_vartyp (Util.Name(false,"attsrcNumElts")) (Util.Integer 32)
 let attsrcAnswer =  add_vartyp (Util.Name(false,"attsrcAnswer"))  (Util.Integer 32)
 let attsrcStateO() = Util.Name(false,"attsrcStateO")
 let special = (* NB: Works now because we have hard-coded bl_bits to 32 *)
   ignore(add_vartyp (Util.Name(false,"attsrcStateO")) (Util.Integer(get_bl_bits())));
   List.fold_right Util.VSet.add
-    [attsrcIsDone; attsrcMemAct; attsrcMemLoc; attsrcMemVal; attsrcMemSize; attsrcNumElts; attsrcAnswer;
+    [attsrcIsDone; attsrcMemAct; attsrcMemLoc; attsrcMemVal; attsrcMemSize; attsrcAnswer;
      attsrcStateO();]
     Util.VSet.empty
 end

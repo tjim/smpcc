@@ -452,8 +452,8 @@ func (y GaxState) InitRam(contents []byte) {
 	Ram = contents
 }
 
-/* Gen-side load that ignores numelts */
-func (y GaxState) Load(loc, numelts, eltsize []base.Wire) []base.Wire {
+/* Gen-side load */
+func (y GaxState) Load(loc, eltsize []base.Wire) []base.Wire {
 	if len(loc) < 8 {
 		panic("Load: bad address")
 	}
@@ -484,8 +484,8 @@ func (y GaxState) Load(loc, numelts, eltsize []base.Wire) []base.Wire {
 	return y.BT(x, v_eltsize*8)
 }
 
-/* Gen-side store that ignores numelts */
-func (y GaxState) Store(loc, numelts, eltsize, val []base.Wire) {
+/* Gen-side store */
+func (y GaxState) Store(loc, eltsize, val []base.Wire) {
 	if len(loc) < 8 {
 		panic("Store: bad address")
 	}

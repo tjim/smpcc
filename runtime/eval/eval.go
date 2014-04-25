@@ -19,8 +19,8 @@ type EvalVM interface {
 	OT(v uint64, bits int) []base.Key
 	BT(bits int) []base.Key
 	Random(bits int) []base.Key
-	Load(loc, numelts, eltsize []base.Key) []base.Key
-	Store(loc, numelts, eltsize, val []base.Key)
+	Load(loc, eltsize []base.Key) []base.Key
+	Store(loc, eltsize, val []base.Key)
 }
 
 func Add(io EvalVM, a, b []base.Key) []base.Key {
@@ -186,7 +186,7 @@ func LoadDebug(io EvalVM, mask, loc []base.Key) []base.Key {
 	if !Reveal(io, mask)[0] {
 		return Uint(io, 0, 32)
 	}
-	return Load(io, loc, Const(io, 1), Uint(io, 4, 32))
+	return Load(io, loc, Uint(io, 4, 32))
 }
 
 func StoreDebug(io EvalVM, mask, loc, val []base.Key) {
@@ -196,7 +196,7 @@ func StoreDebug(io EvalVM, mask, loc, val []base.Key) {
 	if !Reveal(io, mask)[0] {
 		return
 	}
-	Store(io, loc, Const(io, 1), Uint(io, 4, 32), val)
+	Store(io, loc, Uint(io, 4, 32), val)
 }
 
 func Unsupported(x string) []base.Key {
@@ -399,10 +399,10 @@ func Random(io EvalVM, bits int) []base.Key {
 	return io.Random(bits)
 }
 
-func Load(io EvalVM, loc, numelts, eltsize []base.Key) []base.Key {
-	return io.Load(loc, numelts, eltsize)
+func Load(io EvalVM, loc, eltsize []base.Key) []base.Key {
+	return io.Load(loc, eltsize)
 }
 
-func Store(io EvalVM, loc, numelts, eltsize, val []base.Key) {
-	io.Store(loc, numelts, eltsize, val)
+func Store(io EvalVM, loc, eltsize, val []base.Key) {
+	io.Store(loc, eltsize, val)
 }
