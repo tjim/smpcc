@@ -779,8 +779,6 @@ begin
   else
     let file = List.hd args in
     let m = file2cu cil_extra_args file in
-    if options.output = None then
-      options.output <- Some(Filename.basename (Filename.chop_suffix file ".c"));
     let f =
       (match options.fname with
       | None ->
@@ -791,6 +789,8 @@ begin
                     m.cfuns)) in
     if not options.delta then begin
       run_phases m.ctyps f;
+      if options.output = None then
+        options.output <- Some(Filename.basename (Filename.chop_suffix file ".c"));
       Gobe.print_function_circuit m f
     end
     else begin
@@ -804,11 +804,11 @@ begin
         else if options.gep then
           (options.load_store <- true; (fun () -> options.load_store <- false))
         else (fun () -> ()) in
-      let file_before = Filename.temp_file "mpcc" ".diff" in
+      let file_before = Filename.temp_file "smpcc." ".diff" in
       options.output <- Some file_before;
       run_phases m.ctyps f;
       toggle_before();
-      let file_after = Filename.temp_file "mpcc" ".diff" in
+      let file_after = Filename.temp_file "smpcc." ".diff" in
       options.output <- Some file_after;
       run_phases m.ctyps f;
       ignore(Sys.command(sprintf "colordiff -U -1 %s %s | more" file_before file_after));

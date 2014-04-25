@@ -404,8 +404,12 @@ let bpr_globals b m =
       let gname = (let b2 = Buffer.create 11 in bpr_var b2 gname; Buffer.contents b2) in
       eprintf "WHOA! expected %d bytes, found %d bytes for global %s\n" bytes (Buffer.length bytevals) gname;
     end;
+    bprintf b1 "\t// %a at location %d == 0x%x\n" bpr_var gname !loc !loc;
     for i = 0 to bytes - 1 do
-      bprintf b1 "\tRam[0x%x] = 0x%x\n" (!loc + i) (Char.code (Buffer.nth bytevals i))
+      (* Only print non-zeros *)
+      let x = Char.code(Buffer.nth bytevals i) in
+      if x <> 0 then
+        bprintf b1 "\tRam[0x%x] = 0x%x\n" (!loc + i) x
     done;
     (* Look for string constants, might be used by Printf *)
     (match gtyp with

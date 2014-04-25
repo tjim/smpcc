@@ -40,10 +40,9 @@ let options = {
 
 let pr_output_file suffix s =
   let outchan, cleanup =
-    (match suffix, options.output with
-    | "",_
-    | _,None -> stdout, (fun () -> ())
-    | _,Some file ->
+    (match options.output with
+    | None -> stdout, (fun () -> ())
+    | Some file ->
         let outchan = open_out (file^suffix) in
         outchan, (fun () -> close_out outchan)
     ) in
