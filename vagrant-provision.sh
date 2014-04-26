@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-echo "pacman -Sy --needed --noconfirm base-devel git llvm-ocaml clang go"
-pacman -Sy --needed --noconfirm base-devel git llvm-ocaml clang go colordiff
+echo "pacman -Sy --needed --noconfirm base-devel git llvm-ocaml clang go colordiff mercurial"
+pacman -Sy --needed --noconfirm base-devel git llvm-ocaml clang go colordiff mercurial
 echo "cp -pr /vagrant/arch/ocaml-findlib /tmp/ocaml-findlib"
 cp -pr /vagrant/arch/ocaml-findlib /tmp/ocaml-findlib
 echo "cd /tmp/ocaml-findlib; makepkg --asroot --noconfirm -i -s"
@@ -18,3 +18,8 @@ echo "cd /tmp/compiler; make; make install"
 cd /tmp/compiler; make; make install
 echo "cd"
 cd
+mkdir -p /home/vagrant/gowork/src/github.com/tjim
+ln -s /vagrant /home/vagrant/goworksrc/github.com/tjim/smpcc
+cat >>/home/vagrant/.bashrc <<EOF
+export GOPATH=$HOME/gowork
+EOF
