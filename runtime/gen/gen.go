@@ -410,15 +410,17 @@ func InitRam(contents []byte) {
 
 /* Gen-side load */
 func Load(io GenVM, loc, eltsize []base.Wire) []base.Wire {
+	fmt.Printf("Ram[0x")
 	address := int(RevealUint64(io, loc))
+	fmt.Printf("%x]", address)
 	bytes := int(RevealUint32(io, eltsize))
+	fmt.Printf("<%d> = ", bytes)
 	switch bytes {
 	default:
 		panic(fmt.Sprintf("Load: bad element size %d", bytes))
 	case 1, 2, 4, 8:
 	}
 	x := uint64(0)
-	fmt.Printf("Ram[0x%x]<%d> = ", address, bytes) // Print before value in case address is out of bounds
 	for j := 0; j < bytes; j++ {
 		byte_j := uint64(Ram[address+j])
 		x += byte_j << uint(j*8)

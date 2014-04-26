@@ -365,17 +365,16 @@ func (y GaxState) Not(a []base.Wire) []base.Wire {
 	return y.Xor(a, ones)
 }
 
+/* Reveal to all parties */
 func (y GaxState) Reveal(a []base.Wire) []bool {
-	// log.Printf("Inside gen reveal const0=%v, const1=%v\n", const0, const1)
+	y.Reveal1(a)
+	return y.Reveal0(a)
+}
+
+/* Reveal to party 0 = gen */
+func (y GaxState) Reveal0(a []base.Wire) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
-		t := make([]base.Ciphertext, 2)
-		w := genWire()
-		w[0][0] = 0
-		w[1][0] = 1
-		y.encrypt_slot(t, w[0], a[i][0])
-		y.encrypt_slot(t, w[1], a[i][1])
-		y.io.SendT(t)
 		bit := resolveKey(a[i], y.io.RecvK2())
 		if bit == 0 {
 			result[i] = false
@@ -384,6 +383,19 @@ func (y GaxState) Reveal(a []base.Wire) []bool {
 		}
 	}
 	return result
+}
+
+/* Reveal to party 1 = eval */
+func (y GaxState) Reveal1(a []base.Wire) {
+	for i := 0; i < len(a); i++ {
+		t := make([]base.Ciphertext, 2)
+		w := genWire()
+		w[0][0] = 0
+		w[1][0] = 1
+		y.encrypt_slot(t, w[0], a[i][0])
+		y.encrypt_slot(t, w[1], a[i][1])
+		y.io.SendT(t)
+	}
 }
 
 func (y GaxState) OT(bits int) []base.Wire {

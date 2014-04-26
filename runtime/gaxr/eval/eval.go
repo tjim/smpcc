@@ -316,12 +316,25 @@ func (y GaxState) Not(a []base.Key) []base.Key {
 	return y.Xor(a, ones)
 }
 
+/* Reveal to all parties */
 func (y GaxState) Reveal(a []base.Key) []bool {
-	// log.Printf("Inside gen reveal const0=%v, const1=%v\n", const0, const1)
+	result := y.Reveal1(a)
+	y.Reveal0(a)
+	return result
+}
+
+/* Reveal to party 0 = gen */
+func (y GaxState) Reveal0(a []base.Key) {
+	for i := 0; i < len(a); i++ {
+		y.io.SendK2(a[i])
+	}
+}
+
+/* Reveal to party 1 = eval */
+func (y GaxState) Reveal1(a []base.Key) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		t := y.io.RecvT()
-		y.io.SendK2(a[i])
 		b := y.Decrypt(t, a[i])
 		if b[0] == 0 {
 			result[i] = false
@@ -333,6 +346,7 @@ func (y GaxState) Reveal(a []base.Key) []bool {
 	}
 	return result
 }
+
 func (y GaxState) OT(v uint64, bits int) []base.Key {
 	a := make([]bool, bits)
 	for i := 0; i < len(a); i++ {

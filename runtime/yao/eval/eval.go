@@ -207,11 +207,25 @@ func (y YaoState) Not(a []base.Key) []base.Key {
 	return y.Xor(a, ones)
 }
 
+/* Reveal to all parties */
 func (y YaoState) Reveal(a []base.Key) []bool {
+	result := y.Reveal1(a)
+	y.Reveal0(a)
+	return result
+}
+
+/* Reveal to party 0 = gen */
+func (y YaoState) Reveal0(a []base.Key) {
+	for i := 0; i < len(a); i++ {
+		y.io.SendK2(a[i])
+	}
+}
+
+/* Reveal to party 1 = eval */
+func (y YaoState) Reveal1(a []base.Key) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		t := y.io.RecvT()
-		y.io.SendK2(a[i])
 		b := gen.Decrypt(t, a[i])
 		if b[0] == 0 {
 			result[i] = false
@@ -223,6 +237,7 @@ func (y YaoState) Reveal(a []base.Key) []bool {
 	}
 	return result
 }
+
 func (y YaoState) OT(v uint64, bits int) []base.Key {
 	a := make([]bool, bits)
 	for i := 0; i < len(a); i++ {

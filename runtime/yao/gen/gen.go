@@ -354,16 +354,16 @@ func (y YaoState) Not(a []base.Wire) []base.Wire {
 	return y.Xor(a, ones)
 }
 
+/* Reveal to all parties */
 func (y YaoState) Reveal(a []base.Wire) []bool {
+	y.Reveal1(a)
+	return y.Reveal0(a)
+}
+
+/* Reveal to party 0 = gen */
+func (y YaoState) Reveal0(a []base.Wire) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
-		t := make([]base.Ciphertext, 2)
-		w := genWire()
-		w[0][0] = 0
-		w[1][0] = 1
-		encrypt_slot(t, w[0], a[i][0])
-		encrypt_slot(t, w[1], a[i][1])
-		y.io.SendT(t)
 		bit := resolveKey(a[i], y.io.RecvK2())
 		if bit == 0 {
 			result[i] = false
@@ -372,6 +372,19 @@ func (y YaoState) Reveal(a []base.Wire) []bool {
 		}
 	}
 	return result
+}
+
+/* Reveal to party 1 = eval */
+func (y YaoState) Reveal1(a []base.Wire) {
+	for i := 0; i < len(a); i++ {
+		t := make([]base.Ciphertext, 2)
+		w := genWire()
+		w[0][0] = 0
+		w[1][0] = 1
+		encrypt_slot(t, w[0], a[i][0])
+		encrypt_slot(t, w[1], a[i][1])
+		y.io.SendT(t)
+	}
 }
 
 func (y YaoState) OT(bits int) []base.Wire {
