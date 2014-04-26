@@ -7,8 +7,6 @@ import (
 )
 
 import "github.com/tjim/smpcc/runtime/gaxr/gen"
-import "fmt"
-import "math"
 import "github.com/tjim/smpcc/runtime/ot"
 import "math/rand"
 
@@ -382,56 +380,4 @@ func (y GaxState) BT(bits int) []base.Key {
 		result[i] = y.io.RecvK()
 	}
 	return result
-}
-
-/* Gen-side load */
-func (y GaxState) Load(loc, eltsize []base.Key) []base.Key {
-	if len(loc) < 8 {
-		panic("Load: bad address")
-	}
-	loc_len := int(math.Min(25, (float64(len(loc)))))
-	loc = loc[:loc_len]
-	for i := 0; i < len(loc); i++ {
-		y.io.SendK2(loc[i])
-	}
-	b_eltsize := y.Reveal(eltsize)
-	v_eltsize := 0
-	for i := 0; i < len(b_eltsize); i++ {
-		if b_eltsize[i] {
-			v_eltsize += 1 << uint(i)
-		}
-	}
-	switch v_eltsize {
-	default:
-		panic(fmt.Sprintf("Load: bad element size %d", v_eltsize))
-	case 1, 2, 4, 8:
-	}
-	return y.BT(64)
-}
-
-/* Gen-side store */
-func (y GaxState) Store(loc, eltsize, val []base.Key) {
-	if len(loc) < 8 {
-		panic("Store: bad address")
-	}
-	loc_len := int(math.Min(25, (float64(len(loc)))))
-	loc = loc[:loc_len]
-	for i := 0; i < len(loc); i++ {
-		y.io.SendK2(loc[i])
-	}
-	b_eltsize := y.Reveal(eltsize)
-	v_eltsize := 0
-	for i := 0; i < len(b_eltsize); i++ {
-		if b_eltsize[i] {
-			v_eltsize += 1 << uint(i)
-		}
-	}
-	switch v_eltsize {
-	default:
-		panic(fmt.Sprintf("Store: bad element size %d", v_eltsize))
-	case 1, 2, 4, 8:
-	}
-	for i := 0; i < len(val); i++ {
-		y.io.SendK2(val[i])
-	}
 }

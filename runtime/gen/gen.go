@@ -6,7 +6,6 @@ import (
 )
 
 type GenVM interface {
-	InitRam(contents []byte)
 	Add(a, b []base.Wire) []base.Wire
 	Sub(a, b []base.Wire) []base.Wire
 	And(a, b []base.Wire) []base.Wire
@@ -23,8 +22,6 @@ type GenVM interface {
 	OT(bits int) []base.Wire
 	BT(a uint64, bits int) []base.Wire
 	Random(bits int) []base.Wire
-	Load(loc, eltsize []base.Wire) []base.Wire
-	Store(loc, eltsize, val []base.Wire)
 }
 
 func Add(io GenVM, a, b []base.Wire) []base.Wire {
@@ -404,10 +401,45 @@ func Random(io GenVM, bits int) []base.Wire {
 	return io.Random(bits)
 }
 
-func Load(io GenVM, loc, eltsize []base.Wire) []base.Wire {
-	return io.Load(loc, eltsize)
+/* Gen side ram, initialized by each program for a particular size */
+var Ram []byte
+
+func InitRam(contents []byte) {
+	Ram = contents
 }
 
+/* Gen-side load */
+func Load(io GenVM, loc, eltsize []base.Wire) []base.Wire {
+	address := int(RevealUint64(io, loc))
+	bytes := int(RevealUint32(io, eltsize))
+	switch bytes {
+	default:
+		panic(fmt.Sprintf("Load: bad element size %d", bytes))
+	case 1, 2, 4, 8:
+	}
+	x := uint64(0)
+	fmt.Printf("Ram[0x%x]<%d> = ", address, bytes) // Print before value in case address is out of bounds
+	for j := 0; j < bytes; j++ {
+		byte_j := uint64(Ram[address+j])
+		x += byte_j << uint(j*8)
+	}
+	fmt.Printf("0x%x\n", x)
+	return BT(io, x, 64)
+}
+
+/* Gen-side store */
 func Store(io GenVM, loc, eltsize, val []base.Wire) {
-	io.Store(loc, eltsize, val)
+	address := int(RevealUint64(io, loc))
+	bytes := int(RevealUint32(io, eltsize))
+	switch bytes {
+	default:
+		panic(fmt.Sprintf("Store: bad element size %d", bytes))
+	case 1, 2, 4, 8:
+	}
+	x := RevealUint32(io, val)
+	fmt.Printf("Ram[0x%x]<%d> := 0x%x\n", address, bytes, x)
+	for j := 0; j < bytes; j++ {
+		byte_j := byte(x>>uint(j*8)) & 0xff
+		Ram[address+j] = byte_j
+	}
 }

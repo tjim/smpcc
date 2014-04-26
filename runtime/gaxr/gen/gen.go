@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/aes"
 	"fmt"
-	"math"
 	"math/rand"
 
 	"github.com/tjim/smpcc/runtime/base"
@@ -523,78 +522,4 @@ func resolveKey(w base.Wire, k base.Key) int {
 		panic(fmt.Sprintf("resolveKey(): key and wire mismatch\nKey: %v\nWire: %v\n", k, w))
 	}
 	panic("unreachable")
-}
-
-/* Gen side ram, initialized by each program for a particular size */
-var Ram []byte
-
-func (y GaxState) InitRam(contents []byte) {
-	// y is used only so that we can export InitRam as part of the GenVM interface
-	Ram = contents
-}
-
-/* Gen-side load */
-func (y GaxState) Load(loc, eltsize []base.Wire) []base.Wire {
-	if len(loc) < 8 {
-		panic("Load: bad address")
-	}
-	loc_len := int(math.Min(25, (float64(len(loc)))))
-	loc = loc[:loc_len]
-	address := 0
-	for i := 0; i < len(loc); i++ { // receive low-order bits first
-		address += (resolveKey(loc[i], y.io.RecvK2())) << uint(i)
-	}
-	b_eltsize := y.Reveal(eltsize)
-	v_eltsize := 0
-	for i := 0; i < len(b_eltsize); i++ {
-		if b_eltsize[i] {
-			v_eltsize += 1 << uint(i)
-		}
-	}
-	switch v_eltsize {
-	default:
-		panic(fmt.Sprintf("Load: bad element size %d", v_eltsize))
-	case 1, 2, 4, 8:
-	}
-	x := uint64(0)
-	for j := 0; j < v_eltsize; j++ {
-		byte_j := uint64(Ram[address+j])
-		x += byte_j << uint(j*8)
-	}
-	//	fmt.Printf("Ram[0x%x]<%d> = 0x%x\n", address, v_eltsize, x)
-	return y.BT(x, 64)
-}
-
-/* Gen-side store */
-func (y GaxState) Store(loc, eltsize, val []base.Wire) {
-	if len(loc) < 8 {
-		panic("Store: bad address")
-	}
-	loc_len := int(math.Min(25, (float64(len(loc)))))
-	loc = loc[:loc_len]
-	address := 0
-	for i := 0; i < len(loc); i++ { // receive low-order bits first
-		address += (resolveKey(loc[i], y.io.RecvK2())) << uint(i)
-	}
-	b_eltsize := y.Reveal(eltsize)
-	v_eltsize := 0
-	for i := 0; i < len(b_eltsize); i++ {
-		if b_eltsize[i] {
-			v_eltsize += 1 << uint(i)
-		}
-	}
-	switch v_eltsize {
-	default:
-		panic(fmt.Sprintf("Store: bad element size %d", v_eltsize))
-	case 1, 2, 4, 8:
-	}
-	x := 0
-	for i := 0; i < len(val); i++ { // receive low-order bits first
-		x += (resolveKey(val[i], y.io.RecvK2())) << uint(i)
-	}
-	for j := 0; j < v_eltsize; j++ {
-		byte_j := byte(x>>uint(j*8)) & 0xff
-		Ram[address+j] = byte_j
-	}
-	//	fmt.Printf("Ram[0x%x]<%d> := 0x%x\n", address, v_eltsize, x)
 }

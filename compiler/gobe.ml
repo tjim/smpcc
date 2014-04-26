@@ -409,7 +409,7 @@ let bpr_globals b m =
       (* Only print non-zeros *)
       let x = Char.code(Buffer.nth bytevals i) in
       if x <> 0 then
-        bprintf b1 "\tRam[0x%x] = 0x%x\n" (!loc + i) x
+        bprintf b1 "\tram[0x%x] = 0x%x\n" (!loc + i) x
     done;
     (* Look for string constants, might be used by Printf *)
     (match gtyp with
@@ -423,9 +423,9 @@ let bpr_globals b m =
   List.iter alloc_global m.cglobals;
   bprintf b "func initialize_ram(io GenVM) {\n";
   if !loc <> 0 then begin
-    bprintf b "\tRam := make([]byte, 0x%x)\n" !loc;
+    bprintf b "\tram := make([]byte, 0x%x)\n" !loc;
     Buffer.add_buffer b b1;
-    bprintf b "\tio.InitRam(Ram)\n";
+    bprintf b "\tInitRam(ram)\n";
   end;
   bprintf b "}\n";
   bprintf b "\n"

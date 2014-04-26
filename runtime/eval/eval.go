@@ -19,8 +19,6 @@ type EvalVM interface {
 	OT(v uint64, bits int) []base.Key
 	BT(bits int) []base.Key
 	Random(bits int) []base.Key
-	Load(loc, eltsize []base.Key) []base.Key
-	Store(loc, eltsize, val []base.Key)
 }
 
 func Add(io EvalVM, a, b []base.Key) []base.Key {
@@ -400,10 +398,16 @@ func Random(io EvalVM, bits int) []base.Key {
 	return io.Random(bits)
 }
 
+/* Gen-side load */
 func Load(io EvalVM, loc, eltsize []base.Key) []base.Key {
-	return io.Load(loc, eltsize)
+	RevealUint64(io, loc)
+	RevealUint32(io, eltsize)
+	return BT(io, 64)
 }
 
+/* Gen-side store */
 func Store(io EvalVM, loc, eltsize, val []base.Key) {
-	io.Store(loc, eltsize, val)
+	RevealUint64(io, loc)
+	RevealUint32(io, eltsize)
+	RevealUint32(io, val)
 }
