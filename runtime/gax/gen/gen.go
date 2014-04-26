@@ -365,12 +365,6 @@ func (y GaxState) Not(a []base.Wire) []base.Wire {
 	return y.Xor(a, ones)
 }
 
-/* Reveal to all parties */
-func (y GaxState) Reveal(a []base.Wire) []bool {
-	y.Reveal1(a)
-	return y.Reveal0(a)
-}
-
 /* Reveal to party 0 = gen */
 func (y GaxState) Reveal0(a []base.Wire) []bool {
 	result := make([]bool, len(a))

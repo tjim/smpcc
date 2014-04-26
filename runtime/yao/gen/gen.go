@@ -354,12 +354,6 @@ func (y YaoState) Not(a []base.Wire) []base.Wire {
 	return y.Xor(a, ones)
 }
 
-/* Reveal to all parties */
-func (y YaoState) Reveal(a []base.Wire) []bool {
-	y.Reveal1(a)
-	return y.Reveal0(a)
-}
-
 /* Reveal to party 0 = gen */
 func (y YaoState) Reveal0(a []base.Wire) []bool {
 	result := make([]bool, len(a))

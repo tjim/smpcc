@@ -207,13 +207,6 @@ func (y YaoState) Not(a []base.Key) []base.Key {
 	return y.Xor(a, ones)
 }
 
-/* Reveal to all parties */
-func (y YaoState) Reveal(a []base.Key) []bool {
-	result := y.Reveal1(a)
-	y.Reveal0(a)
-	return result
-}
-
 /* Reveal to party 0 = gen */
 func (y YaoState) Reveal0(a []base.Key) {
 	for i := 0; i < len(a); i++ {

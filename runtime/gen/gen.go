@@ -18,7 +18,8 @@ type GenVM interface {
 	Uint(a uint64, width int) []base.Wire
 	Nand(a, b []base.Wire) []base.Wire
 	Not(a []base.Wire) []base.Wire
-	Reveal(a []base.Wire) []bool
+	Reveal0(a []base.Wire) []bool
+	Reveal1(a []base.Wire)
 	OT(bits int) []base.Wire
 	BT(a uint64, bits int) []base.Wire
 	Random(bits int) []base.Wire
@@ -350,8 +351,18 @@ func Not(io GenVM, a []base.Wire) []base.Wire {
 	return io.Not(a)
 }
 
+/* Reveal to all parties */
 func Reveal(io GenVM, a []base.Wire) []bool {
-	return io.Reveal(a)
+	Reveal1(io, a)
+	return Reveal0(io, a)
+}
+
+func Reveal0(io GenVM, a []base.Wire) []bool {
+	return io.Reveal0(a)
+}
+
+func Reveal1(io GenVM, a []base.Wire) {
+	io.Reveal1(a)
 }
 
 func RevealUint32(io GenVM, a []base.Wire) uint32 {

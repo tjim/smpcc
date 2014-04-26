@@ -15,7 +15,8 @@ type EvalVM interface {
 	Uint(a uint64, width int) []base.Key
 	Nand(a, b []base.Key) []base.Key
 	Not(a []base.Key) []base.Key
-	Reveal(a []base.Key) []bool
+	Reveal0(a []base.Key)
+	Reveal1(a []base.Key) []bool
 	OT(v uint64, bits int) []base.Key
 	BT(bits int) []base.Key
 	Random(bits int) []base.Key
@@ -347,8 +348,19 @@ func Not(io EvalVM, a []base.Key) []base.Key {
 	return io.Not(a)
 }
 
+/* Reveal to all parties */
 func Reveal(io EvalVM, a []base.Key) []bool {
-	return io.Reveal(a)
+	result := Reveal1(io, a)
+	Reveal0(io, a)
+	return result
+}
+
+func Reveal0(io EvalVM, a []base.Key) {
+	io.Reveal0(a)
+}
+
+func Reveal1(io EvalVM, a []base.Key) []bool {
+	return io.Reveal1(a)
 }
 
 func RevealUint32(io EvalVM, a []base.Key) uint32 {
