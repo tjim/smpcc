@@ -365,11 +365,7 @@ func Reveal1(io GenVM, a []base.Wire) {
 	io.Reveal1(a)
 }
 
-func RevealUint32(io GenVM, a []base.Wire) uint32 {
-	if len(a) > 32 {
-		panic("RevealUint32: argument too large")
-	}
-	bits := Reveal(io, a)
+func bits2Uint32(bits []bool) uint32 {
 	var result uint32
 	for i := 0; i < len(bits); i++ {
 		if bits[i] {
@@ -379,6 +375,23 @@ func RevealUint32(io GenVM, a []base.Wire) uint32 {
 	return result
 }
 
+func RevealUint32(io GenVM, a []base.Wire) uint32 {
+	if len(a) > 32 {
+		panic("RevealUint32: argument too large")
+	}
+	bits := Reveal(io, a)
+	return bits2Uint32(bits)
+}
+
+/* Use with Reveal0() on the eval side */
+func Reveal0Uint32(io GenVM, a []base.Wire) uint32 {
+	if len(a) > 32 {
+		panic("RevealUint32: argument too large")
+	}
+	bits := Reveal0(io, a)
+	return bits2Uint32(bits)
+}
+
 func RevealInt32(io GenVM, a []base.Wire) int32 {
 	if len(a) > 32 {
 		panic("RevealInt32: argument too large")
@@ -386,11 +399,7 @@ func RevealInt32(io GenVM, a []base.Wire) int32 {
 	return int32(RevealUint32(io, a))
 }
 
-func RevealUint64(io GenVM, a []base.Wire) uint64 {
-	if len(a) > 64 {
-		panic("RevealUint64: argument too large")
-	}
-	bits := Reveal(io, a)
+func bits2Uint64(bits []bool) uint64 {
 	var result uint64
 	for i := 0; i < len(bits); i++ {
 		if bits[i] {
@@ -398,6 +407,23 @@ func RevealUint64(io GenVM, a []base.Wire) uint64 {
 		}
 	}
 	return result
+}
+
+func RevealUint64(io GenVM, a []base.Wire) uint64 {
+	if len(a) > 64 {
+		panic("RevealUint64: argument too large")
+	}
+	bits := Reveal(io, a)
+	return bits2Uint64(bits)
+}
+
+/* Use with Reveal0() on the eval side */
+func Reveal0Uint64(io GenVM, a []base.Wire) uint64 {
+	if len(a) > 64 {
+		panic("Reveal0Uint64: argument too large")
+	}
+	bits := Reveal0(io, a)
+	return bits2Uint64(bits)
 }
 
 func OT(io GenVM, bits int) []base.Wire {
@@ -422,9 +448,9 @@ func InitRam(contents []byte) {
 /* Gen-side load */
 func Load(io GenVM, loc, eltsize []base.Wire) []base.Wire {
 	fmt.Printf("Ram[0x")
-	address := int(RevealUint64(io, loc))
+	address := int(Reveal0Uint64(io, loc))
 	fmt.Printf("%x]", address)
-	bytes := int(RevealUint32(io, eltsize))
+	bytes := int(Reveal0Uint32(io, eltsize))
 	fmt.Printf("<%d> = ", bytes)
 	switch bytes {
 	default:
@@ -442,14 +468,14 @@ func Load(io GenVM, loc, eltsize []base.Wire) []base.Wire {
 
 /* Gen-side store */
 func Store(io GenVM, loc, eltsize, val []base.Wire) {
-	address := int(RevealUint64(io, loc))
-	bytes := int(RevealUint32(io, eltsize))
+	address := int(Reveal0Uint64(io, loc))
+	bytes := int(Reveal0Uint32(io, eltsize))
 	switch bytes {
 	default:
 		panic(fmt.Sprintf("Store: bad element size %d", bytes))
 	case 1, 2, 4, 8:
 	}
-	x := RevealUint32(io, val)
+	x := Reveal0Uint32(io, val)
 	fmt.Printf("Ram[0x%x]<%d> := 0x%x\n", address, bytes, x)
 	for j := 0; j < bytes; j++ {
 		byte_j := byte(x>>uint(j*8)) & 0xff

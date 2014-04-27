@@ -412,14 +412,14 @@ func Random(io EvalVM, bits int) []base.Key {
 
 /* Gen-side load */
 func Load(io EvalVM, loc, eltsize []base.Key) []base.Key {
-	RevealUint64(io, loc)
-	RevealUint32(io, eltsize)
+	Reveal0(io, loc)
+	Reveal0(io, eltsize)
 	return BT(io, 64)
 }
 
 /* Gen-side store */
 func Store(io EvalVM, loc, eltsize, val []base.Key) {
-	RevealUint64(io, loc)
-	RevealUint32(io, eltsize)
-	RevealUint32(io, val)
+	Reveal0(io, loc)
+	Reveal0(io, eltsize)
+	Reveal0(io, val)
 }
