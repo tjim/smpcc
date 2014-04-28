@@ -19,7 +19,7 @@ cd /tmp/compiler; make; make install
 echo "cd"
 cd
 mkdir -p /home/vagrant/gowork/src/github.com/tjim
-ln -s /vagrant /home/vagrant/goworksrc/github.com/tjim/smpcc
+ln -s /vagrant /home/vagrant/gowork/src/github.com/tjim/smpcc
 cat >>/home/vagrant/.bashrc <<EOF
 export GOPATH=$HOME/gowork
 EOF
