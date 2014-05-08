@@ -447,14 +447,21 @@ let gep_elim_value =
                   Big_int.add_big_int
                     (Big_int.mult_big_int i (Big_int.big_int_of_int(State.bytewidth ety')))
                     (loop ety' tl)
-              | Structtyp(_),(Int(i)) ->
-                  (* TEMPORARY HACK, assume all fields have width 4 *)
-                  if tl=[] then
-                    Big_int.add_big_int
-                      (Big_int.mult_big_int i (Big_int.big_int_of_int 4))
-                      (Big_int.big_int_of_int(Hashtbl.find global_locations v))
-                  else
-                    failwith "gep_elim_value: struct"
+              | Structtyp(_,typs),(Int(i)) ->
+                  let width, ety' =
+                    let rec f i = function
+                      | [] ->
+                          failwith "gep_elim_value: struct does not have enough fields"
+                      | hd::tl ->
+                          if i=0 then
+                            (State.bytewidth hd, hd)
+                          else
+                            let width', ety' = f (i-1) tl in
+                            (State.bytewidth hd + width', ety') in
+                    f (Big_int.int_of_big_int i) typs in
+                  Big_int.add_big_int
+                    (Big_int.big_int_of_int width)
+                    (loop ety' tl)
               | Vartyp v, _ ->
                   loop (State.typ_of_var v) ((y_typ,y)::tl)
               | _ ->
