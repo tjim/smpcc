@@ -1,8 +1,8 @@
 package gen
 
 import (
-	"github.com/tjim/smpcc/runtime/base"
 	"fmt"
+	"github.com/tjim/smpcc/runtime/base"
 )
 
 type GenVM interface {
@@ -29,8 +29,8 @@ func Add(io GenVM, a, b []base.Wire) []base.Wire {
 	result[0] = Xor(io, a[0:1], b[0:1])[0]
 	c := And(io, a[0:1], b[0:1])[0:1] /* carry bit */
 	for i := 1; i < len(a); i++ {
-		ai := a[i:i+1]
-		bi := b[i:i+1]
+		ai := a[i : i+1]
+		bi := b[i : i+1]
 		/* compute the result bit */
 		bi_xor_c := Xor(io, bi, c)
 		result[i] = Xor(io, ai, bi_xor_c)[0]
@@ -51,8 +51,8 @@ func Sub(io GenVM, a, b []base.Wire) []base.Wire {
 	result[0] = Xor(io, a[0:1], b[0:1])[0]
 	c := Xor(io, a[0:1], And(io, Not(io, a[0:1]), Not(io, b[0:1])))[0:1] /* carry bit */
 	for i := 1; i < len(a); i++ {
-		ai := a[i:i+1]
-		bi := b[i:i+1]
+		ai := a[i : i+1]
+		bi := b[i : i+1]
 		/* compute the result bit */
 		bi_xor_c := Xor(io, bi, c)
 		result[i] = Not(io, Xor(io, ai, bi_xor_c))[0]
@@ -153,8 +153,8 @@ func Icmp_ugt(io GenVM, a, b []base.Wire) []base.Wire {
 	}
 	c := False(io)
 	for i := 0; i < len(a); i++ {
-		ai := a[i:i+1]
-		bi := b[i:i+1]
+		ai := a[i : i+1]
+		bi := b[i : i+1]
 		c = Xor(io, ai, And(io, Xor(io, ai, c), Xor(io, bi, c)))
 	}
 	return c
@@ -195,8 +195,8 @@ func Icmp_uge(io GenVM, a, b []base.Wire) []base.Wire {
 	}
 	c := True(io)
 	for i := 0; i < len(a); i++ {
-		ai := a[i:i+1]
-		bi := b[i:i+1]
+		ai := a[i : i+1]
+		bi := b[i : i+1]
 		c = Xor(io, ai, And(io, Xor(io, ai, c), Xor(io, bi, c)))
 	}
 	return c

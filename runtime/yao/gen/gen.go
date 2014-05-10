@@ -164,12 +164,12 @@ func (y YaoState) Xor(a, b []base.Wire) []base.Wire {
 
 func (y YaoState) True() []base.Wire {
 	init_constants(y.io)
-	return []base.Wire{ const1 }
+	return []base.Wire{const1}
 }
 
 func (y YaoState) False() []base.Wire {
 	init_constants(y.io)
-	return []base.Wire{ const0 }
+	return []base.Wire{const0}
 }
 
 /* Reveal to party 0 = gen */

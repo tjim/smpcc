@@ -130,12 +130,12 @@ func (y GaxState) Xor(a, b []base.Key) []base.Key {
 
 func (y GaxState) True() []base.Key {
 	init_constants(y.io)
-	return []base.Key{ const1 }
+	return []base.Key{const1}
 }
 
 func (y GaxState) False() []base.Key {
 	init_constants(y.io)
-	return []base.Key{ const0 }
+	return []base.Key{const0}
 }
 
 /* Reveal to party 0 = gen */
@@ -210,4 +210,3 @@ func (y GaxState) BT(bits int) []base.Key {
 	}
 	return result
 }
-

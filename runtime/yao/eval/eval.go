@@ -73,12 +73,12 @@ func (y YaoState) Xor(a, b []base.Key) []base.Key {
 
 func (y YaoState) True() []base.Key {
 	init_constants(y.io)
-	return []base.Key{ const1 }
+	return []base.Key{const1}
 }
 
 func (y YaoState) False() []base.Key {
 	init_constants(y.io)
-	return []base.Key{ const0 }
+	return []base.Key{const0}
 }
 
 /* Reveal to party 0 = gen */

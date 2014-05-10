@@ -10,9 +10,9 @@ package ot
 // Modified with preprocessing step
 
 import (
-	"github.com/tjim/smpcc/runtime/bit"
 	"crypto/rand"
 	"fmt"
+	"github.com/tjim/smpcc/runtime/bit"
 	"io"
 	//	"log"
 	"bitbucket.org/ede/sha3"

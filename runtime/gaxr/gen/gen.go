@@ -244,12 +244,12 @@ func (y GaxState) Xor(a, b []base.Wire) []base.Wire {
 
 func (y GaxState) True() []base.Wire {
 	init_constants(y.io)
-	return []base.Wire{ const1 }
+	return []base.Wire{const1}
 }
 
 func (y GaxState) False() []base.Wire {
 	init_constants(y.io)
-	return []base.Wire{ const0 }
+	return []base.Wire{const0}
 }
 
 // Other gates and helper functions
