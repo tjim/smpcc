@@ -40,26 +40,6 @@ func reset() {
 	const1 = nil
 }
 
-func (y YaoState) Sub(a, b []base.Key) []base.Key {
-	if len(a) != len(b) {
-		panic("argument mismatch in Sub()")
-	}
-	if len(a) == 0 {
-		panic("empty arguments in Sub()")
-	}
-	result := make([]base.Key, len(a))
-	result[0] = y.Xor(a[0:1], b[0:1])[0]
-	c := y.And(y.Not(a[0:1]), b[0:1])[0] /* borrow bit */
-	for i := 1; i < len(a); i++ {
-		/* compute the result bit */
-		result[i] = y.Xor(y.Xor(a[i:i+1], b[i:i+1]), []base.Key{c})[0]
-		/* compute the borrow bit */
-		t := y.io.RecvT()
-		c = gen.Decrypt(t, c, a[i], b[i])
-	}
-	return result
-}
-
 func bitwise_binary_operator(io base.Evalio, a, b []base.Key) []base.Key {
 	if len(a) != len(b) {
 		panic("Wire mismatch in eval.bitwise_binary_operator()")
