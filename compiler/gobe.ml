@@ -35,7 +35,7 @@ let rec bpr_go_value b (typ, value) =
       bprintf b "Uint(io, 0, %d) /* CAUTION: null */" (State.bitwidth typ)
   | Undef ->
       bprintf b "Uint(io, 0, %d) /* CAUTION: undef */" (State.bitwidth typ)
-  | Inttoptr(x, y) -> 
+  | Inttoptr(x, y) ->
       bprintf b "/* CAUTION: inttoptr */ ";
       bpr_go_value b x
   | op ->
@@ -92,14 +92,14 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
                bprintf b "Printf(io, mask, \"%%c\", %a)\n" bpr_go_value (typ, value)
   | Call(_,_,_,_,Var(Name(true, "gen_int")),_,_) ->
       if is_gen then
-        bprintf b "Gen_int(io, mask, next_arg)\n"
+        bprintf b "InputFrom0(io, mask, next_arg)\n"
       else
-        bprintf b "Gen_int(io, mask)\n"
+        bprintf b "InputFrom0(io, mask)\n"
   | Call(_,_,_,_,Var(Name(true, "eval_int")),_,_) ->
       if is_gen then
-        bprintf b "Eval_int(io, mask)\n"
+        bprintf b "InputFrom1(io, mask)\n"
       else
-        bprintf b "Eval_int(io, mask, next_arg)\n"
+        bprintf b "InputFrom1(io, mask, next_arg)\n"
   | Load(_,_,(Pointer(ety,_),_ as x),_,_) -> (* in case we are debugging loads *)
       bprintf b "LoadDebug(io, mask, %a, Uint(io, %d, 32))\n" bpr_go_value x (State.bytewidth ety)
   | Store(_,_,x,addr,_,_) -> (* in case we are debugging stores*)

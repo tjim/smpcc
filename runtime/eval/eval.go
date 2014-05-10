@@ -9,10 +9,10 @@ type EvalVM interface {
 	Xor(a, b []base.Key) []base.Key
 	True() []base.Key
 	False() []base.Key
-	Reveal0(a []base.Key)
-	Reveal1(a []base.Key) []bool
-	OT(v uint64, bits int) []base.Key
-	BT(bits int) []base.Key
+	RevealTo0(a []base.Key)
+	RevealTo1(a []base.Key) []bool
+	ShareTo0(v uint64, bits int) []base.Key
+	ShareTo1(bits int) []base.Key
 	Random(bits int) []base.Key
 }
 
@@ -275,25 +275,25 @@ func Printf(io EvalVM, mask []base.Key, f string, args ...[]base.Key) {
 }
 
 // NB Gen_int() reveals the active block
-func Gen_int(io EvalVM, mask []base.Key) []base.Key {
+func InputFrom0(io EvalVM, mask []base.Key) []base.Key {
 	if len(mask) != 1 {
 		panic("Gen_int")
 	}
 	if !Reveal(io, mask)[0] {
 		return Uint(io, 0, 32)
 	}
-	return BT(io, 32)
+	return ShareTo1(io, 32)
 }
 
 // NB Eval_int() reveals the active block
-func Eval_int(io EvalVM, mask []base.Key, next_arg func() uint64) []base.Key {
+func InputFrom1(io EvalVM, mask []base.Key, next_arg func() uint64) []base.Key {
 	if len(mask) != 1 {
 		panic("Eval_int")
 	}
 	if !Reveal(io, mask)[0] {
 		return Uint(io, 0, 32)
 	}
-	return OT(io, next_arg(), 32)
+	return ShareTo0(io, next_arg(), 32)
 }
 
 // Switch(io, s, dflt, c0, c1, ...) tests s.
@@ -426,17 +426,17 @@ func Not(io EvalVM, a []base.Key) []base.Key {
 
 /* Reveal to all parties */
 func Reveal(io EvalVM, a []base.Key) []bool {
-	result := Reveal1(io, a)
-	Reveal0(io, a)
+	result := RevealTo1(io, a)
+	RevealTo0(io, a)
 	return result
 }
 
-func Reveal0(io EvalVM, a []base.Key) {
-	io.Reveal0(a)
+func RevealTo0(io EvalVM, a []base.Key) {
+	io.RevealTo0(a)
 }
 
-func Reveal1(io EvalVM, a []base.Key) []bool {
-	return io.Reveal1(a)
+func RevealTo1(io EvalVM, a []base.Key) []bool {
+	return io.RevealTo1(a)
 }
 
 func RevealUint32(io EvalVM, a []base.Key) uint32 {
@@ -474,12 +474,12 @@ func RevealUint64(io EvalVM, a []base.Key) uint64 {
 	return result
 }
 
-func OT(io EvalVM, v uint64, bits int) []base.Key {
-	return io.OT(v, bits)
+func ShareTo0(io EvalVM, v uint64, bits int) []base.Key {
+	return io.ShareTo0(v, bits)
 }
 
-func BT(io EvalVM, bits int) []base.Key {
-	return io.BT(bits)
+func ShareTo1(io EvalVM, bits int) []base.Key {
+	return io.ShareTo1(bits)
 }
 
 func Random(io EvalVM, bits int) []base.Key {
@@ -488,14 +488,14 @@ func Random(io EvalVM, bits int) []base.Key {
 
 /* Gen-side load */
 func Load(io EvalVM, loc, eltsize []base.Key) []base.Key {
-	Reveal0(io, loc)
-	Reveal0(io, eltsize)
-	return BT(io, 64)
+	RevealTo0(io, loc)
+	RevealTo0(io, eltsize)
+	return ShareTo1(io, 64)
 }
 
 /* Gen-side store */
 func Store(io EvalVM, loc, eltsize, val []base.Key) {
-	Reveal0(io, loc)
-	Reveal0(io, eltsize)
-	Reveal0(io, val)
+	RevealTo0(io, loc)
+	RevealTo0(io, eltsize)
+	RevealTo0(io, val)
 }

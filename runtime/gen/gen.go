@@ -11,10 +11,10 @@ type GenVM interface {
 	Xor(a, b []base.Wire) []base.Wire
 	True() []base.Wire
 	False() []base.Wire
-	Reveal0(a []base.Wire) []bool
-	Reveal1(a []base.Wire)
-	OT(bits int) []base.Wire
-	BT(a uint64, bits int) []base.Wire
+	RevealTo0(a []base.Wire) []bool
+	RevealTo1(a []base.Wire)
+	ShareTo0(bits int) []base.Wire
+	ShareTo1(a uint64, bits int) []base.Wire
 	Random(bits int) []base.Wire
 }
 
@@ -280,25 +280,25 @@ func Printf(io GenVM, mask []base.Wire, f string, args ...[]base.Wire) {
 }
 
 // NB Gen_int() reveals the active block
-func Gen_int(io GenVM, mask []base.Wire, next_arg func() uint64) []base.Wire {
+func InputFrom0(io GenVM, mask []base.Wire, next_arg func() uint64) []base.Wire {
 	if len(mask) != 1 {
 		panic("Gen_int")
 	}
 	if !Reveal(io, mask)[0] {
 		return Uint(io, 0, 32)
 	}
-	return BT(io, next_arg(), 32)
+	return ShareTo1(io, next_arg(), 32)
 }
 
 // NB Eval_int() reveals the active block
-func Eval_int(io GenVM, mask []base.Wire) []base.Wire {
+func InputFrom1(io GenVM, mask []base.Wire) []base.Wire {
 	if len(mask) != 1 {
 		panic("Eval_int")
 	}
 	if !Reveal(io, mask)[0] {
 		return Uint(io, 0, 32)
 	}
-	return OT(io, 32)
+	return ShareTo0(io, 32)
 }
 
 // Switch(io, s, dflt, c0, c1, ...) tests s.
@@ -429,16 +429,16 @@ func Not(io GenVM, a []base.Wire) []base.Wire {
 
 /* Reveal to all parties */
 func Reveal(io GenVM, a []base.Wire) []bool {
-	Reveal1(io, a)
-	return Reveal0(io, a)
+	RevealTo1(io, a)
+	return RevealTo0(io, a)
 }
 
-func Reveal0(io GenVM, a []base.Wire) []bool {
-	return io.Reveal0(a)
+func RevealTo0(io GenVM, a []base.Wire) []bool {
+	return io.RevealTo0(a)
 }
 
-func Reveal1(io GenVM, a []base.Wire) {
-	io.Reveal1(a)
+func RevealTo1(io GenVM, a []base.Wire) {
+	io.RevealTo1(a)
 }
 
 func bits2Uint32(bits []bool) uint32 {
@@ -464,7 +464,7 @@ func Reveal0Uint32(io GenVM, a []base.Wire) uint32 {
 	if len(a) > 32 {
 		panic("RevealUint32: argument too large")
 	}
-	bits := Reveal0(io, a)
+	bits := RevealTo0(io, a)
 	return bits2Uint32(bits)
 }
 
@@ -498,16 +498,16 @@ func Reveal0Uint64(io GenVM, a []base.Wire) uint64 {
 	if len(a) > 64 {
 		panic("Reveal0Uint64: argument too large")
 	}
-	bits := Reveal0(io, a)
+	bits := RevealTo0(io, a)
 	return bits2Uint64(bits)
 }
 
-func OT(io GenVM, bits int) []base.Wire {
-	return io.OT(bits)
+func ShareTo0(io GenVM, bits int) []base.Wire {
+	return io.ShareTo0(bits)
 }
 
-func BT(io GenVM, a uint64, bits int) []base.Wire {
-	return io.BT(a, bits)
+func ShareTo1(io GenVM, a uint64, bits int) []base.Wire {
+	return io.ShareTo1(a, bits)
 }
 
 func Random(io GenVM, bits int) []base.Wire {
@@ -539,7 +539,7 @@ func Load(io GenVM, loc, eltsize []base.Wire) []base.Wire {
 		x += byte_j << uint(j*8)
 	}
 	fmt.Printf("0x%x\n", x)
-	return BT(io, x, 64)
+	return ShareTo1(io, x, 64)
 }
 
 /* Gen-side store */

@@ -82,14 +82,14 @@ func (y YaoState) False() []base.Key {
 }
 
 /* Reveal to party 0 = gen */
-func (y YaoState) Reveal0(a []base.Key) {
+func (y YaoState) RevealTo0(a []base.Key) {
 	for i := 0; i < len(a); i++ {
 		y.io.SendK2(a[i])
 	}
 }
 
 /* Reveal to party 1 = eval */
-func (y YaoState) Reveal1(a []base.Key) []bool {
+func (y YaoState) RevealTo1(a []base.Key) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		t := y.io.RecvT()
@@ -105,7 +105,7 @@ func (y YaoState) Reveal1(a []base.Key) []bool {
 	return result
 }
 
-func (y YaoState) OT(v uint64, bits int) []base.Key {
+func (y YaoState) ShareTo0(v uint64, bits int) []base.Key {
 	a := make([]bool, bits)
 	for i := 0; i < len(a); i++ {
 		bit := (v >> uint(i)) % 2
@@ -143,7 +143,7 @@ func (y YaoState) Random(bits int) []base.Key {
 }
 
 /* Bit transfer: Generator knows the bits, evaluator gets keys */
-func (y YaoState) BT(bits int) []base.Key {
+func (y YaoState) ShareTo1(bits int) []base.Key {
 	if bits > 64 {
 		panic("BT: bits > 64")
 	}

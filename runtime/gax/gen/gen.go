@@ -190,7 +190,7 @@ func (y GaxState) False() []base.Wire {
 }
 
 /* Reveal to party 0 = gen */
-func (y GaxState) Reveal0(a []base.Wire) []bool {
+func (y GaxState) RevealTo0(a []base.Wire) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		bit := resolveKey(a[i], y.io.RecvK2())
@@ -204,7 +204,7 @@ func (y GaxState) Reveal0(a []base.Wire) []bool {
 }
 
 /* Reveal to party 1 = eval */
-func (y GaxState) Reveal1(a []base.Wire) {
+func (y GaxState) RevealTo1(a []base.Wire) {
 	for i := 0; i < len(a); i++ {
 		t := make([]base.Ciphertext, 2)
 		w := genWire()
@@ -216,7 +216,7 @@ func (y GaxState) Reveal1(a []base.Wire) {
 	}
 }
 
-func (y GaxState) OT(bits int) []base.Wire {
+func (y GaxState) ShareTo0(bits int) []base.Wire {
 	a := make([]base.Wire, bits)
 	for i := 0; i < len(a); i++ {
 		w := genWire()
@@ -226,7 +226,7 @@ func (y GaxState) OT(bits int) []base.Wire {
 	return a
 }
 
-func (y GaxState) BT(a uint64, bits int) []base.Wire {
+func (y GaxState) ShareTo1(a uint64, bits int) []base.Wire {
 	if bits > 64 {
 		panic("BT: bits > 64")
 	}
