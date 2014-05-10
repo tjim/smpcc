@@ -113,36 +113,6 @@ func genWires(size int) []base.Wire {
 
 /* http://www.llvm.org/docs/LangRef.html */
 
-func (y YaoState) Add(a, b []base.Wire) []base.Wire {
-	if len(a) != len(b) {
-		panic(fmt.Sprintf("Wire mismatch in gen.Add(), %d vs %d", len(a), len(b)))
-	}
-	if len(a) == 0 {
-		panic("empty arguments in gen.Add()")
-	}
-	result := make([]base.Wire, len(a))
-	result[0] = y.Xor(a[0:1], b[0:1])[0]
-	c := y.And(a[0:1], b[0:1])[0] /* carry bit */
-	for i := 1; i < len(a); i++ {
-		/* compute the result bit */
-		result[i] = y.Xor(y.Xor(a[i:i+1], b[i:i+1]), []base.Wire{c})[0]
-		/* compute the carry bit. */
-		w := genWire()
-		t := make([]base.Ciphertext, 8)
-		encrypt_slot(t, w[0], c[0], a[i][0], b[i][0])
-		encrypt_slot(t, w[0], c[0], a[i][0], b[i][1])
-		encrypt_slot(t, w[0], c[0], a[i][1], b[i][0])
-		encrypt_slot(t, w[1], c[0], a[i][1], b[i][1])
-		encrypt_slot(t, w[0], c[1], a[i][0], b[i][0])
-		encrypt_slot(t, w[1], c[1], a[i][0], b[i][1])
-		encrypt_slot(t, w[1], c[1], a[i][1], b[i][0])
-		encrypt_slot(t, w[1], c[1], a[i][1], b[i][1])
-		y.io.SendT(t)
-		c = w
-	}
-	return result
-}
-
 func (y YaoState) Sub(a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("argument mismatch in Sub()")

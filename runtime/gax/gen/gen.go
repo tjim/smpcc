@@ -130,33 +130,6 @@ func genWires(size int) []base.Wire {
 
 /* http://www.llvm.org/docs/LangRef.html */
 
-func (y GaxState) Add(a, b []base.Wire) []base.Wire {
-	if len(a) != len(b) {
-		panic(fmt.Sprintf("Wire mismatch in gen.Add(), %d vs %d", len(a), len(b)))
-	}
-	if len(a) == 0 {
-		panic("empty arguments in gen.Add()")
-	}
-	result := make([]base.Wire, len(a))
-	result[0] = y.Xor(a[0:1], b[0:1])[0]
-	c := y.And(a[0:1], b[0:1]) /* carry bit */
-	for i := 1; i < len(a); i++ {
-		/* compute the result bit */
-		inner := y.Xor(a[i:i+1], b[i:i+1])
-		// fmt.Printf("gen inner length %d\n", len(inner))
-		result[i] = y.Xor(inner, c)[0]
-
-		/* compute the next carry bit w2. */
-		and1 := y.And(a[i:i+1], b[i:i+1])
-		and2 := y.And(inner, c)
-		or1 := y.Or(and1, and2)
-
-		// set the carry output
-		c = or1
-	}
-	return result
-}
-
 func (y GaxState) Sub(a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("argument mismatch in Sub()")

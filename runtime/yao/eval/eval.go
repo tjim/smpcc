@@ -40,26 +40,6 @@ func reset() {
 	const1 = nil
 }
 
-func (y YaoState) Add(a, b []base.Key) []base.Key {
-	if len(a) != len(b) {
-		panic("Key mismatch in eval.Add()")
-	}
-	if len(a) == 0 {
-		panic("empty arguments in eval.Add()")
-	}
-	result := make([]base.Key, len(a))
-	result[0] = y.Xor(a[0:1], b[0:1])[0]
-	c := y.And(a[0:1], b[0:1])[0] /* carry bit */
-	for i := 1; i < len(a); i++ {
-		/* compute the result bit */
-		result[i] = y.Xor(y.Xor(a[i:i+1], b[i:i+1]), []base.Key{c})[0]
-		/* compute the carry bit */
-		t := y.io.RecvT()
-		c = gen.Decrypt(t, c, a[i], b[i])
-	}
-	return result
-}
-
 func (y YaoState) Sub(a, b []base.Key) []base.Key {
 	if len(a) != len(b) {
 		panic("argument mismatch in Sub()")

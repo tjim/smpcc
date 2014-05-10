@@ -6,7 +6,6 @@ import (
 )
 
 type GenVM interface {
-	Add(a, b []base.Wire) []base.Wire
 	Sub(a, b []base.Wire) []base.Wire
 	And(a, b []base.Wire) []base.Wire
 	Or(a, b []base.Wire) []base.Wire
@@ -26,7 +25,25 @@ type GenVM interface {
 }
 
 func Add(io GenVM, a, b []base.Wire) []base.Wire {
-	return io.Add(a, b)
+	if len(a) != len(b) {
+		panic(fmt.Sprintf("Wire mismatch in gen.Add(), %d vs %d", len(a), len(b)))
+	}
+	if len(a) == 0 {
+		panic("empty arguments in gen.Add()")
+	}
+	result := make([]base.Wire, len(a))
+	result[0] = Xor(io, a[0:1], b[0:1])[0]
+	c := And(io, a[0:1], b[0:1])[0:1] /* carry bit */
+	for i := 1; i < len(a); i++ {
+		ai := a[i:i+1]
+		bi := b[i:i+1]
+		/* compute the result bit */
+		bi_xor_c := Xor(io, bi, c)
+		result[i] = Xor(io, ai, bi_xor_c)[0]
+		/* compute the carry bit. */
+		c = Xor(io, c, And(io, Xor(io, ai, c), bi_xor_c))
+	}
+	return result
 }
 
 func Sub(io GenVM, a, b []base.Wire) []base.Wire {
