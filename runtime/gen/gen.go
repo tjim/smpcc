@@ -69,7 +69,7 @@ func Shl(io GenVM, a []base.Wire, b int) []base.Wire {
 	if len(a) <= b {
 		panic("Shl() too far")
 	}
-	z := Const(io, 0)
+	z := False(io)
 	zeros := make([]base.Wire, b)
 	for i := 0; i < len(zeros); i++ {
 		zeros[i] = z[0]
@@ -119,9 +119,9 @@ func Zext(io GenVM, a []base.Wire, b int) []base.Wire {
 		panic("zext must extend operand")
 	}
 	if b == len(a)+1 {
-		return append(a, Const(io, 0)...)
+		return append(a, False(io)...)
 	}
-	return Sext(io, append(a, Const(io, 0)...), b)
+	return Sext(io, append(a, False(io)...), b)
 }
 
 func Sext(io GenVM, a []base.Wire, b int) []base.Wire {
@@ -153,7 +153,7 @@ func Icmp_ugt(io GenVM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("argument mismatch in gen.Icmp_ugt()")
 	}
-	c := Const(io, 0)
+	c := False(io)
 	for i := 0; i < len(a); i++ {
 		ai := a[i:i+1]
 		bi := b[i:i+1]
@@ -174,7 +174,7 @@ func Icmp_sgt(io GenVM, a, b []base.Wire) []base.Wire {
 		panic("argument mismatch in Icmp_sgt()")
 	}
 	if len(a) == 0 {
-		return Const(io, 0)
+		return False(io)
 	}
 	highbit := len(a) - 1
 	a_high, a_rest := a[highbit:highbit+1], a[:highbit]
@@ -195,7 +195,7 @@ func Icmp_uge(io GenVM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("argument mismatch in Icmp_uge()")
 	}
-	c := Const(io, 1)
+	c := True(io)
 	for i := 0; i < len(a); i++ {
 		ai := a[i:i+1]
 		bi := b[i:i+1]
@@ -391,12 +391,29 @@ func treeOr0(io GenVM, x ...base.Wire) base.Wire {
 	panic("unreachable")
 }
 
-func Const(io GenVM, bits ...int) []base.Wire {
-	return io.Const(bits...)
+func True(io GenVM) []base.Wire {
+	return io.Const(1)
+}
+
+func False(io GenVM) []base.Wire {
+	return io.Const(0)
 }
 
 func Uint(io GenVM, a uint64, width int) []base.Wire {
-	return io.Uint(a, width)
+	if width > 64 {
+		panic("Uint: width > 64")
+	}
+	result := make([]base.Wire, width)
+	const0 := False(io)[0]
+	const1 := True(io)[0]
+	for i := 0; i < width; i++ {
+		if (a>>uint(i))%2 == 0 {
+			result[i] = const0
+		} else {
+			result[i] = const1
+		}
+	}
+	return result
 }
 
 func Int(io GenVM, a int64, width int) []base.Wire {

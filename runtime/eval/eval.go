@@ -67,7 +67,7 @@ func Shl(io EvalVM, a []base.Key, b int) []base.Key {
 	if len(a) <= b {
 		panic("Shl() too far")
 	}
-	z := Const(io, 0)
+	z := False(io)
 	zeros := make([]base.Key, b)
 	for i := 0; i < len(zeros); i++ {
 		zeros[i] = z[0]
@@ -117,9 +117,9 @@ func Zext(io EvalVM, a []base.Key, b int) []base.Key {
 		panic("zext must extend operand")
 	}
 	if b == len(a)+1 {
-		return append(a, Const(io, 0)...)
+		return append(a, False(io)...)
 	}
-	return Sext(io, append(a, Const(io, 0)...), b)
+	return Sext(io, append(a, False(io)...), b)
 }
 
 func Sext(io EvalVM, a []base.Key, b int) []base.Key {
@@ -151,7 +151,7 @@ func Icmp_ugt(io EvalVM, a, b []base.Key) []base.Key {
 	if len(a) != len(b) {
 		panic("argument mismatch in eval.Icmp_ugt()")
 	}
-	c := Const(io, 0)
+	c := False(io)
 	for i := 0; i < len(a); i++ {
 		ai := a[i:i+1]
 		bi := b[i:i+1]
@@ -172,7 +172,7 @@ func Icmp_sgt(io EvalVM, a, b []base.Key) []base.Key {
 		panic("argument mismatch in Icmp_sgt()")
 	}
 	if len(a) == 0 {
-		return Const(io, 0)
+		return False(io)
 	}
 	highbit := len(a) - 1
 	a_high, a_rest := a[highbit:highbit+1], a[:highbit]
@@ -193,7 +193,7 @@ func Icmp_uge(io EvalVM, a, b []base.Key) []base.Key {
 	if len(a) != len(b) {
 		panic("argument mismatch in Icmp_uge()")
 	}
-	c := Const(io, 1)
+	c := True(io)
 	for i := 0; i < len(a); i++ {
 		ai := a[i:i+1]
 		bi := b[i:i+1]
@@ -388,12 +388,29 @@ func TreeXor(io EvalVM, x ...[]base.Key) []base.Key {
 	panic("unreachable")
 }
 
-func Const(io EvalVM, bits ...int) []base.Key {
-	return io.Const(bits...)
+func True(io EvalVM) []base.Key {
+	return io.Const(1)
+}
+
+func False(io EvalVM) []base.Key {
+	return io.Const(0)
 }
 
 func Uint(io EvalVM, a uint64, width int) []base.Key {
-	return io.Uint(a, width)
+	if width > 64 {
+		panic("Uint: width > 64")
+	}
+	result := make([]base.Key, width)
+	const0 := False(io)[0]
+	const1 := True(io)[0]
+	for i := 0; i < width; i++ {
+		if (a>>uint(i))%2 == 0 {
+			result[i] = const0
+		} else {
+			result[i] = const1
+		}
+	}
+	return result
 }
 
 func Int(io EvalVM, a int64, width int) []base.Key {
