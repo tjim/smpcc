@@ -7,7 +7,8 @@ type EvalVM interface {
 	And(a, b []base.Key) []base.Key
 	Or(a, b []base.Key) []base.Key
 	Xor(a, b []base.Key) []base.Key
-	Const(bits ...int) []base.Key
+	True() []base.Key
+	False() []base.Key
 	Nand(a, b []base.Key) []base.Key
 	Not(a []base.Key) []base.Key
 	Reveal0(a []base.Key)
@@ -388,11 +389,11 @@ func TreeXor(io EvalVM, x ...[]base.Key) []base.Key {
 }
 
 func True(io EvalVM) []base.Key {
-	return io.Const(1)
+	return io.True()
 }
 
 func False(io EvalVM) []base.Key {
-	return io.Const(0)
+	return io.False()
 }
 
 func Uint(io EvalVM, a uint64, width int) []base.Key {

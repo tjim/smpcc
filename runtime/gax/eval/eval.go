@@ -128,21 +128,14 @@ func (y GaxState) Xor(a, b []base.Key) []base.Key {
 	return result
 }
 
-func (y GaxState) Const(bits ...int) []base.Key {
-	if len(bits) == 0 {
-		panic("Const with no bits")
-	}
+func (y GaxState) True() []base.Key {
 	init_constants(y.io)
-	result := make([]base.Key, len(bits))
-	/* count down: leftmost argument bits[0] is high-order bit */
-	for i := len(bits); i > 0; i-- {
-		if bits[i-1] == 0 {
-			result[i-1] = const0
-		} else {
-			result[i-1] = const1
-		}
-	}
-	return result
+	return []base.Key{ const1 }
+}
+
+func (y GaxState) False() []base.Key {
+	init_constants(y.io)
+	return []base.Key{ const0 }
 }
 
 func (y GaxState) Nand(a, b []base.Key) []base.Key {

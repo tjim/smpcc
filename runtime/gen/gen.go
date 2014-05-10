@@ -9,7 +9,8 @@ type GenVM interface {
 	And(a, b []base.Wire) []base.Wire
 	Or(a, b []base.Wire) []base.Wire
 	Xor(a, b []base.Wire) []base.Wire
-	Const(bits ...int) []base.Wire
+	True() []base.Wire
+	False() []base.Wire
 	Nand(a, b []base.Wire) []base.Wire
 	Not(a []base.Wire) []base.Wire
 	Reveal0(a []base.Wire) []bool
@@ -391,11 +392,11 @@ func treeOr0(io GenVM, x ...base.Wire) base.Wire {
 }
 
 func True(io GenVM) []base.Wire {
-	return io.Const(1)
+	return io.True()
 }
 
 func False(io GenVM) []base.Wire {
-	return io.Const(0)
+	return io.False()
 }
 
 func Uint(io GenVM, a uint64, width int) []base.Wire {

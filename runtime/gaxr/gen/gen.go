@@ -242,22 +242,14 @@ func (y GaxState) Xor(a, b []base.Wire) []base.Wire {
 	return result
 }
 
-/* example: Const(0,1,0,0) is 8 */
-func (y GaxState) Const(bits ...int) []base.Wire {
-	if len(bits) == 0 {
-		panic("Const with no bits")
-	}
+func (y GaxState) True() []base.Wire {
 	init_constants(y.io)
-	result := make([]base.Wire, len(bits))
-	/* count down: leftmost argument bits[0] is high-order bit */
-	for i := len(bits); i > 0; i-- {
-		if bits[i-1] == 0 {
-			result[i-1] = const0
-		} else {
-			result[i-1] = const1
-		}
-	}
-	return result
+	return []base.Wire{ const1 }
+}
+
+func (y GaxState) False() []base.Wire {
+	init_constants(y.io)
+	return []base.Wire{ const0 }
 }
 
 func (y GaxState) Nand(a, b []base.Wire) []base.Wire {
