@@ -128,21 +128,6 @@ func (y GaxState) Xor(a, b []base.Key) []base.Key {
 	return result
 }
 
-func (y GaxState) Select(s, a, b []base.Key) []base.Key {
-	if len(s) != 1 {
-		panic("Wire mismatch in eval.Select()")
-	}
-	if len(a) != len(b) {
-		panic("Wire mismatch in eval.Select()")
-	}
-	result := make([]base.Key, len(a))
-	for i := 0; i < len(a); i++ {
-		// result[i] = y.Or(y.And(s, a[i:i+1]), y.And(y.Not(s), b[i:i+1]))[0]
-		result[i] = y.Xor(b[i:i+1], y.And(s, y.Xor(a[i:i+1], b[i:i+1])))[0]
-	}
-	return result
-}
-
 func (y GaxState) Const(bits ...int) []base.Key {
 	if len(bits) == 0 {
 		panic("Const with no bits")

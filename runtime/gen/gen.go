@@ -9,7 +9,6 @@ type GenVM interface {
 	And(a, b []base.Wire) []base.Wire
 	Or(a, b []base.Wire) []base.Wire
 	Xor(a, b []base.Wire) []base.Wire
-	Select(s, a, b []base.Wire) []base.Wire
 	Const(bits ...int) []base.Wire
 	Uint(a uint64, width int) []base.Wire
 	Nand(a, b []base.Wire) []base.Wire
@@ -213,7 +212,18 @@ func Icmp_ule(io GenVM, a, b []base.Wire) []base.Wire {
 }
 
 func Select(io GenVM, s, a, b []base.Wire) []base.Wire {
-	return io.Select(s, a, b)
+	if len(s) != 1 {
+		panic("Wire mismatch in gen.Select()")
+	}
+	if len(a) != len(b) {
+		panic("Wire mismatch in gen.Select()")
+	}
+	result := make([]base.Wire, len(a))
+
+	for i := 0; i < len(a); i++ {
+		result[i] = Xor(io, b[i:i+1], And(io, s, Xor(io, a[i:i+1], b[i:i+1])))[0]
+	}
+	return result
 }
 
 func Mask(io GenVM, s, a []base.Wire) []base.Wire {

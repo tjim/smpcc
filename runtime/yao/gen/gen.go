@@ -162,22 +162,6 @@ func (y YaoState) Xor(a, b []base.Wire) []base.Wire {
 	return result
 }
 
-func (y YaoState) Select(s, a, b []base.Wire) []base.Wire {
-	if len(s) != 1 {
-		panic("Wire mismatch in gen.Select()")
-	}
-	if len(a) != len(b) {
-		panic("Wire mismatch in gen.Select()")
-	}
-	result := make([]base.Wire, len(a))
-
-	for i := 0; i < len(a); i++ {
-		// result[i] = y.Or(y.And(s, a[i:i+1]), y.And(y.Not(s), b[i:i+1]))[0]
-		result[i] = y.Xor(b[i:i+1], y.And(s, y.Xor(a[i:i+1], b[i:i+1])))[0]
-	}
-	return result
-}
-
 /* example: Const(0,1,0,0) is 8 */
 func (y YaoState) Const(bits ...int) []base.Wire {
 	if len(bits) == 0 {

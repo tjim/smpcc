@@ -7,7 +7,6 @@ type EvalVM interface {
 	And(a, b []base.Key) []base.Key
 	Or(a, b []base.Key) []base.Key
 	Xor(a, b []base.Key) []base.Key
-	Select(s, a, b []base.Key) []base.Key
 	Const(bits ...int) []base.Key
 	Uint(a uint64, width int) []base.Key
 	Nand(a, b []base.Key) []base.Key
@@ -211,7 +210,17 @@ func Icmp_ule(io EvalVM, a, b []base.Key) []base.Key {
 }
 
 func Select(io EvalVM, s, a, b []base.Key) []base.Key {
-	return io.Select(s, a, b)
+	if len(s) != 1 {
+		panic("Wire mismatch in eval.Select()")
+	}
+	if len(a) != len(b) {
+		panic("Wire mismatch in eval.Select()")
+	}
+	result := make([]base.Key, len(a))
+	for i := 0; i < len(a); i++ {
+		result[i] = Xor(io, b[i:i+1], And(io, s, Xor(io, a[i:i+1], b[i:i+1])))[0]
+	}
+	return result
 }
 
 func Mask(io EvalVM, s, a []base.Key) []base.Key {
