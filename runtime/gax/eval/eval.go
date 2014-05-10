@@ -128,40 +128,6 @@ func (y GaxState) Xor(a, b []base.Key) []base.Key {
 	return result
 }
 
-func (y GaxState) Icmp_ugt(a, b []base.Key) []base.Key {
-	if len(a) != len(b) {
-		panic("argument mismatch in Icmp_ugt()")
-	}
-	if len(a) == 0 {
-		return y.Const(0)
-	}
-	highbit := len(a) - 1
-	t := y.io.RecvT()
-	highbit_gt := make([]base.Key, 1)
-	highbit_gt[0] = y.Decrypt(t, a[highbit], b[highbit])
-	t = y.io.RecvT()
-	highbit_eq := make([]base.Key, 1)
-	highbit_eq[0] = y.Decrypt(t, a[highbit], b[highbit])
-	return y.Or(highbit_gt, y.And(highbit_eq, y.Icmp_ugt(a[:highbit], b[:highbit])))
-}
-
-func (y GaxState) Icmp_uge(a, b []base.Key) []base.Key {
-	if len(a) != len(b) {
-		panic("argument mismatch in Icmp_uge()")
-	}
-	if len(a) == 0 {
-		return y.Const(0)
-	}
-	highbit := len(a) - 1
-	t := y.io.RecvT()
-	highbit_gt := make([]base.Key, 1)
-	highbit_gt[0] = y.Decrypt(t, a[highbit], b[highbit])
-	t = y.io.RecvT()
-	highbit_eq := make([]base.Key, 1)
-	highbit_eq[0] = y.Decrypt(t, a[highbit], b[highbit])
-	return y.Or(highbit_gt, y.And(highbit_eq, y.Icmp_uge(a[1:], b[1:])))
-}
-
 func (y GaxState) Select(s, a, b []base.Key) []base.Key {
 	if len(s) != 1 {
 		panic("Wire mismatch in eval.Select()")

@@ -179,60 +179,6 @@ func (y GaxState) Xor(a, b []base.Wire) []base.Wire {
 	return result
 }
 
-func (y GaxState) Icmp_ugt(a, b []base.Wire) []base.Wire {
-	if len(a) != len(b) {
-		panic("argument mismatch in Icmp_ugt()")
-	}
-	if len(a) == 0 {
-		return y.Const(0)
-	}
-	highbit := len(a) - 1
-	highbit_gt := make([]base.Wire, 1)
-	highbit_gt[0] = genWire()
-	t := make([]base.Ciphertext, 4)
-	y.encrypt_slot(t, highbit_gt[0][0], a[highbit][0], b[highbit][0])
-	y.encrypt_slot(t, highbit_gt[0][0], a[highbit][0], b[highbit][1])
-	y.encrypt_slot(t, highbit_gt[0][1], a[highbit][1], b[highbit][0])
-	y.encrypt_slot(t, highbit_gt[0][0], a[highbit][1], b[highbit][1])
-	y.io.SendT(t)
-	highbit_eq := make([]base.Wire, 1)
-	highbit_eq[0] = genWire()
-	t = make([]base.Ciphertext, 4)
-	y.encrypt_slot(t, highbit_eq[0][1], a[highbit][0], b[highbit][0])
-	y.encrypt_slot(t, highbit_eq[0][0], a[highbit][0], b[highbit][1])
-	y.encrypt_slot(t, highbit_eq[0][0], a[highbit][1], b[highbit][0])
-	y.encrypt_slot(t, highbit_eq[0][1], a[highbit][1], b[highbit][1])
-	y.io.SendT(t)
-	return y.Or(highbit_gt, y.And(highbit_eq, y.Icmp_ugt(a[:highbit], b[:highbit])))
-}
-
-func (y GaxState) Icmp_uge(a, b []base.Wire) []base.Wire {
-	if len(a) != len(b) {
-		panic("argument mismatch in Icmp_uge()")
-	}
-	if len(a) == 0 {
-		return y.Const(0)
-	}
-	highbit := len(a) - 1
-	highbit_gt := make([]base.Wire, 1)
-	highbit_gt[0] = genWire()
-	t := make([]base.Ciphertext, 4)
-	y.encrypt_slot(t, highbit_gt[0][0], a[highbit][0], b[highbit][0])
-	y.encrypt_slot(t, highbit_gt[0][0], a[highbit][0], b[highbit][1])
-	y.encrypt_slot(t, highbit_gt[0][1], a[highbit][1], b[highbit][0])
-	y.encrypt_slot(t, highbit_gt[0][0], a[highbit][1], b[highbit][1])
-	y.io.SendT(t)
-	highbit_eq := make([]base.Wire, 1)
-	highbit_eq[0] = genWire()
-	t = make([]base.Ciphertext, 4)
-	y.encrypt_slot(t, highbit_eq[0][1], a[highbit][0], b[highbit][0])
-	y.encrypt_slot(t, highbit_eq[0][0], a[highbit][0], b[highbit][1])
-	y.encrypt_slot(t, highbit_eq[0][0], a[highbit][1], b[highbit][0])
-	y.encrypt_slot(t, highbit_eq[0][1], a[highbit][1], b[highbit][1])
-	y.io.SendT(t)
-	return y.Or(highbit_gt, y.And(highbit_eq, y.Icmp_uge(a[1:], b[1:])))
-}
-
 func (y GaxState) Select(s, a, b []base.Wire) []base.Wire {
 	if len(s) != 1 {
 		panic("Wire mismatch in gen.Select()")

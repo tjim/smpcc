@@ -9,8 +9,6 @@ type GenVM interface {
 	And(a, b []base.Wire) []base.Wire
 	Or(a, b []base.Wire) []base.Wire
 	Xor(a, b []base.Wire) []base.Wire
-	Icmp_ugt(a, b []base.Wire) []base.Wire
-	Icmp_uge(a, b []base.Wire) []base.Wire
 	Select(s, a, b []base.Wire) []base.Wire
 	Const(bits ...int) []base.Wire
 	Uint(a uint64, width int) []base.Wire
@@ -153,7 +151,16 @@ func Icmp_eq(io GenVM, a, b []base.Wire) []base.Wire {
 }
 
 func Icmp_ugt(io GenVM, a, b []base.Wire) []base.Wire {
-	return io.Icmp_ugt(a, b)
+	if len(a) != len(b) {
+		panic("argument mismatch in gen.Icmp_ugt()")
+	}
+	c := Const(io, 0)
+	for i := 0; i < len(a); i++ {
+		ai := a[i:i+1]
+		bi := b[i:i+1]
+		c = Xor(io, ai, And(io, Xor(io, ai, c), Xor(io, bi, c)))
+	}
+	return c
 }
 
 func Icmp_ult(io GenVM, a, b []base.Wire) []base.Wire {
@@ -186,7 +193,16 @@ func Icmp_slt(io GenVM, a, b []base.Wire) []base.Wire {
 }
 
 func Icmp_uge(io GenVM, a, b []base.Wire) []base.Wire {
-	return io.Icmp_uge(a, b)
+	if len(a) != len(b) {
+		panic("argument mismatch in Icmp_uge()")
+	}
+	c := Const(io, 1)
+	for i := 0; i < len(a); i++ {
+		ai := a[i:i+1]
+		bi := b[i:i+1]
+		c = Xor(io, ai, And(io, Xor(io, ai, c), Xor(io, bi, c)))
+	}
+	return c
 }
 
 func Icmp_ule(io GenVM, a, b []base.Wire) []base.Wire {

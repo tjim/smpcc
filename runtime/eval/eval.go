@@ -7,8 +7,6 @@ type EvalVM interface {
 	And(a, b []base.Key) []base.Key
 	Or(a, b []base.Key) []base.Key
 	Xor(a, b []base.Key) []base.Key
-	Icmp_ugt(a, b []base.Key) []base.Key
-	Icmp_uge(a, b []base.Key) []base.Key
 	Select(s, a, b []base.Key) []base.Key
 	Const(bits ...int) []base.Key
 	Uint(a uint64, width int) []base.Key
@@ -151,7 +149,16 @@ func Icmp_eq(io EvalVM, a, b []base.Key) []base.Key {
 }
 
 func Icmp_ugt(io EvalVM, a, b []base.Key) []base.Key {
-	return io.Icmp_ugt(a, b)
+	if len(a) != len(b) {
+		panic("argument mismatch in eval.Icmp_ugt()")
+	}
+	c := Const(io, 0)
+	for i := 0; i < len(a); i++ {
+		ai := a[i:i+1]
+		bi := b[i:i+1]
+		c = Xor(io, ai, And(io, Xor(io, ai, c), Xor(io, bi, c)))
+	}
+	return c
 }
 
 func Icmp_ult(io EvalVM, a, b []base.Key) []base.Key {
@@ -184,7 +191,16 @@ func Icmp_slt(io EvalVM, a, b []base.Key) []base.Key {
 }
 
 func Icmp_uge(io EvalVM, a, b []base.Key) []base.Key {
-	return io.Icmp_uge(a, b)
+	if len(a) != len(b) {
+		panic("argument mismatch in Icmp_uge()")
+	}
+	c := Const(io, 1)
+	for i := 0; i < len(a); i++ {
+		ai := a[i:i+1]
+		bi := b[i:i+1]
+		c = Xor(io, ai, And(io, Xor(io, ai, c), Xor(io, bi, c)))
+	}
+	return c
 }
 
 func Icmp_ule(io EvalVM, a, b []base.Key) []base.Key {
