@@ -8,7 +8,6 @@ type EvalVM interface {
 	Or(a, b []base.Key) []base.Key
 	Xor(a, b []base.Key) []base.Key
 	Const(bits ...int) []base.Key
-	Uint(a uint64, width int) []base.Key
 	Nand(a, b []base.Key) []base.Key
 	Not(a []base.Key) []base.Key
 	Reveal0(a []base.Key)
@@ -414,7 +413,7 @@ func Uint(io EvalVM, a uint64, width int) []base.Key {
 }
 
 func Int(io EvalVM, a int64, width int) []base.Key {
-	return io.Uint(uint64(a), width)
+	return Uint(io, uint64(a), width)
 }
 
 func Nand(io EvalVM, a, b []base.Key) []base.Key {

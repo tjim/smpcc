@@ -145,22 +145,6 @@ func (y GaxState) Const(bits ...int) []base.Key {
 	return result
 }
 
-func (y GaxState) Uint(a uint64, width int) []base.Key {
-	if width > 64 {
-		panic("Uint: width > 64")
-	}
-	init_constants(y.io)
-	result := make([]base.Key, width)
-	for i := 0; i < width; i++ {
-		if (a>>uint(i))%2 == 0 {
-			result[i] = const0
-		} else {
-			result[i] = const1
-		}
-	}
-	return result
-}
-
 func (y GaxState) Nand(a, b []base.Key) []base.Key {
 	return y.bitwise_binary_operator(y.io, a, b)
 }

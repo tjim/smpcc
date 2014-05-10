@@ -180,22 +180,6 @@ func (y YaoState) Const(bits ...int) []base.Wire {
 	return result
 }
 
-func (y YaoState) Uint(a uint64, width int) []base.Wire {
-	if width > 64 {
-		panic("Uint: width > 64")
-	}
-	init_constants(y.io)
-	result := make([]base.Wire, width)
-	for i := 0; i < width; i++ {
-		if (a>>uint(i))%2 == 0 {
-			result[i] = const0
-		} else {
-			result[i] = const1
-		}
-	}
-	return result
-}
-
 func (y YaoState) Nand(a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("Wire mismatch in gen.Nand()")
