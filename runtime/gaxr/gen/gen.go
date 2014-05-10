@@ -252,18 +252,6 @@ func (y GaxState) False() []base.Wire {
 	return []base.Wire{ const0 }
 }
 
-// Gates built by composing other gates
-
-/* We use the free XOR and unbounded fanout of constant bits */
-func (y GaxState) Not(a []base.Wire) []base.Wire {
-	init_constants(y.io)
-	ones := make([]base.Wire, len(a))
-	for i := 0; i < len(ones); i++ {
-		ones[i] = const1
-	}
-	return y.Xor(a, ones)
-}
-
 // Other gates and helper functions
 
 /* Reveal to party 0 = gen */

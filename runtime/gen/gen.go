@@ -11,7 +11,6 @@ type GenVM interface {
 	Xor(a, b []base.Wire) []base.Wire
 	True() []base.Wire
 	False() []base.Wire
-	Not(a []base.Wire) []base.Wire
 	Reveal0(a []base.Wire) []bool
 	Reveal1(a []base.Wire)
 	OT(bits int) []base.Wire
@@ -420,7 +419,12 @@ func Int(io GenVM, a int64, width int) []base.Wire {
 }
 
 func Not(io GenVM, a []base.Wire) []base.Wire {
-	return io.Not(a)
+	const1 := True(io)[0]
+	ones := make([]base.Wire, len(a))
+	for i := 0; i < len(ones); i++ {
+		ones[i] = const1
+	}
+	return Xor(io, a, ones)
 }
 
 /* Reveal to all parties */

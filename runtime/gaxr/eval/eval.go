@@ -176,16 +176,6 @@ func (y GaxState) False() []base.Key {
 	return []base.Key{ const0 }
 }
 
-/* We use the free XOR and unbounded fanout of constant bits */
-func (y GaxState) Not(a []base.Key) []base.Key {
-	init_constants(y.io)
-	ones := make([]base.Key, len(a))
-	for i := 0; i < len(ones); i++ {
-		ones[i] = const1
-	}
-	return y.Xor(a, ones)
-}
-
 /* Reveal to party 0 = gen */
 func (y GaxState) Reveal0(a []base.Key) {
 	for i := 0; i < len(a); i++ {

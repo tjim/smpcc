@@ -9,7 +9,6 @@ type EvalVM interface {
 	Xor(a, b []base.Key) []base.Key
 	True() []base.Key
 	False() []base.Key
-	Not(a []base.Key) []base.Key
 	Reveal0(a []base.Key)
 	Reveal1(a []base.Key) []bool
 	OT(v uint64, bits int) []base.Key
@@ -417,7 +416,12 @@ func Int(io EvalVM, a int64, width int) []base.Key {
 }
 
 func Not(io EvalVM, a []base.Key) []base.Key {
-	return io.Not(a)
+	const1 := True(io)[0]
+	ones := make([]base.Key, len(a))
+	for i := 0; i < len(ones); i++ {
+		ones[i] = const1
+	}
+	return Xor(io, a, ones)
 }
 
 /* Reveal to all parties */
