@@ -189,24 +189,6 @@ func (y GaxState) False() []base.Wire {
 	return []base.Wire{ const0 }
 }
 
-func (y GaxState) Nand(a, b []base.Wire) []base.Wire {
-	if len(a) != len(b) {
-		panic("Wire mismatch in gen.Nand()")
-	}
-	result := make([]base.Wire, len(a))
-	for i := 0; i < len(a); i++ {
-		w := genWire()
-		result[i] = w
-		t := make([]base.Ciphertext, 4)
-		y.encrypt_slot(t, w[1], a[i][0], b[i][0])
-		y.encrypt_slot(t, w[1], a[i][0], b[i][1])
-		y.encrypt_slot(t, w[1], a[i][1], b[i][0])
-		y.encrypt_slot(t, w[0], a[i][1], b[i][1])
-		y.io.SendT(t)
-	}
-	return result
-}
-
 /* We use the free XOR and unbounded fanout of constant bits */
 func (y GaxState) Not(a []base.Wire) []base.Wire {
 	init_constants(y.io)

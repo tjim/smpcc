@@ -252,38 +252,6 @@ func (y GaxState) False() []base.Wire {
 	return []base.Wire{ const0 }
 }
 
-func (y GaxState) Nand(a, b []base.Wire) []base.Wire {
-	if len(a) != len(b) {
-		panic("Wire mismatch in gen.And()")
-	}
-	result := make([]base.Wire, len(a))
-
-	var w base.Wire
-
-	for i := 0; i < len(a); i++ {
-		t := make([]base.Ciphertext, 3)
-
-		ii := a[i][0][0] % 2
-		jj := b[i][0][0] % 2
-		r := ii & jj
-		w = y.genWireRR(a[i][ii], b[i][jj], r)
-		result[i] = w
-		for counter := 1; counter < 4; counter++ {
-			aa := byte(counter % 2)
-			bb := byte(counter / 2)
-			ii := aa ^ (a[i][0][0] % 2)
-			jj := bb ^ (b[i][0][0] % 2)
-
-			tweak := y.computeTweak()
-			t[counter-1] = encrypt([]base.Key{a[i][ii], b[i][jj]}, w[^(ii&jj)], tweak)
-		}
-
-		y.io.SendT(t)
-	}
-	return result
-
-}
-
 // Gates built by composing other gates
 
 /* We use the free XOR and unbounded fanout of constant bits */

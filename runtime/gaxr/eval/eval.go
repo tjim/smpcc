@@ -176,10 +176,6 @@ func (y GaxState) False() []base.Key {
 	return []base.Key{ const0 }
 }
 
-func (y GaxState) Nand(a, b []base.Key) []base.Key {
-	return y.bitwise_binary_operator(y.io, a, b)
-}
-
 /* We use the free XOR and unbounded fanout of constant bits */
 func (y GaxState) Not(a []base.Key) []base.Key {
 	init_constants(y.io)

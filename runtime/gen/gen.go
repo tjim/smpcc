@@ -11,7 +11,6 @@ type GenVM interface {
 	Xor(a, b []base.Wire) []base.Wire
 	True() []base.Wire
 	False() []base.Wire
-	Nand(a, b []base.Wire) []base.Wire
 	Not(a []base.Wire) []base.Wire
 	Reveal0(a []base.Wire) []bool
 	Reveal1(a []base.Wire)
@@ -418,10 +417,6 @@ func Uint(io GenVM, a uint64, width int) []base.Wire {
 
 func Int(io GenVM, a int64, width int) []base.Wire {
 	return Uint(io, uint64(a), width)
-}
-
-func Nand(io GenVM, a, b []base.Wire) []base.Wire {
-	return io.Nand(a, b)
 }
 
 func Not(io GenVM, a []base.Wire) []base.Wire {

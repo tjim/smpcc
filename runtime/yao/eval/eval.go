@@ -81,10 +81,6 @@ func (y YaoState) False() []base.Key {
 	return []base.Key{ const0 }
 }
 
-func (y YaoState) Nand(a, b []base.Key) []base.Key {
-	return bitwise_binary_operator(y.io, a, b)
-}
-
 /* We use the free XOR and unbounded fanout of constant bits */
 func (y YaoState) Not(a []base.Key) []base.Key {
 	init_constants(y.io)
