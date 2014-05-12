@@ -16,6 +16,26 @@ type EvalVM interface {
 	Random(bits int) []base.Key
 }
 
+func Mul(io EvalVM, a, b []base.Key) []base.Key {
+	if len(a) != len(b) {
+		panic("argument mismatch in Mul()")
+	}
+	if len(a) == 0 {
+		panic("empty arguments in Mul()")
+	}
+	zeros := Uint(io, 0, len(a))
+	result := Select(io, b[0:1], a, zeros)
+	for i := 1; i < len(b); i++ {
+		a_shifted := Uint(io, 0, len(a))
+		for j := 0; i+j < len(a); j++ {
+			a_shifted[j+i] = a[j]
+		}
+		sum := Add(io, result, a_shifted)
+		result = Select(io, b[i:i+1], sum, result)
+	}
+	return result
+}
+
 func Add(io EvalVM, a, b []base.Key) []base.Key {
 	if len(a) != len(b) {
 		panic(fmt.Sprintf("Key mismatch in eval.Add(), %d vs %d", len(a), len(b)))

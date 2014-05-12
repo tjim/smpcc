@@ -18,6 +18,26 @@ type GenVM interface {
 	Random(bits int) []base.Wire
 }
 
+func Mul(io GenVM, a, b []base.Wire) []base.Wire {
+	if len(a) != len(b) {
+		panic("argument mismatch in Mul()")
+	}
+	if len(a) == 0 {
+		panic("empty arguments in Mul()")
+	}
+	zeros := Uint(io, 0, len(a))
+	result := Select(io, b[0:1], a, zeros)
+	for i := 1; i < len(b); i++ {
+		a_shifted := Uint(io, 0, len(a))
+		for j := 0; i+j < len(a); j++ {
+			a_shifted[j+i] = a[j]
+		}
+		sum := Add(io, result, a_shifted)
+		result = Select(io, b[i:i+1], sum, result)
+	}
+	return result
+}
+
 func Add(io GenVM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic(fmt.Sprintf("Wire mismatch in gen.Add(), %d vs %d", len(a), len(b)))

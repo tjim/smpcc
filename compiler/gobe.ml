@@ -125,6 +125,8 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         | 256 -> 8
         | _   -> failwith "the go back end does not support Mul" in
       bprintf b "Shl(io, %a, %d)\n" bpr_go_value tv shift_bits
+  | Mul(_,_,(typ,x),y) ->
+      bprintf b "Mul(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
   | Lshr(_,tv,Int y) ->
       let shift_bits = Big_int.int_of_big_int y in
       bprintf b "Lshr(io, %a, %d)\n" bpr_go_value tv shift_bits
