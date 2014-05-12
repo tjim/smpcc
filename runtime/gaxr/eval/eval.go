@@ -68,18 +68,6 @@ func slot(keys []base.Key) int {
 	return result
 }
 
-func findZeroSlots(a, b []base.Key) (res []bool) {
-	res = make([]bool, len(a))
-	for i := 0; i < len(a); i++ {
-		if a[i][0]%2 == 0 && b[i][0]%2 == 0 {
-			res[i] = true
-		} else {
-			res[i] = false
-		}
-	}
-	return
-}
-
 func decrypt_nonoptimized(keys []base.Key, ciphertext []byte) []byte {
 	result := ciphertext
 	for i := len(keys); i > 0; i-- {

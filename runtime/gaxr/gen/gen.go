@@ -43,20 +43,6 @@ func slot(keys []base.Key) int {
 	return result
 }
 
-func findZeroSlots(a, b []base.Wire) (res [][2]int) {
-	res = make([][2]int, len(a))
-	for i, wire := range a {
-		for j1 := 0; j1 <= 1; j1++ {
-			for j2 := 0; j2 <= 1; j2++ {
-				if (wire[j1][0]%2 == 0) && (b[i][j2][0]%2 == 0) {
-					res[i] = [2]int{j1, j2}
-				}
-			}
-		}
-	}
-	return
-}
-
 func encrypt(keys []base.Key, plaintext, tweak []byte) []byte {
 	// log.Printf("Computing encrypt with inputs %v, %v, %v\n", keys, plaintext, tweak)
 	AESCount++
