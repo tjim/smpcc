@@ -284,3 +284,21 @@ let bytewidth ty =
   if (bits mod 8) <> 0 then Printf.eprintf "Warning: bitwidth not divisible by 8";
   bits/8 + (if (bits mod 8) <> 0 then 1 else 0)
 
+let global_locations = Hashtbl.create 10
+let loc = ref 0
+let alloc_globals m =
+  loc := 0; (* smallest memory location *)
+  Hashtbl.reset global_locations;
+  let align n =
+    let md = !loc mod n in
+    if md = 0 then () else
+    loc := !loc + (n - md) in
+  let alloc_global = function
+    | { gvalue=None } -> ()
+    | { gname; gtyp; gvalue=Some v } ->
+        Hashtbl.add global_locations gname !loc;
+        let bytes =
+          try bytewidth gtyp with _ -> 100 in
+        loc := !loc + bytes;
+        align 4 in
+  List.iter alloc_global m.cglobals

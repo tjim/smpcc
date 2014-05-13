@@ -404,8 +404,49 @@ let phi_elimination f =
   ()
 
 (* Replace getelementptr by arithmetic *)
+let gep_elim_value =
+  value_map (function
+    | Getelementptr(_, (Pointer(ety,s),Var v)::tl) as c ->
+        if not(Hashtbl.mem State.global_locations v) then
+          (let b = Buffer.create 11 in
+          bpr_value b c;
+          eprintf "Warning: unable to eliminate '%s'\n" (Buffer.contents b);
+          c)
+        else begin
+          let ety = Arraytyp(0,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
+          let rec loop ety = function
+            | [] -> Big_int.big_int_of_int(Hashtbl.find State.global_locations v)
+            | (y_typ,y)::tl ->
+                (match ety,y with
+                | Arraytyp(_,ety'),(Int(i)) -> (* NB we ignore the bitwidth of the constant *)
+                    Big_int.add_big_int
+                      (Big_int.mult_big_int i (Big_int.big_int_of_int(State.bytewidth ety')))
+                      (loop ety' tl)
+                | Structtyp(_,typs),(Int(i)) ->
+                    let ety' = List.nth typs (Big_int.int_of_big_int i) in
+                    let skip_bytes =
+                      let rec skip n = function
+                        | [] -> failwith "getelementptr: insufficient fields"
+                        | hd::tl -> if n = 0 then 0 else State.bytewidth hd + skip (n-1) tl in
+                      skip (Big_int.int_of_big_int i) typs in
+                    Big_int.add_big_int
+                      (Big_int.big_int_of_int skip_bytes)
+                      (loop ety' tl)
+                | Vartyp v, _ ->
+                    loop (State.typ_of_var v) ((y_typ,y)::tl)
+                | _ ->
+                    let b = Buffer.create 11 in
+                    bprintf b "gep_elim_value error: type is %a, value is %a\n" bpr_typ ety bpr_value y;
+                    eprintf "%s" (Buffer.contents b);
+                    failwith "gep_elim_value") in
+          let sum = loop ety tl in
+          Int sum
+        end
+    | c -> c)
+
 (* http://www.llvm.org/docs/GetElementPtr.html *)
 let gep_elimination ctyps f =
+  gep_elim_value f;
   let elim (nopt, i) = match (nopt, i) with
     | Some n, Getelementptr(_,(Pointer(ety,aspace),x)::tl) ->
         let buf = Buffer.create 11 in
@@ -771,6 +812,7 @@ begin
   else
     let file = List.hd args in
     let m = file2cu cil_extra_args file in
+    State.alloc_globals m;
     let f =
       (match options.fname with
       | None ->
