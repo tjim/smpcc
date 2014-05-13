@@ -6,7 +6,6 @@ open Options
 
 let package_prefix = "github.com/tjim/smpcc/runtime/"
 
-let global_locations = Hashtbl.create 10
 let string_constants = Hashtbl.create 10
 
 let govar v =
@@ -18,7 +17,7 @@ let rec bpr_go_value b (typ, value) =
       let is_a_global = (match v with Name(x,_) -> x | Id(x,_) -> x) in
       if is_a_global then
         (try
-          let loc = Hashtbl.find global_locations v in
+          let loc = Hashtbl.find State.global_locations v in
           bprintf b "Uint(io, %d, 64)" loc
         with Not_found ->
           eprintf "global not there %s\n" (govar v);
@@ -386,94 +385,43 @@ let rec bytes_of_value b bytes = function
       failwith "bytes_of_value"
 
 let bpr_globals b m =
-  let loc = ref 0 in (* smallest memory location *)
-  Hashtbl.reset global_locations;
   Hashtbl.reset string_constants;
-  let align n =
-    let md = !loc mod n in
-    if md = 0 then () else
-    loc := !loc + (n - md) in
   let b1 = Buffer.create 11 in
-  let alloc_global = function
+  let pr_global = function
     | { gvalue=None } -> ()
     | { gname; gtyp; gvalue=Some v } ->
-    Hashtbl.add global_locations gname !loc;
-    let bytes =
-      try State.bytewidth gtyp with _ -> 100 in
-    let bytevals = Buffer.create bytes in
-    let written = bytes_of_value bytevals bytes (gtyp, v) in
-    if written != 0 || bytes != Buffer.length bytevals then begin
-      let gname = (let b2 = Buffer.create 11 in bpr_var b2 gname; Buffer.contents b2) in
-      eprintf "WHOA! expected %d bytes, found %d bytes for global %s\n" bytes (Buffer.length bytevals) gname;
-    end;
-    bprintf b1 "\t// %a at location %d == 0x%x\n" bpr_var gname !loc !loc;
-    for i = 0 to bytes - 1 do
-      (* Only print non-zeros *)
-      let x = Char.code(Buffer.nth bytevals i) in
-      if x <> 0 then
-        bprintf b1 "\tram[0x%x] = 0x%x\n" (!loc + i) x
-    done;
-    (* Look for string constants, might be used by Printf *)
-    (match gtyp with
-    | Arraytyp(len, Integer 8) ->
-        if (0 = Char.code (Buffer.nth bytevals (bytes - 1))) then
-          let s = Buffer.sub bytevals 0 (len - 1) in
-          Hashtbl.add string_constants !loc s
-    | _ -> ());
-    loc := !loc + bytes;
-    align 4 in
-  List.iter alloc_global m.cglobals;
+        let loc = Hashtbl.find State.global_locations gname in
+        let bytes =
+          try State.bytewidth gtyp with _ -> 100 in
+        let bytevals = Buffer.create bytes in
+        let written = bytes_of_value bytevals bytes (gtyp, v) in
+        if written != 0 || bytes != Buffer.length bytevals then begin
+          let gname = (let b2 = Buffer.create 11 in bpr_var b2 gname; Buffer.contents b2) in
+          eprintf "WHOA! expected %d bytes, found %d bytes for global %s\n" bytes (Buffer.length bytevals) gname;
+        end;
+        bprintf b1 "\t// %a at location %d == 0x%x\n" bpr_var gname loc loc;
+        for i = 0 to bytes - 1 do
+          (* Only print non-zeros *)
+          let x = Char.code(Buffer.nth bytevals i) in
+          if x <> 0 then
+            bprintf b1 "\tram[0x%x] = 0x%x\n" (loc + i) x
+        done;
+        (* Look for string constants, might be used by Printf *)
+        (match gtyp with
+        | Arraytyp(len, Integer 8) ->
+            if (0 = Char.code (Buffer.nth bytevals (bytes - 1))) then
+              let s = Buffer.sub bytevals 0 (len - 1) in
+              Hashtbl.add string_constants loc s
+        | _ -> ()) in
+  List.iter pr_global m.cglobals;
   bprintf b "func initialize_ram(io GenVM) {\n";
-  if !loc <> 0 then begin
-    bprintf b "\tram := make([]byte, 0x%x)\n" !loc;
+  if !State.loc <> 0 then begin
+    bprintf b "\tram := make([]byte, 0x%x)\n" !State.loc;
     Buffer.add_buffer b b1;
     bprintf b "\tInitRam(ram)\n";
   end;
   bprintf b "}\n";
   bprintf b "\n"
-
-let gep_elim_value =
-  value_map (function
-    | Getelementptr(_, (Pointer(ety,s),Var v)::tl) as c ->
-        if not(Hashtbl.mem global_locations v) then
-          (let b = Buffer.create 11 in
-          bpr_value b c;
-          eprintf "Warning: unable to eliminate '%s'\n" (Buffer.contents b);
-          c) else
-        let ety = Arraytyp(0,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
-        let rec loop ety = function
-          | [] -> Big_int.big_int_of_int(Hashtbl.find global_locations v)
-          | (y_typ,y)::tl ->
-              (match ety,y with
-              | Arraytyp(_,ety'),(Int(i)) -> (* NB we ignore the bitwidth of the constant *)
-                  Big_int.add_big_int
-                    (Big_int.mult_big_int i (Big_int.big_int_of_int(State.bytewidth ety')))
-                    (loop ety' tl)
-              | Structtyp(_,typs),(Int(i)) ->
-                  let width, ety' =
-                    let rec f i = function
-                      | [] ->
-                          failwith "gep_elim_value: struct does not have enough fields"
-                      | hd::tl ->
-                          if i=0 then
-                            (State.bytewidth hd, hd)
-                          else
-                            let width', ety' = f (i-1) tl in
-                            (State.bytewidth hd + width', ety') in
-                    f (Big_int.int_of_big_int i) typs in
-                  Big_int.add_big_int
-                    (Big_int.big_int_of_int width)
-                    (loop ety' tl)
-              | Vartyp v, _ ->
-                  loop (State.typ_of_var v) ((y_typ,y)::tl)
-              | _ ->
-                  let b = Buffer.create 11 in
-                  bprintf b "gep_elim_value error: type is %a, value is %a\n" bpr_typ ety bpr_value y;
-                  eprintf "%s" (Buffer.contents b);
-                  failwith "gep_elim_value") in
-        let sum = loop ety tl in
-        Int sum
-    | c -> c)
 
 let print_function_circuit m f =
   let b = Buffer.create 11 in
@@ -485,7 +433,6 @@ let print_function_circuit m f =
   bprintf b "import \"fmt\"\n";
   bprintf b "\n";
   bpr_globals b m;
-  gep_elim_value f;
   bpr_main b f true;
   let blocks_fv = List.fold_left VSet.union VSet.empty (* TODO: eliminate duplicate code *)
       (List.map free_of_block f.fblocks) in

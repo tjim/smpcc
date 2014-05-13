@@ -1047,6 +1047,11 @@ let bpr_cu b cu =
   if cu.cmdnodes <> [] then bprintf b "\n";
   List.iter (bpr_mdnode b) cu.cmdnodes
 
+let spr bpr x =
+  let b = Buffer.create 11 in
+  bpr b x;
+  Buffer.contents b
+
 module VSet = Set.Make(
   struct
     type t = var
