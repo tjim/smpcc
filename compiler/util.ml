@@ -1,5 +1,3 @@
-let third (a,b,c) = c
-
 type var =
   | Id   of bool * int    (* global?, index *)
   | Name of bool * string (* global?, name *)
@@ -62,12 +60,12 @@ type typ =
   | Label
   | Metadata
   | Vartyp  of var
-  | Integer of int                   (* bitwidth *)
+  | Integer of int                                                         (* bitwidth *)
   | Funtyp  of typ * (typ * param_attribute list * var option) list * bool (* return type, param types, var_arg? *)
-  | Structtyp of bool * typ list       (* packed?, fields *) (* TODO: name *) (* TODO: missing isLiteral *)
-  | Arraytyp of int * typ             (* array length, element type *)
-  | Pointer of typ * int option      (* element type, address space *)
-  | Vector  of int * typ             (* array length, element type *)
+  | Structtyp of bool * typ list                                           (* packed?, fields *)
+  | Arraytyp of int * typ                                                  (* array length, element type *)
+  | Pointer of typ * int option                                            (* element type, address space *)
+  | Vector  of int * typ                                                   (* array length, element type *)
 
 module I = struct
   type t =
@@ -117,9 +115,9 @@ type value =
   | Int            of Big_int.big_int
   | Float          of string
   | Blockaddress   of value * value
-  | Struct of bool * (typ * value) list (* packed?, fields *)
-  | Vector of (typ * value) list
-  | Array  of (typ * value) list
+  | Struct         of bool * (typ * value) list (* packed?, fields *)
+  | Vector         of (typ * value) list
+  | Array          of (typ * value) list
   | Trunc          of (typ * value) * typ
   | Zext           of (typ * value) * typ
   | Sext           of (typ * value) * typ
@@ -185,9 +183,9 @@ type dll_storageclass =
   | Dllexport
 
 type aliasee =
-  | A_bitcast of (typ * value) * typ
+  | A_bitcast       of (typ * value) * typ
   | A_getelementptr of bool * (typ * value) list
-  | A_typ_value of (typ * value)
+  | A_typ_value     of (typ * value)
 
 type callingconv =
   | Ccc
@@ -230,7 +228,7 @@ type ordering =
   | Seq_cst
 
 type landingpad =
-  | Catch of typ * value
+  | Catch  of typ * value
   | Filter of typ * value
 
 type binop =
@@ -287,30 +285,32 @@ type instr =
   | Shufflevector  of (typ * value) list
   | Select         of (typ * value) list
   | Phi            of typ * (value * value) list
-  | Landingpad of typ * (typ * value) * bool * landingpad list
-  | Call of bool * callingconv option * return_attribute list * typ * value * (typ * param_attribute list * value) list * call_attribute list
-  | Alloca of bool * typ * (typ * value) option * int option
-  | Load of bool * bool * (typ * value) * (bool * ordering) option * int option
-  | Store of bool * bool * (typ * value) * (typ * value) * (bool * ordering) option * int option
-  | Cmpxchg of bool * (typ * value) * (typ * value) * (typ * value) * bool * ordering * ordering
-  | Atomicrmw of bool * binop * (typ * value) * (typ * value) * bool * ordering
-  | Fence of bool * ordering
+  | Landingpad     of typ * (typ * value) * bool * landingpad list
+  | Call           of bool * callingconv option * return_attribute list * typ * value * (typ * param_attribute list * value) list * call_attribute list
+  | Alloca         of bool * typ * (typ * value) option * int option
+  | Load           of bool * bool * (typ * value) * (bool * ordering) option * int option
+  | Store          of bool * bool * (typ * value) * (typ * value) * (bool * ordering) option * int option
+  | Cmpxchg        of bool * (typ * value) * (typ * value) * (typ * value) * bool * ordering * ordering
+  | Atomicrmw      of bool * binop * (typ * value) * (typ * value) * bool * ordering
+  | Fence          of bool * ordering
   | Extractvalue   of (typ * value) * int list
   | Insertvalue    of (typ * value) * (typ * value) * int list
 (* terminator instructions *)
   | Unreachable
-  | Return of (typ * value) option
-  | Br of (typ * value) *  ((typ * value) * (typ * value)) option
-  | Indirectbr of (typ * value) * (typ * value) list
-  | Resume of (typ * value)
-  | Switch of (typ * value) * (typ * value) * ((typ * value) * (typ * value)) list
-  | Invoke of callingconv option * return_attribute list * typ * value * ((typ * param_attribute list * value) list) * function_attribute list * (typ * value) * (typ * value)
+  | Return         of (typ * value) option
+  | Br             of (typ * value) *  ((typ * value) * (typ * value)) option
+  | Indirectbr     of (typ * value) * (typ * value) list
+  | Resume         of (typ * value)
+  | Switch         of (typ * value) * (typ * value) * ((typ * value) * (typ * value)) list
+  | Invoke         of callingconv option * return_attribute list * typ * value * ((typ * param_attribute list * value) list) * function_attribute list * (typ * value) * (typ * value)
 
+(* blocks *)
 type binfo = {
     mutable bname: var;
     mutable binstrs: (var option * instr) list
-  }      
+  }
 
+(* functions *)
 type finfo = {
     mutable flinkage: linkage option;
     mutable fvisibility: visibility option;
@@ -334,6 +334,7 @@ type thread_local =
   | Initialexec
   | Localexec
 
+(* global variables *)
 type ginfo = {
     mutable gname: var;
     mutable glinkage: linkage option;
@@ -350,6 +351,7 @@ type ginfo = {
     mutable galign: int option;
   }
 
+(* aliases *)
 type ainfo = {
     aname: var;
     avisibility: visibility option;
@@ -357,6 +359,7 @@ type ainfo = {
     aaliasee: aliasee
   }
 
+(* metadata *)
 type mdinfo = {
     mdid: int;
     mdtyp: typ;
@@ -378,6 +381,11 @@ type cunit = {
   }
 
 open Printf
+
+let spr bpr x =
+  let b = Buffer.create 11 in
+  bpr b x;
+  Buffer.contents b
 
 let between s bpr b =
   let rec loop = function
@@ -427,14 +435,14 @@ let yesno syes sno b x =
 
 let bpr_binop b = function
   | Xchg -> bprintf b "xchg"
-  | Add -> bprintf b "add"
-  | Sub -> bprintf b "sub"
-  | And -> bprintf b "and"
+  | Add  -> bprintf b "add"
+  | Sub  -> bprintf b "sub"
+  | And  -> bprintf b "and"
   | Nand -> bprintf b "nand"
-  | Or -> bprintf b "or"
-  | Xor -> bprintf b "xor"
-  | Max -> bprintf b "max"
-  | Min -> bprintf b "min"
+  | Or   -> bprintf b "or"
+  | Xor  -> bprintf b "xor"
+  | Max  -> bprintf b "max"
+  | Min  -> bprintf b "min"
   | Umax -> bprintf b "umax"
   | Umin -> bprintf b "umin"
 
@@ -448,47 +456,47 @@ let bpr_fast_math_flag b = function
 let bpr_fast_math_flags = between " " bpr_fast_math_flag
 
 let bpr_attribute b = function
-  | Align x -> bprintf b "align %d" x
-  | Byval -> bprintf b "byval"
-  | Inalloca -> bprintf b "inalloca"
-  | Inreg -> bprintf b "inreg"
-  | Nest -> bprintf b "nest"
-  | Noalias -> bprintf b "noalias"
-  | Nocapture -> bprintf b "nocapture"
-  | Readnone -> bprintf b "readnone"
-  | Readonly -> bprintf b "readonly"
-  | Returned -> bprintf b "returned"
-  | Signext -> bprintf b "signext"
-  | Sret -> bprintf b "sret"
-  | Zeroext -> bprintf b "zeroext"
-  | Attrgrp x -> bprintf b "#%d" x
-  | Attr(x, None) -> bprintf b "%s" x
-  | Attr(x, Some y) -> bprintf b "%s=%s" x y
-  | Alignstack x -> bprintf b "alignstack = (%d)" x
-  | Alwaysinline -> bprintf b "alwaysinline"
-  | Builtin -> bprintf b "builtin"
-  | Cold -> bprintf b "cold"
-  | Inlinehint -> bprintf b "inlinehint"
-  | Minsize -> bprintf b "minsize"
-  | Naked -> bprintf b "naked"
-  | Nobuiltin -> bprintf b "nobuiltin"
-  | Noduplicate -> bprintf b "noduplicate"
-  | Noimplicitfloat -> bprintf b "noimplicitfloat"
-  | Noinline -> bprintf b "noinline"
-  | Nonlazybind -> bprintf b "nonlazybind"
-  | Noredzone -> bprintf b "noredzone"
-  | Noreturn -> bprintf b "noreturn"
-  | Nounwind -> bprintf b "nounwind"
-  | Optnone -> bprintf b "optnone"
-  | Optsize -> bprintf b "optsize"
-  | Returns_twice -> bprintf b "returns_twice"
-  | Ssp -> bprintf b "ssp"
-  | Sspreq -> bprintf b "sspreq"
-  | Sspstrong -> bprintf b "sspstrong"
+  | Align x          -> bprintf b "align %d" x
+  | Byval            -> bprintf b "byval"
+  | Inalloca         -> bprintf b "inalloca"
+  | Inreg            -> bprintf b "inreg"
+  | Nest             -> bprintf b "nest"
+  | Noalias          -> bprintf b "noalias"
+  | Nocapture        -> bprintf b "nocapture"
+  | Readnone         -> bprintf b "readnone"
+  | Readonly         -> bprintf b "readonly"
+  | Returned         -> bprintf b "returned"
+  | Signext          -> bprintf b "signext"
+  | Sret             -> bprintf b "sret"
+  | Zeroext          -> bprintf b "zeroext"
+  | Attrgrp x        -> bprintf b "#%d" x
+  | Attr(x, None)    -> bprintf b "%s" x
+  | Attr(x, Some y)  -> bprintf b "%s=%s" x y
+  | Alignstack x     -> bprintf b "alignstack = (%d)" x
+  | Alwaysinline     -> bprintf b "alwaysinline"
+  | Builtin          -> bprintf b "builtin"
+  | Cold             -> bprintf b "cold"
+  | Inlinehint       -> bprintf b "inlinehint"
+  | Minsize          -> bprintf b "minsize"
+  | Naked            -> bprintf b "naked"
+  | Nobuiltin        -> bprintf b "nobuiltin"
+  | Noduplicate      -> bprintf b "noduplicate"
+  | Noimplicitfloat  -> bprintf b "noimplicitfloat"
+  | Noinline         -> bprintf b "noinline"
+  | Nonlazybind      -> bprintf b "nonlazybind"
+  | Noredzone        -> bprintf b "noredzone"
+  | Noreturn         -> bprintf b "noreturn"
+  | Nounwind         -> bprintf b "nounwind"
+  | Optnone          -> bprintf b "optnone"
+  | Optsize          -> bprintf b "optsize"
+  | Returns_twice    -> bprintf b "returns_twice"
+  | Ssp              -> bprintf b "ssp"
+  | Sspreq           -> bprintf b "sspreq"
+  | Sspstrong        -> bprintf b "sspstrong"
   | Sanitize_address -> bprintf b "sanitize_address"
-  | Sanitize_thread -> bprintf b "sanitize_thread"
-  | Sanitize_memory -> bprintf b "sanitize_memory"
-  | Uwtable -> bprintf b "uwtable"
+  | Sanitize_thread  -> bprintf b "sanitize_thread"
+  | Sanitize_memory  -> bprintf b "sanitize_memory"
+  | Uwtable          -> bprintf b "uwtable"
 
 let bpr_attributes =
   between " " bpr_attribute
@@ -497,39 +505,39 @@ let bpr_attrgrp b (x, y) =
   bprintf b "attributes #%s = { %a }\n" x bpr_attributes y
 
 let bpr_callingconv b = function
-  | Ccc -> bprintf b "ccc"
-  | Fastcc -> bprintf b "fastcc"
-  | Intel_ocl_bicc -> bprintf b "intel_ocl_bicc"
-  | Coldcc -> bprintf b "coldcc"
-  | X86_stdcallcc -> bprintf b "x86_stdcallcc"
-  | X86_fastcallcc -> bprintf b "x86_fastcallcc"
-  | X86_thiscallcc -> bprintf b "x86_thiscallcc"
+  | Ccc               -> bprintf b "ccc"
+  | Fastcc            -> bprintf b "fastcc"
+  | Intel_ocl_bicc    -> bprintf b "intel_ocl_bicc"
+  | Coldcc            -> bprintf b "coldcc"
+  | X86_stdcallcc     -> bprintf b "x86_stdcallcc"
+  | X86_fastcallcc    -> bprintf b "x86_fastcallcc"
+  | X86_thiscallcc    -> bprintf b "x86_thiscallcc"
   | X86_cdeclmethodcc -> bprintf b "x86_cdeclmethodcc"
-  | Arm_apcscc -> bprintf b "arm_apcscc"
-  | Arm_aapcscc -> bprintf b "arm_aapcscc"
-  | Arm_aapcs_vfpcc -> bprintf b "arm_aapcs_vfpcc"
-  | Msp430_intrcc -> bprintf b "msp430_intrcc"
-  | Ptx_kernel -> bprintf b "ptx_kernel"
-  | Ptx_device -> bprintf b "ptx_device"
-  | Spir_func -> bprintf b "spir_func"
-  | Spir_kernel -> bprintf b "spir_kernel"
-  | X86_64_sysvcc -> bprintf b "x86_64_sysvcc"
-  | X86_64_win64cc -> bprintf b "x86_64_win64cc"
-  | Webkit_jscc -> bprintf b "webkit_jscc"
-  | Anyregcc -> bprintf b "anyregcc"
-  | Preserve_mostcc -> bprintf b "preserve_mostcc"
-  | Preserve_allcc -> bprintf b "preserve_allcc"
-  | Cc -> bprintf b "cc"
+  | Arm_apcscc        -> bprintf b "arm_apcscc"
+  | Arm_aapcscc       -> bprintf b "arm_aapcscc"
+  | Arm_aapcs_vfpcc   -> bprintf b "arm_aapcs_vfpcc"
+  | Msp430_intrcc     -> bprintf b "msp430_intrcc"
+  | Ptx_kernel        -> bprintf b "ptx_kernel"
+  | Ptx_device        -> bprintf b "ptx_device"
+  | Spir_func         -> bprintf b "spir_func"
+  | Spir_kernel       -> bprintf b "spir_kernel"
+  | X86_64_sysvcc     -> bprintf b "x86_64_sysvcc"
+  | X86_64_win64cc    -> bprintf b "x86_64_win64cc"
+  | Webkit_jscc       -> bprintf b "webkit_jscc"
+  | Anyregcc          -> bprintf b "anyregcc"
+  | Preserve_mostcc   -> bprintf b "preserve_mostcc"
+  | Preserve_allcc    -> bprintf b "preserve_allcc"
+  | Cc                -> bprintf b "cc"
 
 let bpr_storageclass b = function
   | Dllimport -> bprintf b "dllimport"
   | Dllexport -> bprintf b "dllexport"
 
 let bpr_thread_local b = function
-  | None -> bprintf b "thread_local"
+  | None              -> bprintf b "thread_local"
   | Some Localdynamic -> bprintf b "thread_local(localdynamic)"
-  | Some Initialexec -> bprintf b "thread_local(initialexec)"
-  | Some Localexec -> bprintf b "thread_local(localexec)"
+  | Some Initialexec  -> bprintf b "thread_local(initialexec)"
+  | Some Localexec    -> bprintf b "thread_local(localexec)"
 
 let bpr_icmp b = function
   | I.Eq  -> bprintf b "eq"
@@ -562,15 +570,13 @@ let bpr_fcmp b = function
   | F.False   -> bprintf b "false"
 
 let bpr_var b = function
-  | Id(true, i) -> bprintf b "@%d" i
-  | Id(false, i) -> bprintf b "%%%d" i
-  | Name(true, name) -> bprintf b "@%s" name
+  | Id(true, i)       -> bprintf b "@%d" i
+  | Id(false, i)      -> bprintf b "%%%d" i
+  | Name(true, name)  -> bprintf b "@%s" name
   | Name(false, name) -> bprintf b "%%%s" name
 
 let string_of_var v =
-  let b = Buffer.create 11 in
-  bpr_var b v;
-  Buffer.contents b
+  spr bpr_var v
 
 let rec bpr_typ b typ =
   let rec pr = function
@@ -639,8 +645,8 @@ let bpr_linkage b = function
   | Available_externally -> bprintf b "available_externally"
 
 let bpr_visibility b = function
-  | Default -> ()
-  | Hidden -> bprintf b "hidden"
+  | Default   -> ()
+  | Hidden    -> bprintf b "hidden"
   | Protected -> bprintf b "protected"
 
 let bpr_index_list b l =
@@ -1047,11 +1053,6 @@ let bpr_cu b cu =
   if cu.cmdnodes <> [] then bprintf b "\n";
   List.iter (bpr_mdnode b) cu.cmdnodes
 
-let spr bpr x =
-  let b = Buffer.create 11 in
-  bpr b x;
-  Buffer.contents b
-
 module VSet = Set.Make(
   struct
     type t = var
@@ -1065,12 +1066,7 @@ let free_of_var = function
 
 let rec free_of_value = function
 | Var x -> free_of_var x
-| Basicblock x -> VSet.empty
-| Struct(_,ops)
-| Vector ops
-| Array ops ->
-    List.fold_left VSet.union VSet.empty
-      (List.map free_of_value (List.map snd ops))
+| Basicblock _
 | Blockaddress _
 | Null
 | True
@@ -1078,11 +1074,17 @@ let rec free_of_value = function
 | Zero
 | Float _
 | Int _
-| Undef -> VSet.empty
+| Undef
 | Asm _
 | Mdnode _
 | Mdstring _
-| Mdnodevector _     -> VSet.empty
+| Mdnodevector _ ->
+    VSet.empty
+| Struct(_,ops)
+| Vector ops
+| Array ops ->
+    List.fold_left VSet.union VSet.empty
+      (List.map free_of_value (List.map snd ops))
 | Trunc          ((_,v),_)
 | Zext           ((_,v),_)
 | Sext           ((_,v),_)
@@ -1191,7 +1193,7 @@ let free_of_instruction = function
 | Br((_,v),None) -> free_of_value v
 | Br((_,v1),Some((_,v2),(_,v3))) -> VSet.union (VSet.union (free_of_value v1) (free_of_value v2)) (free_of_value v3)
 | Indirectbr((_,v),vs) ->
-    VSet.union (free_of_value v) 
+    VSet.union (free_of_value v)
       (List.fold_left VSet.union VSet.empty
          (List.map free_of_value (List.map snd vs)))
 | Switch(tv1,tv2,tvs) ->
@@ -1201,16 +1203,13 @@ let free_of_instruction = function
     (List.fold_left VSet.union VSet.empty
        (List.map free_of_value (v::(List.map (function Catch(_,v) -> v | Filter(_,v) -> v) lps))))
 | Call(_,_,_,_,v,params,_) ->
+    let third (a,b,c) = c in
     let vs = v::(List.map third params) in
     List.fold_left VSet.union VSet.empty (List.map free_of_value vs)
 | Invoke(_,_,_,v,params,_,tv1,tv2) ->
+    let third (a,b,c) = c in
     let vs = v::(snd tv1)::(snd tv2)::(List.map third params) in
     List.fold_left VSet.union VSet.empty (List.map free_of_value vs)
-
-(*
-  | Landingpad of typ * (typ * value) * bool * landingpad list
-*)
-
 
 let free_of_block bl =
   let rec loop = function
@@ -1276,21 +1275,21 @@ let value_map g f =
     | Insertelement  vs -> Insertelement  (h vs)
     | Extractelement vs -> Extractelement (h vs)
     | Select         vs -> Select         (h vs)
-    | Phi(t,l) -> Phi(t, List.map (fun (v1,v2) -> (g v1, g v2)) l)
-    | Alloca(a,b,None,c) -> Alloca(a,b,None,c)
-    | Alloca(a,b,Some(t,v),c) -> Alloca(a,b,Some(t,g v),c)
-    | Load(a,b,(t,v),c,d) -> Load(a,b,(t,g v),c,d)
-    | Store(a,b,(t1,v1),(t2,v2),c,d) -> Store(a,b,(t1,g v1),(t2,g v2),c,d)
-    | Atomicrmw(a,b,(t1,v1),(t2,v2),c,d) -> Atomicrmw(a,b,(t1,g v1),(t2,g v2),c,d)
-    | Cmpxchg(a,(t1,v1),(t2,v2),(t3,v3),b,c,d) -> Cmpxchg(a,(t1,g v1),(t2,g v2),(t3,g v3),b,c,d)
-    | Fence(a,b) -> Fence(a,b)
+    | Phi            (t,l) -> Phi(t, List.map (fun (v1,v2) -> (g v1, g v2)) l)
+    | Alloca         (a,b,None,c) -> Alloca(a,b,None,c)
+    | Alloca         (a,b,Some(t,v),c) -> Alloca(a,b,Some(t,g v),c)
+    | Load           (a,b,(t,v),c,d) -> Load(a,b,(t,g v),c,d)
+    | Store          (a,b,(t1,v1),(t2,v2),c,d) -> Store(a,b,(t1,g v1),(t2,g v2),c,d)
+    | Atomicrmw      (a,b,(t1,v1),(t2,v2),c,d) -> Atomicrmw(a,b,(t1,g v1),(t2,g v2),c,d)
+    | Cmpxchg        (a,(t1,v1),(t2,v2),(t3,v3),b,c,d) -> Cmpxchg(a,(t1,g v1),(t2,g v2),(t3,g v3),b,c,d)
+    | Fence          (a,b) -> Fence(a,b)
     | Unreachable -> Unreachable
     | Return None -> Return None
-    | Return(Some(t,v)) -> Return(Some(t,g v))
-    | Resume(t,v) -> Resume(t,g v)
-    | Br((t,v),None) -> Br((t,g v),None)
-    | Br((t1,v1),Some((t2,v2),(t3,v3))) -> Br((t1,g v1),Some((t2,g v2),(t3,g v3)))
-    | Indirectbr((t,v),vs) -> Indirectbr((t,g v),h vs)
+    | Return         (Some(t,v)) -> Return(Some(t,g v))
+    | Resume         (t,v) -> Resume(t,g v)
+    | Br             ((t,v),None) -> Br((t,g v),None)
+    | Br             ((t1,v1),Some((t2,v2),(t3,v3))) -> Br((t1,g v1),Some((t2,g v2),(t3,g v3)))
+    | Indirectbr     ((t,v),vs) -> Indirectbr((t,g v),h vs)
     | Switch((t1,v1),(t2,v2),tvs) ->
         Switch((t1,g v1),(t2,g v2),
                List.map (fun ((t1,v1),(t2,v2)) -> ((t1,g v1),(t2,g v2))) tvs)

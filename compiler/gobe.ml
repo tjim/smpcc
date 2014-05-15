@@ -99,6 +99,10 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         bprintf b "InputFrom1(io, mask)\n"
       else
         bprintf b "InputFrom1(io, mask, next_arg)\n"
+  | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.start")),_,_) ->
+      ()
+  | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.end")),_,_) ->
+      ()
   | Load(_,_,(Pointer(ety,_),_ as x),_,_) -> (* in case we are debugging loads *)
       bprintf b "LoadDebug(io, mask, %a, Uint(io, %d, 32))\n" bpr_go_value x (State.bytewidth ety)
   | Store(_,_,x,addr,_,_) -> (* in case we are debugging stores*)
@@ -175,7 +179,7 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
   | Trunc(x, ty) ->
       bprintf b "%a[:%d]\n" bpr_go_value x (State.bitwidth ty)
   | _ -> begin
-      eprintf "Error: unsupported %s\n" (let b = Buffer.create 11 in bpr_instr b (nopt,i); Buffer.contents b);
+      eprintf "Error: unsupported %s\n" (spr bpr_instr (nopt,i));
       bprintf b "Unsupported(\"UNSUPPORTED %a\")\n" bpr_instr (nopt,i)
   end);
   declared_vars
@@ -396,7 +400,7 @@ let bpr_globals b m =
         let bytevals = Buffer.create bytes in
         let written = bytes_of_value bytevals bytes (gtyp, v) in
         if written != 0 || bytes != Buffer.length bytevals then begin
-          let gname = (let b2 = Buffer.create 11 in bpr_var b2 gname; Buffer.contents b2) in
+          let gname = (spr bpr_var gname) in
           eprintf "WHOA! expected %d bytes, found %d bytes for global %s\n" bytes (Buffer.length bytevals) gname;
         end;
         bprintf b1 "\t// %a at location %d == 0x%x\n" bpr_var gname loc loc;
