@@ -244,65 +244,67 @@ type binop =
   | Umax
   | Umin
 
+type instr_metadata = (string * value) list
+
 type instr =
-  | Add            of bool * bool * (typ * value) * value
-  | Sub            of bool * bool * (typ * value) * value
-  | Mul            of bool * bool * (typ * value) * value
-  | Shl            of bool * bool * (typ * value) * value
-  | Fadd           of fast_math_flag list * (typ * value) * value
-  | Fsub           of fast_math_flag list * (typ * value) * value
-  | Fmul           of fast_math_flag list * (typ * value) * value
-  | Fdiv           of fast_math_flag list * (typ * value) * value
-  | Frem           of fast_math_flag list * (typ * value) * value
-  | Sdiv           of bool * (typ * value) * value
-  | Udiv           of bool * (typ * value) * value
-  | Lshr           of bool * (typ * value) * value
-  | Ashr           of bool * (typ * value) * value
-  | Urem           of (typ * value) * value
-  | Srem           of (typ * value) * value
-  | And            of (typ * value) * value
-  | Or             of (typ * value) * value
-  | Xor            of (typ * value) * value
-  | Icmp           of I.t * (typ * value) * value
-  | Fcmp           of F.t * (typ * value) * value
-  | Trunc          of (typ * value) * typ
-  | Zext           of (typ * value) * typ
-  | Sext           of (typ * value) * typ
-  | Fptrunc        of (typ * value) * typ
-  | Fpext          of (typ * value) * typ
-  | Bitcast        of (typ * value) * typ
-  | Addrspacecast  of (typ * value) * typ
-  | Uitofp         of (typ * value) * typ
-  | Sitofp         of (typ * value) * typ
-  | Fptoui         of (typ * value) * typ
-  | Fptosi         of (typ * value) * typ
-  | Inttoptr       of (typ * value) * typ
-  | Ptrtoint       of (typ * value) * typ
-  | Va_arg         of (typ * value) * typ
-  | Getelementptr  of bool * (typ * value) list
-  | Extractelement of (typ * value) list
-  | Insertelement  of (typ * value) list
-  | Shufflevector  of (typ * value) list
-  | Select         of (typ * value) list
-  | Phi            of typ * (value * value) list
-  | Landingpad     of typ * (typ * value) * bool * landingpad list
-  | Call           of bool * callingconv option * return_attribute list * typ * value * (typ * param_attribute list * value) list * call_attribute list
-  | Alloca         of bool * typ * (typ * value) option * int option
-  | Load           of bool * bool * (typ * value) * (bool * ordering) option * int option
-  | Store          of bool * bool * (typ * value) * (typ * value) * (bool * ordering) option * int option
-  | Cmpxchg        of bool * (typ * value) * (typ * value) * (typ * value) * bool * ordering * ordering
-  | Atomicrmw      of bool * binop * (typ * value) * (typ * value) * bool * ordering
-  | Fence          of bool * ordering
-  | Extractvalue   of (typ * value) * int list
-  | Insertvalue    of (typ * value) * (typ * value) * int list
+  | Add            of bool * bool * (typ * value) * value * instr_metadata
+  | Sub            of bool * bool * (typ * value) * value * instr_metadata
+  | Mul            of bool * bool * (typ * value) * value * instr_metadata
+  | Shl            of bool * bool * (typ * value) * value * instr_metadata
+  | Fadd           of fast_math_flag list * (typ * value) * value * instr_metadata
+  | Fsub           of fast_math_flag list * (typ * value) * value * instr_metadata
+  | Fmul           of fast_math_flag list * (typ * value) * value * instr_metadata
+  | Fdiv           of fast_math_flag list * (typ * value) * value * instr_metadata
+  | Frem           of fast_math_flag list * (typ * value) * value * instr_metadata
+  | Sdiv           of bool * (typ * value) * value * instr_metadata
+  | Udiv           of bool * (typ * value) * value * instr_metadata
+  | Lshr           of bool * (typ * value) * value * instr_metadata
+  | Ashr           of bool * (typ * value) * value * instr_metadata
+  | Urem           of (typ * value) * value * instr_metadata
+  | Srem           of (typ * value) * value * instr_metadata
+  | And            of (typ * value) * value * instr_metadata
+  | Or             of (typ * value) * value * instr_metadata
+  | Xor            of (typ * value) * value * instr_metadata
+  | Icmp           of I.t * (typ * value) * value * instr_metadata
+  | Fcmp           of F.t * (typ * value) * value * instr_metadata
+  | Trunc          of (typ * value) * typ * instr_metadata
+  | Zext           of (typ * value) * typ * instr_metadata
+  | Sext           of (typ * value) * typ * instr_metadata
+  | Fptrunc        of (typ * value) * typ * instr_metadata
+  | Fpext          of (typ * value) * typ * instr_metadata
+  | Bitcast        of (typ * value) * typ * instr_metadata
+  | Addrspacecast  of (typ * value) * typ * instr_metadata
+  | Uitofp         of (typ * value) * typ * instr_metadata
+  | Sitofp         of (typ * value) * typ * instr_metadata
+  | Fptoui         of (typ * value) * typ * instr_metadata
+  | Fptosi         of (typ * value) * typ * instr_metadata
+  | Inttoptr       of (typ * value) * typ * instr_metadata
+  | Ptrtoint       of (typ * value) * typ * instr_metadata
+  | Va_arg         of (typ * value) * typ * instr_metadata
+  | Getelementptr  of bool * (typ * value) list * instr_metadata
+  | Extractelement of (typ * value) list * instr_metadata
+  | Insertelement  of (typ * value) list * instr_metadata
+  | Shufflevector  of (typ * value) list * instr_metadata
+  | Select         of (typ * value) list * instr_metadata
+  | Phi            of typ * (value * value) list * instr_metadata
+  | Landingpad     of typ * (typ * value) * bool * landingpad list * instr_metadata
+  | Call           of bool * callingconv option * return_attribute list * typ * value * (typ * param_attribute list * value) list * call_attribute list * instr_metadata
+  | Alloca         of bool * typ * (typ * value) option * int option * instr_metadata
+  | Load           of bool * bool * (typ * value) * (bool * ordering) option * int option * instr_metadata
+  | Store          of bool * bool * (typ * value) * (typ * value) * (bool * ordering) option * int option * instr_metadata
+  | Cmpxchg        of bool * (typ * value) * (typ * value) * (typ * value) * bool * ordering * ordering * instr_metadata
+  | Atomicrmw      of bool * binop * (typ * value) * (typ * value) * bool * ordering * instr_metadata
+  | Fence          of bool * ordering * instr_metadata
+  | Extractvalue   of (typ * value) * int list * instr_metadata
+  | Insertvalue    of (typ * value) * (typ * value) * int list * instr_metadata
 (* terminator instructions *)
-  | Unreachable
-  | Return         of (typ * value) option
-  | Br             of (typ * value) *  ((typ * value) * (typ * value)) option
-  | Indirectbr     of (typ * value) * (typ * value) list
-  | Resume         of (typ * value)
-  | Switch         of (typ * value) * (typ * value) * ((typ * value) * (typ * value)) list
-  | Invoke         of callingconv option * return_attribute list * typ * value * ((typ * param_attribute list * value) list) * function_attribute list * (typ * value) * (typ * value)
+  | Unreachable    of instr_metadata
+  | Return         of (typ * value) option * instr_metadata
+  | Br             of (typ * value) *  ((typ * value) * (typ * value)) option * instr_metadata
+  | Indirectbr     of (typ * value) * (typ * value) list * instr_metadata
+  | Resume         of (typ * value) * instr_metadata
+  | Switch         of (typ * value) * (typ * value) * ((typ * value) * (typ * value)) list * instr_metadata
+  | Invoke         of callingconv option * return_attribute list * typ * value * ((typ * param_attribute list * value) list) * function_attribute list * (typ * value) * (typ * value) * instr_metadata
 
 (* blocks *)
 type binfo = {
@@ -822,85 +824,85 @@ let bpr_instr b (nopt, i) =
   (match nopt with None -> ()
   | Some n -> bprintf b "%a = " bpr_var n);
   (match i with
-  | Add(nuw, nsw, x, y) ->
+  | Add(nuw, nsw, x, y, md) ->
       bprintf b "add %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
-  | Sub(nuw, nsw, x, y) ->
+  | Sub(nuw, nsw, x, y, md) ->
       bprintf b "sub %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
-  | Mul(nuw, nsw, x, y) ->
+  | Mul(nuw, nsw, x, y, md) ->
       bprintf b "mul %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
-  | Shl(nuw, nsw, x, y) ->
+  | Shl(nuw, nsw, x, y, md) ->
       bprintf b "shl %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
-  | Fadd(fmf, x, y)           ->
+  | Fadd(fmf, x, y, md)           ->
       bprintf b "fadd %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
-  | Fsub(fmf, x, y)           ->
+  | Fsub(fmf, x, y, md)           ->
       bprintf b "fsub %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
-  | Fmul(fmf, x, y)           ->
+  | Fmul(fmf, x, y, md)           ->
       bprintf b "fmul %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
-  | Fdiv(fmf, x, y)           ->
+  | Fdiv(fmf, x, y, md)           ->
       bprintf b "fdiv %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
-  | Frem(fmf, x, y)           ->
+  | Frem(fmf, x, y, md)           ->
       bprintf b "frem %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
-  | Sdiv(e, x, y)           ->
+  | Sdiv(e, x, y, md)           ->
       bprintf b "sdiv%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
-  | Udiv(e, x, y)           ->
+  | Udiv(e, x, y, md)           ->
       bprintf b "udiv%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
-  | Lshr(e, x, y)           ->
+  | Lshr(e, x, y, md)           ->
       bprintf b "lshr%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
-  | Ashr(e, x, y)           ->
+  | Ashr(e, x, y, md)           ->
       bprintf b "ashr%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
-  | Urem(x, y)           ->
+  | Urem(x, y, md)           ->
       bprintf b "urem %a, %a" bpr_typ_value x bpr_value y
-  | Srem(x, y)           ->
+  | Srem(x, y, md)           ->
       bprintf b "srem %a, %a" bpr_typ_value x bpr_value y
-  | And (x, y)           ->
+  | And (x, y, md)           ->
       bprintf b "and %a, %a" bpr_typ_value x bpr_value y
-  | Or  (x, y)           ->
+  | Or  (x, y, md)           ->
       bprintf b "or %a, %a" bpr_typ_value x bpr_value y
-  | Xor (x, y)           ->
+  | Xor (x, y, md)           ->
       bprintf b "xor %a, %a" bpr_typ_value x bpr_value y
-  | Icmp(icmp, x, y) ->
+  | Icmp(icmp, x, y, md) ->
       bprintf b "icmp %a %a, %a" bpr_icmp icmp bpr_typ_value x bpr_value y
-  | Fcmp(fcmp, x, y) ->
+  | Fcmp(fcmp, x, y, md) ->
       bprintf b "icmp %a %a, %a" bpr_fcmp fcmp bpr_typ_value x bpr_value y
-  | Trunc(x, y)          ->
+  | Trunc(x, y, md)          ->
       bprintf b "trunc %a to %a" bpr_typ_value x         bpr_typ y
-  | Zext(x, y)           ->
+  | Zext(x, y, md)           ->
       bprintf b "zext %a to %a" bpr_typ_value x          bpr_typ y
-  | Sext(x, y)           ->
+  | Sext(x, y, md)           ->
       bprintf b "sext %a to %a" bpr_typ_value x          bpr_typ y
-  | Fptrunc(x, y)        ->
+  | Fptrunc(x, y, md)        ->
       bprintf b "fptrunc %a to %a" bpr_typ_value x       bpr_typ y
-  | Fpext(x, y)          ->
+  | Fpext(x, y, md)          ->
       bprintf b "fpext %a to %a" bpr_typ_value x         bpr_typ y
-  | Bitcast(x, y)        ->
+  | Bitcast(x, y, md)        ->
       bprintf b "bitcast %a to %a" bpr_typ_value x       bpr_typ y
-  | Addrspacecast(x, y)  ->
+  | Addrspacecast(x, y, md)  ->
       bprintf b "addrspacecast %a to %a" bpr_typ_value x bpr_typ y
-  | Uitofp(x, y)         ->
+  | Uitofp(x, y, md)         ->
       bprintf b "uitofp %a to %a" bpr_typ_value x        bpr_typ y
-  | Sitofp(x, y)         ->
+  | Sitofp(x, y, md)         ->
       bprintf b "sitofp %a to %a" bpr_typ_value x        bpr_typ y
-  | Fptoui(x, y)         ->
+  | Fptoui(x, y, md)         ->
       bprintf b "fptoui %a to %a" bpr_typ_value x        bpr_typ y
-  | Fptosi(x, y)         ->
+  | Fptosi(x, y, md)         ->
       bprintf b "fptosi %a to %a" bpr_typ_value x        bpr_typ y
-  | Inttoptr(x, y)       ->
+  | Inttoptr(x, y, md)       ->
       bprintf b "inttoptr %a to %a" bpr_typ_value x      bpr_typ y
-  | Ptrtoint(x, y)       ->
+  | Ptrtoint(x, y, md)       ->
       bprintf b "ptrtoint %a to %a" bpr_typ_value x      bpr_typ y
-  | Va_arg(x, y)         ->
+  | Va_arg(x, y, md)         ->
       bprintf b "va_arg %a, %a" bpr_typ_value x      bpr_typ y
-  | Getelementptr(inbounds, x) ->
+  | Getelementptr(inbounds, x, md) ->
       bprintf b "getelementptr%a %a" (yes " inbounds") inbounds bpr_typ_value_list x
-  | Shufflevector x ->
+  | Shufflevector(x, md) ->
       bprintf b "shufflevector %a" bpr_typ_value_list x
-  | Insertelement x ->
+  | Insertelement(x, md) ->
       bprintf b "insertelement %a" bpr_typ_value_list x
-  | Extractelement x ->
+  | Extractelement(x, md) ->
       bprintf b "extractelement %a" bpr_typ_value_list x
-  | Select x ->
+  | Select(x, md) ->
       bprintf b "select %a" bpr_typ_value_list x
-  | Phi(ty, incoming) ->
+  | Phi(ty, incoming, md) ->
       bprintf b "phi %a " bpr_typ ty;
       let first = ref true in
       List.iter
@@ -908,7 +910,7 @@ let bpr_instr b (nopt, i) =
           if not !first then bprintf b ", " else first := false;
           bprintf b "[ %a, %a ]" bpr_value x bpr_value y)
         incoming
-  | Landingpad(x, y, z, w) ->
+  | Landingpad(x, y, z, w, md) ->
       let bpr_landingpad b = function
         | Catch(typ, value) ->  bprintf b "catch %a %a" bpr_typ typ bpr_value value
         | Filter(typ, value) -> bprintf b "filter %a %a" bpr_typ typ bpr_value value in
@@ -916,33 +918,33 @@ let bpr_instr b (nopt, i) =
         | [] -> ()
         | hd::tl -> bprintf b " %a" bpr_landingpad hd; bpr b tl in
       bprintf b "landingpad %a personality %a%a%a" bpr_typ x bpr_typ_value y (yes " cleanup") z bpr w
-  | Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs) ->
+  | Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs, md) ->
       if is_tail_call then bprintf b "tail ";
       bprintf b "call ";
       (opt bpr_callingconv) b callconv;
       bprintf b "%a %a(%a)%a"
         bpr_typ callee_ty bpr_value callee_name bpr_arguments operands (before " " bpr_attribute) callattrs
-  | Alloca(x, y, z, w) ->
+  | Alloca(x, y, z, w, md) ->
       bprintf b "alloca ";
       if x then bprintf b "inalloca ";
       bpr_typ b y;
       (match z with None -> () | Some q -> bprintf b ", %a" bpr_typ_value q);
       (match w with None -> () | Some q -> bprintf b ", align %d" q)
-  | Load(x, y, z, w, v) ->
+  | Load(x, y, z, w, v, md) ->
       bprintf b "load %a%a%a" (yes "atomic ") x (yes "volatile ") y bpr_typ_value z;
       (match w with None -> () | Some(q, r) -> if q then bprintf b " singlethread"; bprintf b " %a" bpr_ordering r);
       (match v with None -> () | Some q -> bprintf b ", align %d" q)
-  | Store(x, y, z, w, v, u) ->
+  | Store(x, y, z, w, v, u, md) ->
       bprintf b "store %a%a%a, %a" (yes "atomic ") x (yes "volatile ") y bpr_typ_value z bpr_typ_value w;
       (match v with None -> () | Some(q, r) -> if q then bprintf b " singlethread"; bprintf b " %a" bpr_ordering r);
       (match u with None -> () | Some q -> bprintf b ", align %d" q)
-  | Cmpxchg(x, y, z, w, v, u, t) ->
+  | Cmpxchg(x, y, z, w, v, u, t, md) ->
       bprintf b "cmpxchg %a%a, %a, %a%a %a %a"
         (yes "volatile ") x bpr_typ_value y bpr_typ_value z bpr_typ_value w
         (yes " singlthread") v
         bpr_ordering u
         bpr_ordering t
-  | Atomicrmw(x, y, z, w, v, u) ->
+  | Atomicrmw(x, y, z, w, v, u, md) ->
       bprintf b "atomicrmw %a%a %a, %a%a %a"
         (yes "volatile ") x
         bpr_binop y
@@ -950,33 +952,33 @@ let bpr_instr b (nopt, i) =
         bpr_typ_value w
         (yes " singlthread") v
         bpr_ordering u
-  | Fence(x, y) ->
+  | Fence(x, y, md) ->
       bprintf b "fence %a%a"
         (yes "singlthread ") x
         bpr_ordering y
-  | Extractvalue(x, y) ->
+  | Extractvalue(x, y, md) ->
       bprintf b "extractvalue %a%a" bpr_typ_value x bpr_index_list y
-  | Insertvalue(x, y, z) ->
+  | Insertvalue(x, y, z, md) ->
       bprintf b "insertvalue %a, %a%a" bpr_typ_value x bpr_typ_value y bpr_index_list z
-  | Unreachable ->
+  | Unreachable md ->
       bprintf b "unreachable"
-  | Return None ->
+  | Return(None, md) ->
       bprintf b "ret void"
-  | Return(Some(x, y)) ->
+  | Return(Some(x, y), md) ->
       bprintf b "ret %a %a" bpr_typ x bpr_value y
-  | Br(x, None) ->
+  | Br(x, None, md) ->
       bprintf b "br %a" bpr_typ_value x
-  | Br(x, Some(y, z)) ->
+  | Br(x, Some(y, z), md) ->
       bprintf b "br %a, %a, %a" bpr_typ_value x bpr_typ_value y bpr_typ_value z
-  | Indirectbr(x, y) ->
+  | Indirectbr(x, y, md) ->
       bprintf b "indirectbr %a, [%a]" bpr_typ_value x bpr_typ_value_list y
-  | Resume x ->
+  | Resume(x, md) ->
       bprintf b "resume %a" bpr_typ_value x
-  | Switch(x, y, z) ->
+  | Switch(x, y, z, md) ->
       bprintf b "switch %a, %a [%a]" bpr_typ_value x bpr_typ_value y
         (between " "
            (fun b (c, d) -> bprintf b "%a, %a" bpr_typ_value c bpr_typ_value d)) z
-  | Invoke(x, y, z, w, v, u, t, s) ->
+  | Invoke(x, y, z, w, v, u, t, s, md) ->
       bprintf b "invoke %a%a%a %a(%a)%a to %a unwind %a"
         (opt bpr_callingconv) x
         bpr_attributes y
@@ -1131,82 +1133,82 @@ let rec free_of_value = function
       (List.map free_of_value (List.map snd vs))
 
 let free_of_instruction = function
-| Va_arg         ((_,v),_)
-| Trunc          ((_,v),_)
-| Zext           ((_,v),_)
-| Sext           ((_,v),_)
-| Fptrunc        ((_,v),_)
-| Fpext          ((_,v),_)
-| Bitcast        ((_,v),_)
-| Addrspacecast  ((_,v),_)
-| Uitofp         ((_,v),_)
-| Sitofp         ((_,v),_)
-| Fptoui         ((_,v),_)
-| Fptosi         ((_,v),_)
-| Inttoptr       ((_,v),_)
-| Ptrtoint       ((_,v),_)
-| Extractvalue   ((_,v),_) ->
+| Va_arg         ((_,v),_,_)
+| Trunc          ((_,v),_,_)
+| Zext           ((_,v),_,_)
+| Sext           ((_,v),_,_)
+| Fptrunc        ((_,v),_,_)
+| Fpext          ((_,v),_,_)
+| Bitcast        ((_,v),_,_)
+| Addrspacecast  ((_,v),_,_)
+| Uitofp         ((_,v),_,_)
+| Sitofp         ((_,v),_,_)
+| Fptoui         ((_,v),_,_)
+| Fptosi         ((_,v),_,_)
+| Inttoptr       ((_,v),_,_)
+| Ptrtoint       ((_,v),_,_)
+| Extractvalue   ((_,v),_,_) ->
     free_of_value v
-| Insertvalue    ((_,v1),(_,v2),_)
-| Icmp           (_,(_,v1),v2)
-| Fcmp           (_,(_,v1),v2)
-| Sdiv           (_,(_,v1),v2)
-| Udiv           (_,(_,v1),v2)
-| Lshr           (_,(_,v1),v2)
-| Ashr           (_,(_,v1),v2)
-| Fadd           (_,(_,v1),v2)
-| Fsub           (_,(_,v1),v2)
-| Fmul           (_,(_,v1),v2)
-| Fdiv           (_,(_,v1),v2)
-| Frem           (_,(_,v1),v2)
-| Urem           ((_,v1),v2)
-| Srem           ((_,v1),v2)
-| And            ((_,v1),v2)
-| Or             ((_,v1),v2)
-| Xor            ((_,v1),v2)
-| Add            (_,_,(_,v1),v2)
-| Sub            (_,_,(_,v1),v2)
-| Mul            (_,_,(_,v1),v2)
-| Shl            (_,_,(_,v1),v2) ->
+| Insertvalue    ((_,v1),(_,v2),_,_)
+| Icmp           (_,(_,v1),v2,_)
+| Fcmp           (_,(_,v1),v2,_)
+| Sdiv           (_,(_,v1),v2,_)
+| Udiv           (_,(_,v1),v2,_)
+| Lshr           (_,(_,v1),v2,_)
+| Ashr           (_,(_,v1),v2,_)
+| Fadd           (_,(_,v1),v2,_)
+| Fsub           (_,(_,v1),v2,_)
+| Fmul           (_,(_,v1),v2,_)
+| Fdiv           (_,(_,v1),v2,_)
+| Frem           (_,(_,v1),v2,_)
+| Urem           ((_,v1),v2,_)
+| Srem           ((_,v1),v2,_)
+| And            ((_,v1),v2,_)
+| Or             ((_,v1),v2,_)
+| Xor            ((_,v1),v2,_)
+| Add            (_,_,(_,v1),v2,_)
+| Sub            (_,_,(_,v1),v2,_)
+| Mul            (_,_,(_,v1),v2,_)
+| Shl            (_,_,(_,v1),v2,_) ->
     VSet.union (free_of_value v1) (free_of_value v2)
-| Getelementptr  (_,vs)
-| Shufflevector  vs
-| Insertelement  vs
-| Extractelement vs
-| Select         vs ->
+| Getelementptr  (_,vs,_)
+| Shufflevector  (vs,_)
+| Insertelement  (vs,_)
+| Extractelement (vs,_)
+| Select         (vs,_) ->
     List.fold_left VSet.union VSet.empty
       (List.map free_of_value (List.map snd vs))
-| Phi(_,l) ->
+| Phi(_,l,_) ->
     List.fold_left VSet.union VSet.empty
       (List.map (fun (v1, v2) -> VSet.union (free_of_value v1) (free_of_value v2)) l)
-| Alloca(_,_,None,_) -> VSet.empty
-| Alloca(_,_,Some(_,v),_)
-| Load(_,_,(_,v),_,_) -> free_of_value v
-| Store(_,_,(_,v1),(_,v2),_,_)
-| Atomicrmw(_,_,(_,v1),(_,v2),_,_) -> VSet.union (free_of_value v1) (free_of_value v2)
-| Cmpxchg(_,(_,v1),(_,v2),(_,v3),_,_,_) -> VSet.union (VSet.union (free_of_value v1) (free_of_value v2)) (free_of_value v3)
-| Fence _
-| Unreachable
-| Return None -> VSet.empty
-| Return Some(_,v)
-| Resume(_,v) -> free_of_value v
-| Br((_,v),None) -> free_of_value v
-| Br((_,v1),Some((_,v2),(_,v3))) -> VSet.union (VSet.union (free_of_value v1) (free_of_value v2)) (free_of_value v3)
-| Indirectbr((_,v),vs) ->
+| Alloca(_,_,None,_,_) -> VSet.empty
+| Alloca(_,_,Some(_,v),_,_)
+| Load(_,_,(_,v),_,_,_) -> free_of_value v
+| Store(_,_,(_,v1),(_,v2),_,_,_)
+| Atomicrmw(_,_,(_,v1),(_,v2),_,_,_) -> VSet.union (free_of_value v1) (free_of_value v2)
+| Cmpxchg(_,(_,v1),(_,v2),(_,v3),_,_,_,_) -> VSet.union (VSet.union (free_of_value v1) (free_of_value v2)) (free_of_value v3)
+| Fence(_,_,_)
+| Unreachable _
+| Return(None,_) -> VSet.empty
+| Return(Some(_,v),_)
+| Resume((_,v),_) -> free_of_value v
+| Br((_,v),None,_) -> free_of_value v
+| Br((_,v1),Some((_,v2),(_,v3)),_) -> VSet.union (VSet.union (free_of_value v1) (free_of_value v2)) (free_of_value v3)
+| Indirectbr((_,v),vs,_) ->
     VSet.union (free_of_value v)
       (List.fold_left VSet.union VSet.empty
          (List.map free_of_value (List.map snd vs)))
-| Switch(tv1,tv2,tvs) ->
+| Switch(tv1,tv2,tvs,_) ->
     (List.fold_left VSet.union VSet.empty
        (List.map free_of_value (List.map snd (tv1::tv2::(List.map snd tvs)))))
-| Landingpad(_,(_,v),_,lps) ->
+| Landingpad(_,(_,v),_,lps,_) ->
     (List.fold_left VSet.union VSet.empty
        (List.map free_of_value (v::(List.map (function Catch(_,v) -> v | Filter(_,v) -> v) lps))))
-| Call(_,_,_,_,v,params,_) ->
+| Call(_,_,_,_,v,params,_,_) ->
     let third (a,b,c) = c in
     let vs = v::(List.map third params) in
     List.fold_left VSet.union VSet.empty (List.map free_of_value vs)
-| Invoke(_,_,_,v,params,_,tv1,tv2) ->
+| Invoke(_,_,_,v,params,_,tv1,tv2,_) ->
     let third (a,b,c) = c in
     let vs = v::(snd tv1)::(snd tv2)::(List.map third params) in
     List.fold_left VSet.union VSet.empty (List.map free_of_value vs)
@@ -1234,76 +1236,78 @@ let assigned_of_block bl =
 let value_map g f =
   let h = List.map (fun (ty,op) -> (ty, g op)) in
   let imap = function
-    | Va_arg         ((t,v),t2) -> Va_arg         ((t,g v),t2)
-    | Trunc          ((t,v),t2) -> Trunc          ((t,g v),t2)
-    | Zext           ((t,v),t2) -> Zext           ((t,g v),t2)
-    | Sext           ((t,v),t2) -> Sext           ((t,g v),t2)
-    | Fptrunc        ((t,v),t2) -> Fptrunc        ((t,g v),t2)
-    | Fpext          ((t,v),t2) -> Fpext          ((t,g v),t2)
-    | Bitcast        ((t,v),t2) -> Bitcast        ((t,g v),t2)
-    | Addrspacecast  ((t,v),t2) -> Addrspacecast  ((t,g v),t2)
-    | Uitofp         ((t,v),t2) -> Uitofp         ((t,g v),t2)
-    | Sitofp         ((t,v),t2) -> Sitofp         ((t,g v),t2)
-    | Fptoui         ((t,v),t2) -> Fptoui         ((t,g v),t2)
-    | Fptosi         ((t,v),t2) -> Fptosi         ((t,g v),t2)
-    | Inttoptr       ((t,v),t2) -> Inttoptr       ((t,g v),t2)
-    | Ptrtoint       ((t,v),t2) -> Ptrtoint       ((t,g v),t2)
-    | Extractvalue   ((t,v),t2) -> Extractvalue   ((t,g v),t2)
-    | Insertvalue    ((t1,v1),(t2,v2),il) -> Insertvalue    ((t1,g v1),(t2,g v2),il)
-    | Icmp           (a,(t,v1),v2) -> Icmp           (a,(t,g v1),v2)
-    | Fcmp           (a,(t,v1),v2) -> Fcmp           (a,(t,g v1),v2)
-    | Sdiv           (a,(t,v1),v2) -> Sdiv           (a,(t,g v1),v2)
-    | Udiv           (a,(t,v1),v2) -> Udiv           (a,(t,g v1),v2)
-    | Lshr           (a,(t,v1),v2) -> Lshr           (a,(t,g v1),v2)
-    | Ashr           (a,(t,v1),v2) -> Ashr           (a,(t,g v1),v2)
-    | Fadd           (a,(t,v1),v2) -> Fadd           (a,(t,g v1),v2)
-    | Fsub           (a,(t,v1),v2) -> Fsub           (a,(t,g v1),v2)
-    | Fmul           (a,(t,v1),v2) -> Fmul           (a,(t,g v1),v2)
-    | Fdiv           (a,(t,v1),v2) -> Fdiv           (a,(t,g v1),v2)
-    | Frem           (a,(t,v1),v2) -> Frem           (a,(t,g v1),v2)
-    | Urem           ((t,v1),v2)   -> Urem           ((t,g v1),g v2)
-    | Srem           ((t,v1),v2)   -> Srem           ((t,g v1),g v2)
-    | And            ((t,v1),v2)   -> And            ((t,g v1),g v2)
-    | Or             ((t,v1),v2)   -> Or             ((t,g v1),g v2)
-    | Xor            ((t,v1),v2)   -> Xor            ((t,g v1),g v2)
-    | Add            (a,b,(t,v1),v2) -> Add            (a,b,(t,g v1),g v2)
-    | Sub            (a,b,(t,v1),v2) -> Sub            (a,b,(t,g v1),g v2)
-    | Mul            (a,b,(t,v1),v2) -> Mul            (a,b,(t,g v1),g v2)
-    | Shl            (a,b,(t,v1),v2) -> Shl            (a,b,(t,g v1),g v2)
-    | Getelementptr  (a,vs) -> Getelementptr  (a,h vs)
-    | Shufflevector  vs -> Shufflevector  (h vs)
-    | Insertelement  vs -> Insertelement  (h vs)
-    | Extractelement vs -> Extractelement (h vs)
-    | Select         vs -> Select         (h vs)
-    | Phi            (t,l) -> Phi(t, List.map (fun (v1,v2) -> (g v1, g v2)) l)
-    | Alloca         (a,b,None,c) -> Alloca(a,b,None,c)
-    | Alloca         (a,b,Some(t,v),c) -> Alloca(a,b,Some(t,g v),c)
-    | Load           (a,b,(t,v),c,d) -> Load(a,b,(t,g v),c,d)
-    | Store          (a,b,(t1,v1),(t2,v2),c,d) -> Store(a,b,(t1,g v1),(t2,g v2),c,d)
-    | Atomicrmw      (a,b,(t1,v1),(t2,v2),c,d) -> Atomicrmw(a,b,(t1,g v1),(t2,g v2),c,d)
-    | Cmpxchg        (a,(t1,v1),(t2,v2),(t3,v3),b,c,d) -> Cmpxchg(a,(t1,g v1),(t2,g v2),(t3,g v3),b,c,d)
-    | Fence          (a,b) -> Fence(a,b)
-    | Unreachable -> Unreachable
-    | Return None -> Return None
-    | Return         (Some(t,v)) -> Return(Some(t,g v))
-    | Resume         (t,v) -> Resume(t,g v)
-    | Br             ((t,v),None) -> Br((t,g v),None)
-    | Br             ((t1,v1),Some((t2,v2),(t3,v3))) -> Br((t1,g v1),Some((t2,g v2),(t3,g v3)))
-    | Indirectbr     ((t,v),vs) -> Indirectbr((t,g v),h vs)
-    | Switch((t1,v1),(t2,v2),tvs) ->
+    | Va_arg         ((t,v),t2,md) -> Va_arg         ((t,g v),t2,md)
+    | Trunc          ((t,v),t2,md) -> Trunc          ((t,g v),t2,md)
+    | Zext           ((t,v),t2,md) -> Zext           ((t,g v),t2,md)
+    | Sext           ((t,v),t2,md) -> Sext           ((t,g v),t2,md)
+    | Fptrunc        ((t,v),t2,md) -> Fptrunc        ((t,g v),t2,md)
+    | Fpext          ((t,v),t2,md) -> Fpext          ((t,g v),t2,md)
+    | Bitcast        ((t,v),t2,md) -> Bitcast        ((t,g v),t2,md)
+    | Addrspacecast  ((t,v),t2,md) -> Addrspacecast  ((t,g v),t2,md)
+    | Uitofp         ((t,v),t2,md) -> Uitofp         ((t,g v),t2,md)
+    | Sitofp         ((t,v),t2,md) -> Sitofp         ((t,g v),t2,md)
+    | Fptoui         ((t,v),t2,md) -> Fptoui         ((t,g v),t2,md)
+    | Fptosi         ((t,v),t2,md) -> Fptosi         ((t,g v),t2,md)
+    | Inttoptr       ((t,v),t2,md) -> Inttoptr       ((t,g v),t2,md)
+    | Ptrtoint       ((t,v),t2,md) -> Ptrtoint       ((t,g v),t2,md)
+    | Extractvalue   ((t,v),t2,md) -> Extractvalue   ((t,g v),t2,md)
+    | Insertvalue    ((t1,v1),(t2,v2),il,md) -> Insertvalue    ((t1,g v1),(t2,g v2),il,md)
+    | Icmp           (a,(t,v1),v2,md) -> Icmp           (a,(t,g v1),v2,md)
+    | Fcmp           (a,(t,v1),v2,md) -> Fcmp           (a,(t,g v1),v2,md)
+    | Sdiv           (a,(t,v1),v2,md) -> Sdiv           (a,(t,g v1),v2,md)
+    | Udiv           (a,(t,v1),v2,md) -> Udiv           (a,(t,g v1),v2,md)
+    | Lshr           (a,(t,v1),v2,md) -> Lshr           (a,(t,g v1),v2,md)
+    | Ashr           (a,(t,v1),v2,md) -> Ashr           (a,(t,g v1),v2,md)
+    | Fadd           (a,(t,v1),v2,md) -> Fadd           (a,(t,g v1),v2,md)
+    | Fsub           (a,(t,v1),v2,md) -> Fsub           (a,(t,g v1),v2,md)
+    | Fmul           (a,(t,v1),v2,md) -> Fmul           (a,(t,g v1),v2,md)
+    | Fdiv           (a,(t,v1),v2,md) -> Fdiv           (a,(t,g v1),v2,md)
+    | Frem           (a,(t,v1),v2,md) -> Frem           (a,(t,g v1),v2,md)
+    | Urem           ((t,v1),v2,md)   -> Urem           ((t,g v1),g v2,md)
+    | Srem           ((t,v1),v2,md)   -> Srem           ((t,g v1),g v2,md)
+    | And            ((t,v1),v2,md)   -> And            ((t,g v1),g v2,md)
+    | Or             ((t,v1),v2,md)   -> Or             ((t,g v1),g v2,md)
+    | Xor            ((t,v1),v2,md)   -> Xor            ((t,g v1),g v2,md)
+    | Add            (a,b,(t,v1),v2,md) -> Add            (a,b,(t,g v1),g v2,md)
+    | Sub            (a,b,(t,v1),v2,md) -> Sub            (a,b,(t,g v1),g v2,md)
+    | Mul            (a,b,(t,v1),v2,md) -> Mul            (a,b,(t,g v1),g v2,md)
+    | Shl            (a,b,(t,v1),v2,md) -> Shl            (a,b,(t,g v1),g v2,md)
+    | Getelementptr  (a,vs,md) -> Getelementptr  (a,h vs,md)
+    | Shufflevector  (vs,md) -> Shufflevector  (h vs,md)
+    | Insertelement  (vs,md) -> Insertelement  (h vs,md)
+    | Extractelement (vs,md) -> Extractelement (h vs,md)
+    | Select         (vs,md) -> Select         (h vs,md)
+    | Phi            (t,l,md) -> Phi(t, List.map (fun (v1,v2) -> (g v1, g v2)) l,md)
+    | Alloca         (a,b,None,c,md) -> Alloca(a,b,None,c,md)
+    | Alloca         (a,b,Some(t,v),c,md) -> Alloca(a,b,Some(t,g v),c,md)
+    | Load           (a,b,(t,v),c,d,md) -> Load(a,b,(t,g v),c,d,md)
+    | Store          (a,b,(t1,v1),(t2,v2),c,d,md) -> Store(a,b,(t1,g v1),(t2,g v2),c,d,md)
+    | Atomicrmw      (a,b,(t1,v1),(t2,v2),c,d,md) -> Atomicrmw(a,b,(t1,g v1),(t2,g v2),c,d,md)
+    | Cmpxchg        (a,(t1,v1),(t2,v2),(t3,v3),b,c,d,md) -> Cmpxchg(a,(t1,g v1),(t2,g v2),(t3,g v3),b,c,d,md)
+    | Fence          (a,b,md) -> Fence(a,b,md)
+    | Unreachable    md -> Unreachable md
+    | Return         (None,md) -> Return(None,md)
+    | Return         (Some(t,v),md) -> Return(Some(t,g v),md)
+    | Resume         ((t,v),md) -> Resume((t,g v),md)
+    | Br             ((t,v),None,md) -> Br((t,g v),None,md)
+    | Br             ((t1,v1),Some((t2,v2),(t3,v3)),md) -> Br((t1,g v1),Some((t2,g v2),(t3,g v3)),md)
+    | Indirectbr     ((t,v),vs,md) -> Indirectbr((t,g v),h vs,md)
+    | Switch((t1,v1),(t2,v2),tvs,md) ->
         Switch((t1,g v1),(t2,g v2),
-               List.map (fun ((t1,v1),(t2,v2)) -> ((t1,g v1),(t2,g v2))) tvs)
-    | Landingpad(a,(t,v),b,lps) ->
+               List.map (fun ((t1,v1),(t2,v2)) -> ((t1,g v1),(t2,g v2))) tvs,
+               md)
+    | Landingpad(a,(t,v),b,lps,md) ->
         Landingpad(a,(t,g v),b,
-                   List.map (function Catch(t,v) -> Catch(t,g v) | Filter(t,v) -> Filter(t,g v)) lps)
-    | Call(a,b,c,d,v,params,e) ->
+                   List.map (function Catch(t,v) -> Catch(t,g v) | Filter(t,v) -> Filter(t,g v)) lps,
+                   md)
+    | Call(a,b,c,d,v,params,e,md) ->
         Call(a,b,c,d,g v,
              List.map (fun (a,b,v) -> (a,b,g v)) params,
-             e)
-    | Invoke(a,b,c,v,params,d,(t1,v1),(t2,v2)) ->
+             e,md)
+    | Invoke(a,b,c,v,params,d,(t1,v1),(t2,v2),md) ->
         Invoke(a,b,c,g v,
                List.map (fun (a,b,v) -> (a,b,g v)) params,
-               d,(t1,g v1),(t2,g v2)) in
+               d,(t1,g v1),(t2,g v2),md) in
   (f.fblocks <-
     (List.map
       (fun bl ->

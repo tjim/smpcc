@@ -46,7 +46,7 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
    *)
   let unused =
     (match i with
-    | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar"))),_,_) -> true
+    | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar"))),_,_,_) -> true
     | Store _ -> true
     | _ -> false) in
   (* Go does not permit re-declaration: in var := expr, var must be a new variable.
@@ -72,7 +72,7 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
           bprintf b "\t%s := " (govar v);
         VSet.add v declared_vars) in
   (match i with
-  | Call(_,_,_,_,Var(Name(true, "printf")),(_,_,Int x)::ops,_) ->
+  | Call(_,_,_,_,Var(Name(true, "printf")),(_,_,Int x)::ops,_,_) ->
       (try
         let s = String.escaped(Hashtbl.find string_constants (Big_int.int_of_big_int x)) in
         if ops = [] then
@@ -81,39 +81,39 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
           bprintf b "Printf(io, mask, \"%s\", %a)\n" s (between ", " bpr_go_value) (List.map (fun (a,b,c) -> (a,c)) ops)
       with _ ->
         failwith "Error: first argument of printf must be a string constant")
-  | Call(_,_,_,_,Var(Name(true, "puts")),[_,_,Int x],_) ->
+  | Call(_,_,_,_,Var(Name(true, "puts")),[_,_,Int x],_,_) ->
       (try
         let s = String.escaped(Hashtbl.find string_constants  (Big_int.int_of_big_int x)) in
         bprintf b "Printf(io, mask, \"%s\\n\")\n" s (* puts adds a newline *)
       with _ ->
         failwith "Error: argument of puts must be a string constant")
-  | Call(_,_,_,_,Var(Name(true, "putchar")),[typ,_,value],_) ->
+  | Call(_,_,_,_,Var(Name(true, "putchar")),[typ,_,value],_,_) ->
                bprintf b "Printf(io, mask, \"%%c\", %a)\n" bpr_go_value (typ, value)
-  | Call(_,_,_,_,Var(Name(true, "gen_int")),_,_) ->
+  | Call(_,_,_,_,Var(Name(true, "gen_int")),_,_,_) ->
       if is_gen then
         bprintf b "InputFrom0(io, mask, next_arg)\n"
       else
         bprintf b "InputFrom0(io, mask)\n"
-  | Call(_,_,_,_,Var(Name(true, "eval_int")),_,_) ->
+  | Call(_,_,_,_,Var(Name(true, "eval_int")),_,_,_) ->
       if is_gen then
         bprintf b "InputFrom1(io, mask)\n"
       else
         bprintf b "InputFrom1(io, mask, next_arg)\n"
-  | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.start")),_,_) ->
+  | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.start")),_,_,_) ->
       ()
-  | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.end")),_,_) ->
+  | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.end")),_,_,_) ->
       ()
-  | Load(_,_,(Pointer(ety,_),_ as x),_,_) -> (* in case we are debugging loads *)
+  | Load(_,_,(Pointer(ety,_),_ as x),_,_,_) -> (* in case we are debugging loads *)
       bprintf b "LoadDebug(io, mask, %a, Uint(io, %d, 32))\n" bpr_go_value x (State.bytewidth ety)
-  | Store(_,_,x,addr,_,_) -> (* in case we are debugging stores*)
+  | Store(_,_,x,addr,_,_,_) -> (* in case we are debugging stores*)
       bprintf b "StoreDebug(io, mask, %a, Uint(io, %d, 32), %a)\n" bpr_go_value addr (State.bytewidth (fst x)) bpr_go_value x
-  | Bitcast(x,_) ->
+  | Bitcast(x,_,_) ->
       bprintf b "%a\n" bpr_go_value x
-  | Sext(tv,t) ->
+  | Sext(tv,t,_) ->
       bprintf b "Sext(io, %a, %d)\n" bpr_go_value tv (State.bitwidth t)
-  | Zext(tv,t) ->
+  | Zext(tv,t,_) ->
       bprintf b "Zext(io, %a, %d)\n" bpr_go_value tv (State.bitwidth t)
-  | Mul(_,_,tv,Int y) ->
+  | Mul(_,_,tv,Int y,_) ->
       (* It would be better to do this strength reduction in LLVM *)
       let shift_bits =
         match Big_int.int_of_big_int y with
@@ -128,33 +128,33 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         | 256 -> 8
         | _   -> failwith "the go back end does not support Mul" in
       bprintf b "Shl(io, %a, %d)\n" bpr_go_value tv shift_bits
-  | Mul(_,_,(typ,x),y) ->
+  | Mul(_,_,(typ,x),y,_) ->
       bprintf b "Mul(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
-  | Lshr(_,tv,Int y) ->
+  | Lshr(_,tv,Int y,_) ->
       let shift_bits = Big_int.int_of_big_int y in
       bprintf b "Lshr(io, %a, %d)\n" bpr_go_value tv shift_bits
-  | Ashr(_,tv,Int y) ->
+  | Ashr(_,tv,Int y,_) ->
       let shift_bits = Big_int.int_of_big_int y in
       bprintf b "Ashr(io, %a, %d)\n" bpr_go_value tv shift_bits
-  | Shl(_,_,tv,Int y) ->
+  | Shl(_,_,tv,Int y,_) ->
       let shift_bits = Big_int.int_of_big_int y in
       bprintf b "Shl(io, %a, %d)\n" bpr_go_value tv shift_bits
-  | Add(_,_,(typ,x),y) ->
+  | Add(_,_,(typ,x),y,_) ->
       bprintf b "Add(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
-  | Sub(_,_,(typ,x),y) ->
+  | Sub(_,_,(typ,x),y,_) ->
       bprintf b "Sub(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
-  | And((typ,x),y) ->
+  | And((typ,x),y,_) ->
       bprintf b "And(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
-  | Or((typ,x),y) ->
+  | Or((typ,x),y,_) ->
       bprintf b "Or(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
-  | Xor((typ,x),y) ->
+  | Xor((typ,x),y,_) ->
       bprintf b "Xor(io, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
-  | Icmp(pred,(typ,x),y) ->
+  | Icmp(pred,(typ,x),y,_) ->
       bprintf b "Icmp_%a(io, %a, %a)\n"
         bpr_icmp pred
         bpr_go_value (typ,x) bpr_go_value (typ,y)
 (*  | AssignInst(result_ty, [(ty,op)]) (* special instruction inserted by our compiler *) *)
-  | Inttoptr((ty,op), result_ty) ->
+  | Inttoptr((ty,op), result_ty,_) ->
       let bits_result = State.bitwidth result_ty in
       let bits_op = State.bitwidth ty in
       if bits_result = bits_op then
@@ -164,9 +164,9 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         bprintf b "Zext(io, %a, %d)\n" bpr_go_value (ty,op) bits_result
       else (* bits_result < bits_op *)
         bprintf b "%a[:%d]\n" bpr_go_value (ty,op) bits_result;
-  | Select([x;y;z]) -> (* TODO: maybe enforce 3 args in datatype? *)
+  | Select([x;y;z],_) -> (* TODO: maybe enforce 3 args in datatype? *)
       bprintf b "Select(io, %a, %a, %a)\n" bpr_go_value x bpr_go_value y bpr_go_value z
-  | Switch(op0,op1,ops) ->
+  | Switch(op0,op1,ops,_) ->
       (* op0 is the value to switch on.
          op1 is the default target.
          ops is a list of pairs; the first element of each pair should be an
@@ -176,7 +176,7 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
       let cases = List.map snd ops in (* throw away the 0, 1, ... part of the pairs *)
       bprintf b "Switch(io, %a, %a, %a)\n" bpr_go_value op0 bpr_go_value op1
         (between ", " bpr_go_value) cases
-  | Trunc(x, ty) ->
+  | Trunc(x, ty,_) ->
       bprintf b "%a[:%d]\n" bpr_go_value x (State.bitwidth ty)
   | _ -> begin
       eprintf "Error: unsupported %s\n" (spr bpr_instr (nopt,i));
@@ -233,7 +233,7 @@ let bpr_go_block b blocks_fv is_gen bl =
         (fun a (_,i) ->
           a ||
           (match i with (* see bpr_go_instr, these are all only only cases using mask *)
-          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "gen_int" | "eval_int"))),_,_)
+          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "gen_int" | "eval_int"))),_,_,_)
           | Load _
           | Store _ ->
               true

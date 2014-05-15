@@ -127,41 +127,41 @@ let assign_vartyps_instr ctyps (nopt, i) =
   let typ =
     let typ_of (t,v) = t in
     (match i with
-    | Util.Add(nuw, nsw, x, y) -> typ_of x
-    | Util.Sub(nuw, nsw, x, y) -> typ_of x
-    | Util.Mul(nuw, nsw, x, y) -> typ_of x
-    | Util.Shl(nuw, nsw, x, y) -> typ_of x
-    | Util.Fadd(fmf, x, y)     -> typ_of x
-    | Util.Fsub(fmf, x, y)     -> typ_of x
-    | Util.Fmul(fmf, x, y)     -> typ_of x
-    | Util.Fdiv(fmf, x, y)     -> typ_of x
-    | Util.Frem(fmf, x, y)     -> typ_of x
-    | Util.Sdiv(e, x, y)       -> typ_of x
-    | Util.Udiv(e, x, y)       -> typ_of x
-    | Util.Lshr(e, x, y)       -> typ_of x
-    | Util.Ashr(e, x, y)       -> typ_of x
-    | Util.Urem(x, y)          -> typ_of x
-    | Util.Srem(x, y)          -> typ_of x
-    | Util.And (x, y)          -> typ_of x
-    | Util.Or  (x, y)          -> typ_of x
-    | Util.Xor (x, y)          -> typ_of x
-    | Util.Icmp(icmp, x, y)    -> Util.Integer 1
-    | Util.Fcmp(fcmp, x, y)    -> Util.Integer 1
-    | Util.Trunc(x, y)         -> y
-    | Util.Zext(x, y)          -> y
-    | Util.Sext(x, y)          -> y
-    | Util.Fptrunc(x, y)       -> y
-    | Util.Fpext(x, y)         -> y
-    | Util.Bitcast(x, y)       -> y
-    | Util.Addrspacecast(x, y) -> y
-    | Util.Uitofp(x, y)        -> y
-    | Util.Sitofp(x, y)        -> y
-    | Util.Fptoui(x, y)        -> y
-    | Util.Fptosi(x, y)        -> y
-    | Util.Inttoptr(x, y)      -> y
-    | Util.Ptrtoint(x, y)      -> y
-    | Util.Va_arg(x, y)        -> y
-    | Util.Getelementptr(inbounds, x) ->
+    | Util.Add(nuw, nsw, x, y, md) -> typ_of x
+    | Util.Sub(nuw, nsw, x, y, md) -> typ_of x
+    | Util.Mul(nuw, nsw, x, y, md) -> typ_of x
+    | Util.Shl(nuw, nsw, x, y, md) -> typ_of x
+    | Util.Fadd(fmf, x, y, md)     -> typ_of x
+    | Util.Fsub(fmf, x, y, md)     -> typ_of x
+    | Util.Fmul(fmf, x, y, md)     -> typ_of x
+    | Util.Fdiv(fmf, x, y, md)     -> typ_of x
+    | Util.Frem(fmf, x, y, md)     -> typ_of x
+    | Util.Sdiv(e, x, y, md)       -> typ_of x
+    | Util.Udiv(e, x, y, md)       -> typ_of x
+    | Util.Lshr(e, x, y, md)       -> typ_of x
+    | Util.Ashr(e, x, y, md)       -> typ_of x
+    | Util.Urem(x, y, md)          -> typ_of x
+    | Util.Srem(x, y, md)          -> typ_of x
+    | Util.And (x, y, md)          -> typ_of x
+    | Util.Or  (x, y, md)          -> typ_of x
+    | Util.Xor (x, y, md)          -> typ_of x
+    | Util.Icmp(icmp, x, y, md)    -> Util.Integer 1
+    | Util.Fcmp(fcmp, x, y, md)    -> Util.Integer 1
+    | Util.Trunc(x, y, md)         -> y
+    | Util.Zext(x, y, md)          -> y
+    | Util.Sext(x, y, md)          -> y
+    | Util.Fptrunc(x, y, md)       -> y
+    | Util.Fpext(x, y, md)         -> y
+    | Util.Bitcast(x, y, md)       -> y
+    | Util.Addrspacecast(x, y, md) -> y
+    | Util.Uitofp(x, y, md)        -> y
+    | Util.Sitofp(x, y, md)        -> y
+    | Util.Fptoui(x, y, md)        -> y
+    | Util.Fptosi(x, y, md)        -> y
+    | Util.Inttoptr(x, y, md)      -> y
+    | Util.Ptrtoint(x, y, md)      -> y
+    | Util.Va_arg(x, y, md)        -> y
+    | Util.Getelementptr(inbounds, x, md) ->
         (match x with
         | (Util.Pointer(ety,aspace),_)::tl ->
             let ety = Util.Arraytyp(1,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
@@ -192,20 +192,20 @@ let assign_vartyps_instr ctyps (nopt, i) =
                       failwith "getelementptr: pointer does not point into an array or struct") in
             Util.Pointer(loop ety tl,aspace)
         | _ -> failwith "getelementptr: must be applied to a pointer")
-    | Util.Shufflevector [(Util.Vector(_,typ),_);_;(Util.Vector(m,_),_)] -> Util.Vector(m,typ)
-    | Util.Insertelement [(typ,_);_;_] -> typ
-    | Util.Extractelement [(Util.Vector(_,typ),_);_;_] -> typ
-    | Util.Select[_;(typ,_);_] -> typ
-    | Util.Phi(typ, incoming) -> typ
-    | Util.Landingpad(x, y, z, w) -> x
-    | Util.Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs) -> callee_ty
-    | Util.Alloca(x, y, z, w) -> y
-    | Util.Load(x, y, (Util.Pointer(typ,_), z), w, v) -> typ
-    | Util.Store(x, y, z, w, v, u) -> typ_of z
-    | Util.Cmpxchg(x, y, z, w, v, u, t) -> typ_of z
-    | Util.Atomicrmw(x, y, z, w, v, u) -> typ_of w
-    | Util.Fence(x, y) -> Util.Void
-    | Util.Extractvalue((typ,_), y) ->
+    | Util.Shufflevector([(Util.Vector(_,typ),_);_;(Util.Vector(m,_),_)], md) -> Util.Vector(m,typ)
+    | Util.Insertelement([(typ,_);_;_], md) -> typ
+    | Util.Extractelement([(Util.Vector(_,typ),_);_;_], md) -> typ
+    | Util.Select([_;(typ,_);_], md) -> typ
+    | Util.Phi(typ, incoming, md) -> typ
+    | Util.Landingpad(x, y, z, w, md) -> x
+    | Util.Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs, md) -> callee_ty
+    | Util.Alloca(x, y, z, w, md) -> y
+    | Util.Load(x, y, (Util.Pointer(typ,_), z), w, v, md) -> typ
+    | Util.Store(x, y, z, w, v, u, md) -> typ_of z
+    | Util.Cmpxchg(x, y, z, w, v, u, t, md) -> typ_of z
+    | Util.Atomicrmw(x, y, z, w, v, u, md) -> typ_of w
+    | Util.Fence(x, y, md) -> Util.Void
+    | Util.Extractvalue((typ,_), y, md) ->
         let rec loop = function
           | typ, [] -> typ
           | Util.Structtyp(_,l), hd::tl ->
@@ -217,16 +217,16 @@ let assign_vartyps_instr ctyps (nopt, i) =
               loop (typ, tl)
           | _ -> failwith "extractvalue: not a struct or array" in
         loop (typ, y)
-    | Util.Insertvalue(x, y, z) -> typ_of x
-    | Util.Unreachable -> Util.Void
-    | Util.Return None -> Util.Void
-    | Util.Return(Some(x, y)) -> Util.Void
-    | Util.Br(x, None) -> Util.Void
-    | Util.Br(x, Some(y, z)) -> Util.Void
-    | Util.Indirectbr(x, y) -> Util.Void
-    | Util.Resume x -> Util.Void
-    | Util.Switch(x, y, z) -> Util.Void
-    | Util.Invoke(x, y, z, w, v, u, t, s) -> z
+    | Util.Insertvalue(x, y, z, md) -> typ_of x
+    | Util.Unreachable md -> Util.Void
+    | Util.Return(None, md) -> Util.Void
+    | Util.Return(Some(x, y), md) -> Util.Void
+    | Util.Br(x, None, md) -> Util.Void
+    | Util.Br(x, Some(y, z), md) -> Util.Void
+    | Util.Indirectbr(x, y, md) -> Util.Void
+    | Util.Resume(x, md) -> Util.Void
+    | Util.Switch(x, y, z, md) -> Util.Void
+    | Util.Invoke(x, y, z, w, v, u, t, s, md) -> z
     | _ -> failwith "assign_vartyps_instr") in
   (match nopt with None -> () | Some var -> ignore(add_vartyp var typ))
 

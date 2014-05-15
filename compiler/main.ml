@@ -221,91 +221,92 @@ and repl_instr var replacement x =
   let rtv = repl_typ_value var replacement in
   let rtvl = List.map (repl_typ_value var replacement) in
   match x with 
-  | Add(nuw, nsw, x, y) -> Add(nuw, nsw, rtv x, rv y)
-  | Sub(nuw, nsw, x, y) -> Sub(nuw, nsw, rtv x, rv y)
-  | Mul(nuw, nsw, x, y) -> Mul(nuw, nsw, rtv x, rv y)
-  | Shl(nuw, nsw, x, y) -> Shl(nuw, nsw, rtv x, rv y)
-  | Fadd(fmf, x, y)           -> Fadd(fmf, rtv x, rv y)
-  | Fsub(fmf, x, y)           -> Fsub(fmf, rtv x, rv y)
-  | Fmul(fmf, x, y)           -> Fmul(fmf, rtv x, rv y)
-  | Fdiv(fmf, x, y)           -> Fdiv(fmf, rtv x, rv y)
-  | Frem(fmf, x, y)           -> Frem(fmf, rtv x, rv y)
-  | Sdiv(e, x, y)           -> Sdiv(e, rtv x, rv y)
-  | Udiv(e, x, y)           -> Udiv(e, rtv x, rv y)
-  | Lshr(e, x, y)           -> Lshr(e, rtv x, rv y)
-  | Ashr(e, x, y)           -> Ashr(e, rtv x, rv y)
-  | Urem(x, y)           -> Urem(rtv x, rv y)
-  | Srem(x, y)           -> Srem(rtv x, rv y)
-  | And (x, y)           -> And (rtv x, rv y)
-  | Or  (x, y)           -> Or  (rtv x, rv y)
-  | Xor (x, y)           -> Xor (rtv x, rv y)
-  | Icmp(icmp, x, y) -> Icmp(icmp, rtv x, rv y)
-  | Fcmp(fcmp, x, y) -> Fcmp(fcmp, rtv x, rv y)
-  | Trunc(x, y)          -> Trunc(rtv x, y)        
-  | Zext(x, y)           -> Zext(rtv x, y)         
-  | Sext(x, y)           -> Sext(rtv x, y)         
-  | Fptrunc(x, y)        -> Fptrunc(rtv x, y)      
-  | Fpext(x, y)          -> Fpext(rtv x, y)        
-  | Bitcast(x, y)        -> Bitcast(rtv x, y)      
-  | Addrspacecast(x, y)  -> Addrspacecast(rtv x, y)
-  | Uitofp(x, y)         -> Uitofp(rtv x, y)       
-  | Sitofp(x, y)         -> Sitofp(rtv x, y)       
-  | Fptoui(x, y)         -> Fptoui(rtv x, y)       
-  | Fptosi(x, y)         -> Fptosi(rtv x, y)       
-  | Inttoptr(x, y)       -> Inttoptr(rtv x, y)     
-  | Ptrtoint(x, y)       -> Ptrtoint(rtv x, y)     
-  | Va_arg(x, y)         -> Va_arg(rtv x, y)       
-  | Getelementptr(inbounds, x) -> Getelementptr(inbounds, x)
-  | Shufflevector x -> Shufflevector(rtvl x)
-  | Insertelement x -> Insertelement(rtvl x)
-  | Extractelement x -> Extractelement(rtvl x)
-  | Select x -> Select(rtvl x)
-  | Phi(ty, incoming) -> Phi(ty,
-                             List.map (fun (v1,v2) -> (rv v1, rv v2)) incoming)
-  | Landingpad(x, y, z, w) ->
+  | Add(nuw, nsw, x, y, md) -> Add(nuw, nsw, rtv x, rv y, md)
+  | Sub(nuw, nsw, x, y, md) -> Sub(nuw, nsw, rtv x, rv y, md)
+  | Mul(nuw, nsw, x, y, md) -> Mul(nuw, nsw, rtv x, rv y, md)
+  | Shl(nuw, nsw, x, y, md) -> Shl(nuw, nsw, rtv x, rv y, md)
+  | Fadd(fmf, x, y, md)           -> Fadd(fmf, rtv x, rv y, md)
+  | Fsub(fmf, x, y, md)           -> Fsub(fmf, rtv x, rv y, md)
+  | Fmul(fmf, x, y, md)           -> Fmul(fmf, rtv x, rv y, md)
+  | Fdiv(fmf, x, y, md)           -> Fdiv(fmf, rtv x, rv y, md)
+  | Frem(fmf, x, y, md)           -> Frem(fmf, rtv x, rv y, md)
+  | Sdiv(e, x, y, md)           -> Sdiv(e, rtv x, rv y, md)
+  | Udiv(e, x, y, md)           -> Udiv(e, rtv x, rv y, md)
+  | Lshr(e, x, y, md)           -> Lshr(e, rtv x, rv y, md)
+  | Ashr(e, x, y, md)           -> Ashr(e, rtv x, rv y, md)
+  | Urem(x, y, md)           -> Urem(rtv x, rv y, md)
+  | Srem(x, y, md)           -> Srem(rtv x, rv y, md)
+  | And (x, y, md)           -> And (rtv x, rv y, md)
+  | Or  (x, y, md)           -> Or  (rtv x, rv y, md)
+  | Xor (x, y, md)           -> Xor (rtv x, rv y, md)
+  | Icmp(icmp, x, y, md) -> Icmp(icmp, rtv x, rv y, md)
+  | Fcmp(fcmp, x, y, md) -> Fcmp(fcmp, rtv x, rv y, md)
+  | Trunc(x, y, md)          -> Trunc(rtv x, y, md)        
+  | Zext(x, y, md)           -> Zext(rtv x, y, md)         
+  | Sext(x, y, md)           -> Sext(rtv x, y, md)         
+  | Fptrunc(x, y, md)        -> Fptrunc(rtv x, y, md)      
+  | Fpext(x, y, md)          -> Fpext(rtv x, y, md)        
+  | Bitcast(x, y, md)        -> Bitcast(rtv x, y, md)      
+  | Addrspacecast(x, y, md)  -> Addrspacecast(rtv x, y, md)
+  | Uitofp(x, y, md)         -> Uitofp(rtv x, y, md)       
+  | Sitofp(x, y, md)         -> Sitofp(rtv x, y, md)       
+  | Fptoui(x, y, md)         -> Fptoui(rtv x, y, md)       
+  | Fptosi(x, y, md)         -> Fptosi(rtv x, y, md)       
+  | Inttoptr(x, y, md)       -> Inttoptr(rtv x, y, md)     
+  | Ptrtoint(x, y, md)       -> Ptrtoint(rtv x, y, md)     
+  | Va_arg(x, y, md)         -> Va_arg(rtv x, y, md)       
+  | Getelementptr(inbounds, x, md) -> Getelementptr(inbounds, x, md)
+  | Shufflevector(x,md) -> Shufflevector(rtvl x, md)
+  | Insertelement(x,md) -> Insertelement(rtvl x, md)
+  | Extractelement(x,md) -> Extractelement(rtvl x, md)
+  | Select(x,md) -> Select(rtvl x, md)
+  | Phi(ty, incoming, md) -> Phi(ty,
+                             List.map (fun (v1,v2) -> (rv v1, rv v2)) incoming, md)
+  | Landingpad(x, y, z, w, md) ->
       Landingpad(x, rtv y, z,
                  List.map (function
                    | Catch(typ, value) -> Catch(typ, rv value)
-                   | Filter(typ, value) ->Filter(typ, rv value)) w)
-  | Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs) ->
+                   | Filter(typ, value) ->Filter(typ, rv value)) w,
+                md)
+  | Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs, md) ->
       Call(is_tail_call, callconv, retattrs, callee_ty, rv callee_name,
            List.map (fun (typ,attrs,value) -> (typ,attrs,rv value)) operands,
-           callattrs)
-  | Alloca(x, y, z, w) ->
+           callattrs, md)
+  | Alloca(x, y, z, w, md) ->
       Alloca(x, y,
              (match z with None -> None | Some q -> Some(rtv q)),
-             w)
-  | Load(x, y, z, w, v) ->
-      Load(x, y, rtv z, w, v)
-  | Store(x, y, z, w, v, u) ->
-      Store(x, y, rtv z, rtv w, v, u)
-  | Cmpxchg(x, y, z, w, v, u, t) ->
-      Cmpxchg(x, rtv y, rtv z, rtv w, v, u, t)
-  | Atomicrmw(x, y, z, w, v, u) ->
-      Atomicrmw(x, y, rtv z, rtv w, v, u)
-  | Fence(x, y) -> Fence(x, y)
-  | Extractvalue(x, y) ->
-      Extractvalue(rtv x, y)
-  | Insertvalue(x, y, z) ->
-      Insertvalue(rtv x, rtv y, z)
-  | Unreachable ->
-      Unreachable
-  | Return None ->
-      Return None
-  | Return(Some tv) ->
-      Return(Some(rtv tv))
-  | Br(x, None) ->
-      Br(rtv x, None)
-  | Br(x, Some(y, z)) ->
-      Br(rtv x, Some(rtv y, rtv z))
-  | Indirectbr(x, y) ->
-      Indirectbr(rtv x, rtvl y)
-  | Resume x ->
-      Resume(rtv x)
-  | Switch(x, y, z) ->
-      Switch(rtv x, rtv y, List.map (fun (a,b) -> (rtv a, rtv b)) z)
-  | Invoke(x, y, z, w, v, u, t, s) ->
-      Invoke(x, y, z, rv w, List.map (fun (typ,attrs,value) -> (typ,attrs,rv value)) v, u, rtv t, rtv s)
+             w, md)
+  | Load(x, y, z, w, v, md) ->
+      Load(x, y, rtv z, w, v, md)
+  | Store(x, y, z, w, v, u, md) ->
+      Store(x, y, rtv z, rtv w, v, u, md)
+  | Cmpxchg(x, y, z, w, v, u, t, md) ->
+      Cmpxchg(x, rtv y, rtv z, rtv w, v, u, t, md)
+  | Atomicrmw(x, y, z, w, v, u, md) ->
+      Atomicrmw(x, y, rtv z, rtv w, v, u, md)
+  | Fence(x, y, md) -> Fence(x, y, md)
+  | Extractvalue(x, y, md) ->
+      Extractvalue(rtv x, y, md)
+  | Insertvalue(x, y, z, md) ->
+      Insertvalue(rtv x, rtv y, z, md)
+  | Unreachable md ->
+      Unreachable md
+  | Return(None, md) ->
+      Return(None, md)
+  | Return(Some tv, md) ->
+      Return(Some(rtv tv), md)
+  | Br(x, None, md) ->
+      Br(rtv x, None, md)
+  | Br(x, Some(y, z), md) ->
+      Br(rtv x, Some(rtv y, rtv z), md)
+  | Indirectbr(x, y, md) ->
+      Indirectbr(rtv x, rtvl y, md)
+  | Resume(x, md) ->
+      Resume(rtv x, md)
+  | Switch(x, y, z, md) ->
+      Switch(rtv x, rtv y, List.map (fun (a,b) -> (rtv a, rtv b)) z, md)
+  | Invoke(x, y, z, w, v, u, t, s, md) ->
+      Invoke(x, y, z, rv w, List.map (fun (typ,attrs,value) -> (typ,attrs,rv value)) v, u, rtv t, rtv s, md)
 
 let repl_instrs var replacement instrs =
   let rec loop = function
@@ -320,7 +321,7 @@ let repl_instrs var replacement instrs =
   loop instrs
 
 let assign_instr n result_ty ty op =
-  (Some n, Inttoptr((ty, op), result_ty)) (* unlike LLVM we will not force result_ty to be a ptr or ty to be an int typ *)
+  (Some n, Inttoptr((ty, op), result_ty, [])) (* unlike LLVM we will not force result_ty to be a ptr or ty to be an int typ *)
 
 (*
   bl_target has var = phi (value,bl_source) --> record and remove
@@ -349,7 +350,7 @@ let phi_elimination f =
     (fun bl ->
       List.iter
         (function
-          | (Some var,Phi(_, incoming)) ->
+          | (Some var,Phi(_, incoming, _)) ->
               List.iter
                 (fun (value,source_block) ->
                   let source_block_name = (match source_block with Var v -> v | Basicblock v -> v | _ -> failwith "phi elimination") in
@@ -368,7 +369,7 @@ let phi_elimination f =
     (fun bl ->
       let non_phi =
         List.filter
-          (function (_,Phi(_, _)) -> false
+          (function (_,Phi(_, _, _)) -> false
             | _ -> true)
           bl.binstrs in
       bl.binstrs <- non_phi)
@@ -396,7 +397,7 @@ let phi_elimination f =
             (before,after))
           !assignments in
       let (befores, afters) = List.split before_and_afters in
-      let branch = (None, Br((Label, Basicblock target_block_name), None)) in
+      let branch = (None, Br((Label, Basicblock target_block_name), None, [])) in
       let binstrs = befores @ afters @ [branch] in
       new_blocks := {bname;binstrs}::!new_blocks)
     tbl;
@@ -445,7 +446,7 @@ let gep_elim_value =
 let gep_elimination ctyps f =
   gep_elim_value f;
   let elim (nopt, i) = match (nopt, i) with
-    | Some n, Getelementptr(_,(Pointer(ety,aspace),x)::tl) ->
+    | Some n, Getelementptr(_,(Pointer(ety,aspace),x)::tl,_) ->
         let buf = Buffer.create 11 in
         let ety = Arraytyp(1,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
         let rec loop x ety = function
@@ -457,14 +458,14 @@ let gep_elimination ctyps f =
                   (* invariant: yty = i64 *)
                   let b = Int(Big_int.mult_big_int i (Big_int.big_int_of_int(State.bytewidth ety'))) in
                   let new_x = Name(false,State.fresh()) in (* typ is Pointer(aspace,ety') *)
-                  (Some(new_x),Add(false, false, (Integer 64,b), x))
+                  (Some(new_x),Add(false, false, (Integer 64,b), x, []))
                   ::(loop (Var new_x) ety' tl)
               | Arraytyp(_,ety'),Var _ ->
                   (* invariant: yty = i64 *)
                   let b = Name(false,State.fresh()) in
                   let new_x = Name(false,State.fresh()) in (* type is Pointer(ety',aspace) *)
-                  (Some(b),Mul(false, false, (Integer 64,y), Int(Big_int.big_int_of_int(State.bytewidth ety'))))
-                  ::(Some(new_x),Add(false, false, (Pointer(ety',aspace),x), Var b))
+                  (Some(b),Mul(false, false, (Integer 64,y), Int(Big_int.big_int_of_int(State.bytewidth ety')), []))
+                  ::(Some(new_x),Add(false, false, (Pointer(ety',aspace),x), Var b, []))
                   ::(loop (Var new_x) ety' tl)
               | Structtyp(_,typs),Int(i) ->
                   let ety' = List.nth typs (Big_int.int_of_big_int i) in
@@ -474,7 +475,7 @@ let gep_elimination ctyps f =
                       | hd::tl -> if n = 0 then 0 else State.bytewidth hd + skip (n-1) tl in
                     skip (Big_int.int_of_big_int i) typs in
                   let new_x = Name(false,State.fresh()) in
-                  (Some(new_x),Add(false, false, (Pointer(ety', None), x), Int(Big_int.big_int_of_int skip_bytes)))
+                  (Some(new_x),Add(false, false, (Pointer(ety', None), x), Int(Big_int.big_int_of_int skip_bytes), []))
                   ::(loop (Var new_x) ety' tl)
               | Vartyp v, _ ->
                   let ety' =
@@ -508,7 +509,7 @@ let load_store_elimination f =
       let rec split = function
         | [] ->
             ([],[])
-        | (Some nopt,Load(_,_,(Pointer(result_ty,_),addr),_,_))::tl ->
+        | (Some nopt,Load(_,_,(Pointer(result_ty,_),addr),_,_,_))::tl ->
             (* TODO: alignment *)
             let bname = State.fresh_label() in
             let binstrs, bl_list = split tl in
@@ -518,7 +519,7 @@ let load_store_elimination f =
               assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) addr;
               assign_instr (V.attsrcStateO()) Label Label (Basicblock bname) ],
             {bname;binstrs}::bl_list
-        | (None, Store(_,_,(typ,x),(_,addr),_,_))::tl ->
+        | (None, Store(_,_,(typ,x),(_,addr),_,_,_))::tl ->
             (* TODO: alignment *)
             let bname = State.fresh_label() in
             let binstrs, bl_list = split tl in
@@ -560,14 +561,14 @@ let cfg f =
         | _, Basicblock target -> Hashtbl.add tbl bl.bname target
         | _ -> () in
       match List.rev bl.binstrs with
-      | (_,Switch(_,_,ops))::_ -> (* first arg determines which of remaining args to branch to *)
+      | (_,Switch(_,_,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
           List.iter add_target (List.map snd ops)
-      | (_,Br(target, None))::_ -> (* unconditional branch *)
+      | (_,Br(target, None, _))::_ -> (* unconditional branch *)
           add_target target
-      | (_,Br(_, Some(target, target2)))::_ -> (* conditional branch *)
+      | (_,Br(_, Some(target, target2), _))::_ -> (* conditional branch *)
           add_target target;
           add_target target2;
-      | (_,Indirectbr(_, ops))::_ -> (* indirect branch computed by first arg, remaining list the possible targets *)
+      | (_,Indirectbr(_, ops, _))::_ -> (* indirect branch computed by first arg, remaining list the possible targets *)
           failwith "Error: indirectbr is unsupported"
       | (_,Return _)::_ -> ()
       | _ ->
@@ -592,15 +593,15 @@ let branch_elimination f =
         | Switch _ ->
             (* Ought to deal with switch better here but see gobe.ml instead *)
             [(Some(V.attsrcStateO()), instr)]
-        | Br((ty,op), None) ->
+        | Br((ty,op), None, _) ->
             [assign_instr (V.attsrcStateO()) ty ty op]
-        | Br(x, Some(y,z)) ->
-            [Some(V.attsrcStateO()), Select([x;y;z])] (* NB do NOT swap order of y,z *)
+        | Br(x, Some(y,z), _) ->
+            [Some(V.attsrcStateO()), Select([x;y;z],[])] (* NB do NOT swap order of y,z *)
         | Indirectbr _ ->
             failwith "branch elimination: indirectbr is unsupported"
-        | Return None ->
+        | Return(None,_) ->
             [(assign_instr V.attsrcIsDone (Integer 1) (Integer 1) (big 1))]
-        | Return(Some(ty, v)) ->
+        | Return(Some(ty, v), _) ->
             [
              (assign_instr V.attsrcAnswer (Integer 32) ty v);
              (assign_instr V.attsrcIsDone (Integer 1) (Integer 1) (big 1))

@@ -674,62 +674,62 @@ opt_local:
 | local_eq    { Some $1 }
 ;
 instruction:
-| local_eq Kw_add opt_nuw_nsw type_value Comma value      instruction_metadata { Some $1, Util.Add(fst $3, snd $3, $4, $6) }
-| local_eq Kw_sub opt_nuw_nsw type_value Comma value      instruction_metadata { Some $1, Util.Sub(fst $3, snd $3, $4, $6) }
-| local_eq Kw_mul opt_nuw_nsw type_value Comma value      instruction_metadata { Some $1, Util.Mul(fst $3, snd $3, $4, $6) }
-| local_eq Kw_shl opt_nuw_nsw type_value Comma value      instruction_metadata { Some $1, Util.Shl(fst $3, snd $3, $4, $6) }
-| local_eq Kw_fadd fast_math_flags type_value Comma value instruction_metadata { Some $1, Util.Fadd($3, $4, $6) }
-| local_eq Kw_fsub fast_math_flags type_value Comma value instruction_metadata { Some $1, Util.Fsub($3, $4, $6) }
-| local_eq Kw_fmul fast_math_flags type_value Comma value instruction_metadata { Some $1, Util.Fmul($3, $4, $6) }
-| local_eq Kw_fdiv fast_math_flags type_value Comma value instruction_metadata { Some $1, Util.Fdiv($3, $4, $6) }
-| local_eq Kw_frem fast_math_flags type_value Comma value instruction_metadata { Some $1, Util.Frem($3, $4, $6) }
-| local_eq Kw_sdiv opt_exact type_value Comma value       instruction_metadata { Some $1, Util.Sdiv($3, $4, $6) }
-| local_eq Kw_udiv opt_exact type_value Comma value       instruction_metadata { Some $1, Util.Udiv($3, $4, $6) }
-| local_eq Kw_lshr opt_exact type_value Comma value       instruction_metadata { Some $1, Util.Lshr($3, $4, $6) }
-| local_eq Kw_ashr opt_exact type_value Comma value       instruction_metadata { Some $1, Util.Ashr($3, $4, $6) }
-| local_eq Kw_urem type_value Comma value                 instruction_metadata { Some $1, Util.Urem($3, $5) }
-| local_eq Kw_srem type_value Comma value                 instruction_metadata { Some $1, Util.Srem($3, $5) }
-| local_eq Kw_and type_value Comma value                  instruction_metadata { Some $1, Util.And($3, $5) }
-| local_eq Kw_or type_value Comma value                   instruction_metadata { Some $1, Util.Or($3, $5) }
-| local_eq Kw_xor type_value Comma value                  instruction_metadata { Some $1, Util.Xor($3, $5) }
-| local_eq Kw_icmp icmp_predicate type_value Comma value  instruction_metadata { Some $1, Util.Icmp($3, $4, $6) }
-| local_eq Kw_fcmp fcmp_predicate type_value Comma value  instruction_metadata { Some $1, Util.Fcmp($3, $4, $6) }
-| local_eq Kw_trunc type_value Kw_to typ                  instruction_metadata { Some $1, Util.Trunc($3, $5) }
-| local_eq Kw_zext type_value Kw_to typ                   instruction_metadata { Some $1, Util.Zext($3, $5) }
-| local_eq Kw_sext type_value Kw_to typ                   instruction_metadata { Some $1, Util.Sext($3, $5) }
-| local_eq Kw_fptrunc type_value Kw_to typ                instruction_metadata { Some $1, Util.Fptrunc($3, $5) }
-| local_eq Kw_fpext type_value Kw_to typ                  instruction_metadata { Some $1, Util.Fpext($3, $5) }
-| local_eq Kw_bitcast type_value Kw_to typ                instruction_metadata { Some $1, Util.Bitcast($3, $5) }
-| local_eq Kw_addrspacecast type_value Kw_to typ          instruction_metadata { Some $1, Util.Addrspacecast($3, $5) }
-| local_eq Kw_uitofp type_value Kw_to typ                 instruction_metadata { Some $1, Util.Uitofp($3, $5) }
-| local_eq Kw_sitofp type_value Kw_to typ                 instruction_metadata { Some $1, Util.Sitofp($3, $5) }
-| local_eq Kw_fptoui type_value Kw_to typ                 instruction_metadata { Some $1, Util.Fptoui($3, $5) }
-| local_eq Kw_fptosi type_value Kw_to typ                 instruction_metadata { Some $1, Util.Fptosi($3, $5) }
-| local_eq Kw_inttoptr type_value Kw_to typ               instruction_metadata { Some $1, Util.Inttoptr($3, $5) }
-| local_eq Kw_ptrtoint type_value Kw_to typ               instruction_metadata { Some $1, Util.Ptrtoint($3, $5) }
-| local_eq Kw_va_arg type_value Comma typ                 instruction_metadata { Some $1, Util.Va_arg($3, $5) }
-| local_eq Kw_getelementptr opt_inbounds type_value_LIST_metadata              { Some $1, Util.Getelementptr($3, fst $4) }
-| local_eq Kw_extractelement type_value_LIST_metadata                          { Some $1, Util.Extractelement(fst $3) }
-| local_eq Kw_insertelement type_value_LIST_metadata                           { Some $1, Util.Insertelement(fst $3) }
-| local_eq Kw_shufflevector type_value_LIST_metadata                           { Some $1, Util.Shufflevector(fst $3) }
-| local_eq Kw_select type_value_LIST_metadata                                  { Some $1, Util.Select(fst $3) }
-| local_eq Kw_phi typ phi_list_metadata                                        { Some $1, Util.Phi($3, fst $4) }
+| local_eq Kw_add opt_nuw_nsw type_value Comma value      instruction_metadata { Some $1, Util.Add(fst $3, snd $3, $4, $6, $7) }
+| local_eq Kw_sub opt_nuw_nsw type_value Comma value      instruction_metadata { Some $1, Util.Sub(fst $3, snd $3, $4, $6, $7) }
+| local_eq Kw_mul opt_nuw_nsw type_value Comma value      instruction_metadata { Some $1, Util.Mul(fst $3, snd $3, $4, $6, $7) }
+| local_eq Kw_shl opt_nuw_nsw type_value Comma value      instruction_metadata { Some $1, Util.Shl(fst $3, snd $3, $4, $6, $7) }
+| local_eq Kw_fadd fast_math_flags type_value Comma value instruction_metadata { Some $1, Util.Fadd($3, $4, $6, $7) }
+| local_eq Kw_fsub fast_math_flags type_value Comma value instruction_metadata { Some $1, Util.Fsub($3, $4, $6, $7) }
+| local_eq Kw_fmul fast_math_flags type_value Comma value instruction_metadata { Some $1, Util.Fmul($3, $4, $6, $7) }
+| local_eq Kw_fdiv fast_math_flags type_value Comma value instruction_metadata { Some $1, Util.Fdiv($3, $4, $6, $7) }
+| local_eq Kw_frem fast_math_flags type_value Comma value instruction_metadata { Some $1, Util.Frem($3, $4, $6, $7) }
+| local_eq Kw_sdiv opt_exact type_value Comma value       instruction_metadata { Some $1, Util.Sdiv($3, $4, $6, $7) }
+| local_eq Kw_udiv opt_exact type_value Comma value       instruction_metadata { Some $1, Util.Udiv($3, $4, $6, $7) }
+| local_eq Kw_lshr opt_exact type_value Comma value       instruction_metadata { Some $1, Util.Lshr($3, $4, $6, $7) }
+| local_eq Kw_ashr opt_exact type_value Comma value       instruction_metadata { Some $1, Util.Ashr($3, $4, $6, $7) }
+| local_eq Kw_urem type_value Comma value                 instruction_metadata { Some $1, Util.Urem($3, $5, $6) }
+| local_eq Kw_srem type_value Comma value                 instruction_metadata { Some $1, Util.Srem($3, $5, $6) }
+| local_eq Kw_and type_value Comma value                  instruction_metadata { Some $1, Util.And($3, $5, $6) }
+| local_eq Kw_or type_value Comma value                   instruction_metadata { Some $1, Util.Or($3, $5, $6) }
+| local_eq Kw_xor type_value Comma value                  instruction_metadata { Some $1, Util.Xor($3, $5, $6) }
+| local_eq Kw_icmp icmp_predicate type_value Comma value  instruction_metadata { Some $1, Util.Icmp($3, $4, $6, $7) }
+| local_eq Kw_fcmp fcmp_predicate type_value Comma value  instruction_metadata { Some $1, Util.Fcmp($3, $4, $6, $7) }
+| local_eq Kw_trunc type_value Kw_to typ                  instruction_metadata { Some $1, Util.Trunc($3, $5, $6) }
+| local_eq Kw_zext type_value Kw_to typ                   instruction_metadata { Some $1, Util.Zext($3, $5, $6) }
+| local_eq Kw_sext type_value Kw_to typ                   instruction_metadata { Some $1, Util.Sext($3, $5, $6) }
+| local_eq Kw_fptrunc type_value Kw_to typ                instruction_metadata { Some $1, Util.Fptrunc($3, $5, $6) }
+| local_eq Kw_fpext type_value Kw_to typ                  instruction_metadata { Some $1, Util.Fpext($3, $5, $6) }
+| local_eq Kw_bitcast type_value Kw_to typ                instruction_metadata { Some $1, Util.Bitcast($3, $5, $6) }
+| local_eq Kw_addrspacecast type_value Kw_to typ          instruction_metadata { Some $1, Util.Addrspacecast($3, $5, $6) }
+| local_eq Kw_uitofp type_value Kw_to typ                 instruction_metadata { Some $1, Util.Uitofp($3, $5, $6) }
+| local_eq Kw_sitofp type_value Kw_to typ                 instruction_metadata { Some $1, Util.Sitofp($3, $5, $6) }
+| local_eq Kw_fptoui type_value Kw_to typ                 instruction_metadata { Some $1, Util.Fptoui($3, $5, $6) }
+| local_eq Kw_fptosi type_value Kw_to typ                 instruction_metadata { Some $1, Util.Fptosi($3, $5, $6) }
+| local_eq Kw_inttoptr type_value Kw_to typ               instruction_metadata { Some $1, Util.Inttoptr($3, $5, $6) }
+| local_eq Kw_ptrtoint type_value Kw_to typ               instruction_metadata { Some $1, Util.Ptrtoint($3, $5, $6) }
+| local_eq Kw_va_arg type_value Comma typ                 instruction_metadata { Some $1, Util.Va_arg($3, $5, $6) }
+| local_eq Kw_getelementptr opt_inbounds type_value_LIST_metadata              { Some $1, Util.Getelementptr($3, fst $4, snd $4) }
+| local_eq Kw_extractelement type_value_LIST_metadata                          { Some $1, Util.Extractelement(fst $3, snd $3) }
+| local_eq Kw_insertelement type_value_LIST_metadata                           { Some $1, Util.Insertelement(fst $3, snd $3) }
+| local_eq Kw_shufflevector type_value_LIST_metadata                           { Some $1, Util.Shufflevector(fst $3, snd $3) }
+| local_eq Kw_select type_value_LIST_metadata                                  { Some $1, Util.Select(fst $3, snd $3) }
+| local_eq Kw_phi typ phi_list_metadata                                        { Some $1, Util.Phi($3, fst $4, snd $4) }
 | local_eq Kw_landingpad typ Kw_personality type_value opt_cleanup landingpad_list
-                                                          instruction_metadata { Some $1, Util.Landingpad($3, $5, $6, $7) }
+                                                          instruction_metadata { Some $1, Util.Landingpad($3, $5, $6, $7, $8) }
 | opt_local opt_tail Kw_call opt_callingconv return_attributes typ value Lparen param_list Rparen call_attributes
-                                                          instruction_metadata { $1, Util.Call($2, $4, $5, $6, $7, $9, $11) }
-| local_eq Kw_alloca alloc_metadata                                            { Some $1, fst $3 }
+                                                          instruction_metadata { $1, Util.Call($2, $4, $5, $6, $7, $9, $11, $12) }
+| local_eq Kw_alloca alloc_metadata                                            { Some $1, $3 }
 | local_eq Kw_load opt_atomic opt_volatile type_value scopeandordering
-                                                                align_metadata { Some $1, Util.Load($3, $4, $5, $6, fst $7) }
+                                                                align_metadata { Some $1, Util.Load($3, $4, $5, $6, fst $7, snd $7) }
 | Kw_store opt_atomic opt_volatile type_value Comma type_value scopeandordering
-                                                                align_metadata { None, Util.Store($2, $3, $4, $6, $7, fst $8) }
+                                                                align_metadata { None, Util.Store($2, $3, $4, $6, $7, fst $8, snd $8) }
 | Kw_cmpxchg opt_volatile type_value Comma type_value Comma type_value opt_singlethread ordering ordering
-                                                          instruction_metadata { None, Util.Cmpxchg($2, $3, $5, $7, $8, $9, $10) }
+                                                          instruction_metadata { None, Util.Cmpxchg($2, $3, $5, $7, $8, $9, $10, $11) }
 | Kw_atomicrmw opt_volatile binop type_value Comma type_value opt_singlethread ordering
-                                                          instruction_metadata { None, Util.Atomicrmw($2, $3, $4, $6, $7, $8) }
-| Kw_fence opt_singlethread ordering                      instruction_metadata { None, Util.Fence($2, $3) }
-| local_eq Kw_extractvalue type_value index_list_metadata                      { Some $1, Util.Extractvalue($3, fst $4) }
-| local_eq Kw_insertvalue type_value Comma type_value index_list_metadata      { Some $1, Util.Insertvalue($3, $5, fst $6) }
+                                                          instruction_metadata { None, Util.Atomicrmw($2, $3, $4, $6, $7, $8, $9) }
+| Kw_fence opt_singlethread ordering                      instruction_metadata { None, Util.Fence($2, $3, $4) }
+| local_eq Kw_extractvalue type_value index_list_metadata                      { Some $1, Util.Extractvalue($3, fst $4, snd $4) }
+| local_eq Kw_insertvalue type_value Comma type_value index_list_metadata      { Some $1, Util.Insertvalue($3, $5, fst $6, snd $6) }
 ;
 binop:
 | Kw_xchg { Util.Xchg }
@@ -770,14 +770,14 @@ scopeandordering:
 | opt_singlethread ordering { Some($1, $2) }
 ;
 alloc_metadata:
-| Kw_inalloca typ Comma type_value Comma Kw_align APInt instruction_metadata { Util.Alloca(true,  $2, Some $4, Some(int_of_string $7)), $8 }
-| Kw_inalloca typ Comma type_value                      instruction_metadata { Util.Alloca(true,  $2, Some $4, None), $5 }
-| Kw_inalloca typ Comma Kw_align APInt                  instruction_metadata { Util.Alloca(true,  $2, None, Some(int_of_string $5)), $6 }
-| Kw_inalloca typ                                       instruction_metadata { Util.Alloca(true,  $2, None, None), $3 }
-| typ Comma type_value Comma Kw_align APInt             instruction_metadata { Util.Alloca(false, $1, Some $3, Some(int_of_string $6)), $7 }
-| typ Comma type_value                                  instruction_metadata { Util.Alloca(false, $1, Some $3, None), $4 }
-| typ Comma Kw_align APInt                              instruction_metadata { Util.Alloca(false, $1, None, Some(int_of_string $4)), $5 }
-| typ                                                   instruction_metadata { Util.Alloca(false, $1, None, None), $2 }
+| Kw_inalloca typ Comma type_value Comma Kw_align APInt instruction_metadata { Util.Alloca(true,  $2, Some $4, Some(int_of_string $7), $8) }
+| Kw_inalloca typ Comma type_value                      instruction_metadata { Util.Alloca(true,  $2, Some $4, None, $5) }
+| Kw_inalloca typ Comma Kw_align APInt                  instruction_metadata { Util.Alloca(true,  $2, None, Some(int_of_string $5), $6) }
+| Kw_inalloca typ                                       instruction_metadata { Util.Alloca(true,  $2, None, None, $3) }
+| typ Comma type_value Comma Kw_align APInt             instruction_metadata { Util.Alloca(false, $1, Some $3, Some(int_of_string $6), $7) }
+| typ Comma type_value                                  instruction_metadata { Util.Alloca(false, $1, Some $3, None, $4) }
+| typ Comma Kw_align APInt                              instruction_metadata { Util.Alloca(false, $1, None, Some(int_of_string $4), $5) }
+| typ                                                   instruction_metadata { Util.Alloca(false, $1, None, None, $2) }
 ;
 fast_math_flags:
 | /* empty */                    { [] }
@@ -791,15 +791,15 @@ fast_math_flag:
 | Kw_arcp { Util.Arcp }
 ;
 terminator_instruction:
-| Kw_unreachable                                                   instruction_metadata { None, Util.Unreachable }
-| Kw_ret Kw_void                                                   instruction_metadata { None, Util.Return None } /* we need to distinguish void from all other types else we have a dependent grammar */
-| Kw_ret non_void_type value                                       instruction_metadata { None, Util.Return(Some($2, $3)) }
-| Kw_br type_value                                                 instruction_metadata { None, Util.Br($2, None) }
-| Kw_br type_value Comma type_value Comma type_value               instruction_metadata { None, Util.Br($2, Some($4, $6)) }
-| Kw_indirectbr type_value Comma Lsquare type_value_LIST Rsquare   instruction_metadata { None, Util.Indirectbr($2, $5) }
-| Kw_resume type_value                                             instruction_metadata { None, Util.Resume $2 }
-| Kw_switch type_value Comma type_value Lsquare jump_table Rsquare instruction_metadata { None, Util.Switch($2, $4, $6) }
-| local_eq Kw_invoke opt_callingconv return_attributes typ value Lparen param_list Rparen function_attributes Kw_to type_value Kw_unwind type_value instruction_metadata { Some $1, Util.Invoke($3, $4, $5, $6, $8, $10, $12, $14) }
+| Kw_unreachable                                                   instruction_metadata { None, Util.Unreachable $2 }
+| Kw_ret Kw_void                                                   instruction_metadata { None, Util.Return(None,$3) } /* we need to distinguish void from all other types else we have a dependent grammar */
+| Kw_ret non_void_type value                                       instruction_metadata { None, Util.Return(Some($2, $3),$4) }
+| Kw_br type_value                                                 instruction_metadata { None, Util.Br($2, None, $3) }
+| Kw_br type_value Comma type_value Comma type_value               instruction_metadata { None, Util.Br($2, Some($4, $6), $7) }
+| Kw_indirectbr type_value Comma Lsquare type_value_LIST Rsquare   instruction_metadata { None, Util.Indirectbr($2, $5, $7) }
+| Kw_resume type_value                                             instruction_metadata { None, Util.Resume($2, $3) }
+| Kw_switch type_value Comma type_value Lsquare jump_table Rsquare instruction_metadata { None, Util.Switch($2, $4, $6, $8) }
+| local_eq Kw_invoke opt_callingconv return_attributes typ value Lparen param_list Rparen function_attributes Kw_to type_value Kw_unwind type_value instruction_metadata { Some $1, Util.Invoke($3, $4, $5, $6, $8, $10, $12, $14, $15) }
 ;
 call_attributes:
 | /* empty */                    { [] }
