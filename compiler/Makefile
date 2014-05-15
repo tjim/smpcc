@@ -7,7 +7,7 @@ smpcc: util.cmx state.cmx llparse.cmx lllex.cmx options.cmx gobe.cmx main.cmx
 	ocamlopt $(LIBS) $^ -o $@
 
 parse: util.cmx state.cmx llparse.cmx lllex.cmx echo.cmx
-	ocamlopt nums.cmxa $^ -o $@
+	ocamlopt $(LIBS) $^ -o $@
 
 clean:
 	$(RM) *.cmx *.cmi *.o llparse.mli llparse.mli lllex.ml
