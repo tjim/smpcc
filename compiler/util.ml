@@ -698,19 +698,19 @@ let rec bpr_value b op = match op with
         (between ", " bpr_typ_value) ops
         (yes " ") (ops <> [])
         (yes ">") is_packed
-  | Trunc(x, y)          -> bprintf b "trunc(%a, %a)" bpr_typ_value x              bpr_typ y
-  | Zext(x, y)           -> bprintf b "zext(%a, %a)" bpr_typ_value x          bpr_typ y
-  | Sext(x, y)           -> bprintf b "sext(%a, %a)" bpr_typ_value x          bpr_typ y
-  | Fptrunc(x, y)        -> bprintf b "fptrunc(%a, %a)" bpr_typ_value x       bpr_typ y
-  | Fpext(x, y)          -> bprintf b "fpext(%a, %a)" bpr_typ_value x         bpr_typ y
-  | Bitcast(x, y)        -> bprintf b "bitcast(%a, %a)" bpr_typ_value x       bpr_typ y
-  | Addrspacecast(x, y)  -> bprintf b "addrspacecast(%a, %a)" bpr_typ_value x bpr_typ y
-  | Uitofp(x, y)         -> bprintf b "uitofp(%a, %a)" bpr_typ_value x        bpr_typ y
-  | Sitofp(x, y)         -> bprintf b "sitofp(%a, %a)" bpr_typ_value x        bpr_typ y
-  | Fptoui(x, y)         -> bprintf b "fptoui(%a, %a)" bpr_typ_value x        bpr_typ y
-  | Fptosi(x, y)         -> bprintf b "fptosi(%a, %a)" bpr_typ_value x        bpr_typ y
-  | Inttoptr(x, y)       -> bprintf b "inttoptr(%a, %a)" bpr_typ_value x      bpr_typ y
-  | Ptrtoint(x, y)       -> bprintf b "ptrtoint(%a, %a)" bpr_typ_value x      bpr_typ y
+  | Trunc(x, y)          -> bprintf b "trunc(%a to %a)" bpr_typ_value x         bpr_typ y
+  | Zext(x, y)           -> bprintf b "zext(%a to %a)" bpr_typ_value x          bpr_typ y
+  | Sext(x, y)           -> bprintf b "sext(%a to %a)" bpr_typ_value x          bpr_typ y
+  | Fptrunc(x, y)        -> bprintf b "fptrunc(%a to %a)" bpr_typ_value x       bpr_typ y
+  | Fpext(x, y)          -> bprintf b "fpext(%a to %a)" bpr_typ_value x         bpr_typ y
+  | Bitcast(x, y)        -> bprintf b "bitcast (%a to %a)" bpr_typ_value x      bpr_typ y
+  | Addrspacecast(x, y)  -> bprintf b "addrspacecast(%a to %a)" bpr_typ_value x bpr_typ y
+  | Uitofp(x, y)         -> bprintf b "uitofp(%a to %a)" bpr_typ_value x        bpr_typ y
+  | Sitofp(x, y)         -> bprintf b "sitofp(%a to %a)" bpr_typ_value x        bpr_typ y
+  | Fptoui(x, y)         -> bprintf b "fptoui(%a to %a)" bpr_typ_value x        bpr_typ y
+  | Fptosi(x, y)         -> bprintf b "fptosi(%a to %a)" bpr_typ_value x        bpr_typ y
+  | Inttoptr(x, y)       -> bprintf b "inttoptr(%a to %a)" bpr_typ_value x      bpr_typ y
+  | Ptrtoint(x, y)       -> bprintf b "ptrtoint(%a to %a)" bpr_typ_value x      bpr_typ y
   | Extractvalue(x, y)   -> bprintf b "extractvalue(%a%a)" bpr_typ_value x bpr_index_list y
   | Insertvalue(x, y, z) -> bprintf b "insertvalue(%a, %a%a)" bpr_typ_value x bpr_typ_value y bpr_index_list z
   | Icmp(cmp, x, y)      -> bprintf b "icmp %a (%a, %a)" bpr_icmp cmp bpr_typ_value x bpr_typ_value y
