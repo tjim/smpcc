@@ -16,6 +16,7 @@ type options = {
     mutable gep: bool;
     mutable phi: bool;
     mutable optflag: string;
+    mutable verbose: bool;
   }
 
 let options = {
@@ -36,6 +37,7 @@ let options = {
   gep = false;
   phi = false;
   optflag = "-O1";
+  verbose = false;
 }
 
 let pr_output_file suffix s =

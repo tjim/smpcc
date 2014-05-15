@@ -403,24 +403,16 @@ let phi_elimination f =
   f.fblocks <- f.fblocks @ !new_blocks;
   ()
 
-(* Replace global variables by their location *)
-let global_locations =
-  value_map (function Var v ->
-        if not(Hashtbl.mem State.global_locations v) then Var v else
-        Int(Big_int.big_int_of_int(Hashtbl.find State.global_locations v))
-    | c -> c)
-
 (* Replace getelementptr by arithmetic *)
 let gep_elim_value =
   value_map (function
     | Getelementptr(_, (Pointer(ety,s), Var v)::tl) as c ->
-        eprintf "Warning: unable to eliminate '%s'\n" (spr bpr_value c);
-        c
-    | Getelementptr(_, (Pointer(ety,s), Int v)::tl) ->
-        begin
+        if not(Hashtbl.mem State.global_locations v) then
+          (eprintf "Warning: unable to eliminate '%s'\n" (spr bpr_value c); c)
+        else begin
           let ety = Arraytyp(0,ety) in (* This is the key to understanding gep --- ety should start out as an Array *)
           let rec loop ety = function
-            | [] -> v
+            | [] -> Big_int.big_int_of_int(Hashtbl.find State.global_locations v)
             | (y_typ,y)::tl ->
                 (match ety,y with
                 | Arraytyp(_,ety'),(Int(i)) -> (* NB we ignore the bitwidth of the constant *)
@@ -451,7 +443,6 @@ let gep_elim_value =
 
 (* http://www.llvm.org/docs/GetElementPtr.html *)
 let gep_elimination ctyps f =
-  global_locations f;
   gep_elim_value f;
   let elim (nopt, i) = match (nopt, i) with
     | Some n, Getelementptr(_,(Pointer(ety,aspace),x)::tl) ->
@@ -675,6 +666,8 @@ let file2cu cil_extra_args file =
               (Filename.quote temp_dir)
               (Filename.quote abs_file)
               (String.concat " " cil_extra_args) in
+          if options.verbose then
+            eprintf "%s\n" cmd;
           Sys.command cmd in
         if ret <> 0 then
           failwith(sprintf "Error: cilly failed with exit code %d" ret);
@@ -692,6 +685,8 @@ let file2cu cil_extra_args file =
     let ll_file = Filename.temp_file "mpcc" ".ll" in
     let cmd =
       sprintf "clang -S %s -emit-llvm %s -o %s" options.optflag (Filename.quote src_file) (Filename.quote ll_file) in
+    if options.verbose then
+      eprintf "%s\n" cmd;
     let ret = Sys.command(cmd) in
     if ret <> 0 then
       failwith(sprintf "Error: clang failed with exit code %d" ret);
@@ -755,6 +750,7 @@ begin
   let (x,args) = getopt "-O3" args               in if x then options.optflag <- "-O3";
   let (x,args) = getopt "-Ofast" args            in if x then options.optflag <- "-Ofast";
   let (x,args) = getopt "-O4" args               in if x then options.optflag <- "-O4";
+  let (x,args) = getopt "-v" args                in options.verbose <- x;
   let (cil_extra_args,args) = getallopts args    in
   if options.help then
     (printf "Usage: ./smpcc foo.c [options]\n";
