@@ -819,89 +819,100 @@ let bpr_ordering b = function
 | Acq_rel   -> bprintf b "acq_rel"
 | Seq_cst   -> bprintf b "seq_cst"
 
+let bpr_instr_metadata b md =
+  List.iter
+    (function
+      | (s, Mdnode i) ->
+          bprintf b ", !%s !%d" s i
+      | (s, Mdnodevector x) -> 
+          bprintf b ", !%s !{%a}" s bpr_mdnodevector x
+      | _ -> failwith "bpr_instr_metadata")
+    md
+
 let bpr_instr b (nopt, i) =
   bprintf b "  ";
   (match nopt with None -> ()
   | Some n -> bprintf b "%a = " bpr_var n);
   (match i with
   | Add(nuw, nsw, x, y, md) ->
-      bprintf b "add %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
+      bprintf b "add %a%a%a, %a%a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Sub(nuw, nsw, x, y, md) ->
-      bprintf b "sub %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
+      bprintf b "sub %a%a%a, %a%a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Mul(nuw, nsw, x, y, md) ->
-      bprintf b "mul %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
+      bprintf b "mul %a%a%a, %a%a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Shl(nuw, nsw, x, y, md) ->
-      bprintf b "shl %a%a%a, %a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y
+      bprintf b "shl %a%a%a, %a%a" (yes "nuw ") nuw (yes "nsw ") nsw bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Fadd(fmf, x, y, md)           ->
-      bprintf b "fadd %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
+      bprintf b "fadd %a%a, %a%a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Fsub(fmf, x, y, md)           ->
-      bprintf b "fsub %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
+      bprintf b "fsub %a%a, %a%a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Fmul(fmf, x, y, md)           ->
-      bprintf b "fmul %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
+      bprintf b "fmul %a%a, %a%a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Fdiv(fmf, x, y, md)           ->
-      bprintf b "fdiv %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
+      bprintf b "fdiv %a%a, %a%a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Frem(fmf, x, y, md)           ->
-      bprintf b "frem %a%a, %a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y
+      bprintf b "frem %a%a, %a%a" bpr_fast_math_flags fmf bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Sdiv(e, x, y, md)           ->
-      bprintf b "sdiv%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
+      bprintf b "sdiv%a %a, %a%a" (yes " exact") e bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Udiv(e, x, y, md)           ->
-      bprintf b "udiv%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
+      bprintf b "udiv%a %a, %a%a" (yes " exact") e bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Lshr(e, x, y, md)           ->
-      bprintf b "lshr%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
+      bprintf b "lshr%a %a, %a%a" (yes " exact") e bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Ashr(e, x, y, md)           ->
-      bprintf b "ashr%a %a, %a" (yes " exact") e bpr_typ_value x bpr_value y
+      bprintf b "ashr%a %a, %a%a" (yes " exact") e bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Urem(x, y, md)           ->
-      bprintf b "urem %a, %a" bpr_typ_value x bpr_value y
+      bprintf b "urem %a, %a%a" bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Srem(x, y, md)           ->
-      bprintf b "srem %a, %a" bpr_typ_value x bpr_value y
+      bprintf b "srem %a, %a%a" bpr_typ_value x bpr_value y bpr_instr_metadata md
   | And (x, y, md)           ->
-      bprintf b "and %a, %a" bpr_typ_value x bpr_value y
+      bprintf b "and %a, %a%a" bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Or  (x, y, md)           ->
-      bprintf b "or %a, %a" bpr_typ_value x bpr_value y
+      bprintf b "or %a, %a%a" bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Xor (x, y, md)           ->
-      bprintf b "xor %a, %a" bpr_typ_value x bpr_value y
+      bprintf b "xor %a, %a%a" bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Icmp(icmp, x, y, md) ->
-      bprintf b "icmp %a %a, %a" bpr_icmp icmp bpr_typ_value x bpr_value y
+      bprintf b "icmp %a %a, %a%a" bpr_icmp icmp bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Fcmp(fcmp, x, y, md) ->
-      bprintf b "icmp %a %a, %a" bpr_fcmp fcmp bpr_typ_value x bpr_value y
+      bprintf b "icmp %a %a, %a%a" bpr_fcmp fcmp bpr_typ_value x bpr_value y bpr_instr_metadata md
   | Trunc(x, y, md)          ->
-      bprintf b "trunc %a to %a" bpr_typ_value x         bpr_typ y
+      bprintf b "trunc %a to %a%a" bpr_typ_value x         bpr_typ y bpr_instr_metadata md
   | Zext(x, y, md)           ->
-      bprintf b "zext %a to %a" bpr_typ_value x          bpr_typ y
+      bprintf b "zext %a to %a%a" bpr_typ_value x          bpr_typ y bpr_instr_metadata md
   | Sext(x, y, md)           ->
-      bprintf b "sext %a to %a" bpr_typ_value x          bpr_typ y
+      bprintf b "sext %a to %a%a" bpr_typ_value x          bpr_typ y bpr_instr_metadata md
   | Fptrunc(x, y, md)        ->
-      bprintf b "fptrunc %a to %a" bpr_typ_value x       bpr_typ y
+      bprintf b "fptrunc %a to %a%a" bpr_typ_value x       bpr_typ y bpr_instr_metadata md
   | Fpext(x, y, md)          ->
-      bprintf b "fpext %a to %a" bpr_typ_value x         bpr_typ y
+      bprintf b "fpext %a to %a%a" bpr_typ_value x         bpr_typ y bpr_instr_metadata md
   | Bitcast(x, y, md)        ->
-      bprintf b "bitcast %a to %a" bpr_typ_value x       bpr_typ y
+      bprintf b "bitcast %a to %a%a" bpr_typ_value x       bpr_typ y bpr_instr_metadata md
   | Addrspacecast(x, y, md)  ->
-      bprintf b "addrspacecast %a to %a" bpr_typ_value x bpr_typ y
+      bprintf b "addrspacecast %a to %a%a" bpr_typ_value x bpr_typ y bpr_instr_metadata md
   | Uitofp(x, y, md)         ->
-      bprintf b "uitofp %a to %a" bpr_typ_value x        bpr_typ y
+      bprintf b "uitofp %a to %a%a" bpr_typ_value x        bpr_typ y bpr_instr_metadata md
   | Sitofp(x, y, md)         ->
-      bprintf b "sitofp %a to %a" bpr_typ_value x        bpr_typ y
+      bprintf b "sitofp %a to %a%a" bpr_typ_value x        bpr_typ y bpr_instr_metadata md
   | Fptoui(x, y, md)         ->
-      bprintf b "fptoui %a to %a" bpr_typ_value x        bpr_typ y
+      bprintf b "fptoui %a to %a%a" bpr_typ_value x        bpr_typ y bpr_instr_metadata md
   | Fptosi(x, y, md)         ->
-      bprintf b "fptosi %a to %a" bpr_typ_value x        bpr_typ y
+      bprintf b "fptosi %a to %a%a" bpr_typ_value x        bpr_typ y bpr_instr_metadata md
   | Inttoptr(x, y, md)       ->
-      bprintf b "inttoptr %a to %a" bpr_typ_value x      bpr_typ y
+      bprintf b "inttoptr %a to %a%a" bpr_typ_value x      bpr_typ y bpr_instr_metadata md
   | Ptrtoint(x, y, md)       ->
-      bprintf b "ptrtoint %a to %a" bpr_typ_value x      bpr_typ y
+      bprintf b "ptrtoint %a to %a%a" bpr_typ_value x      bpr_typ y bpr_instr_metadata md
   | Va_arg(x, y, md)         ->
-      bprintf b "va_arg %a, %a" bpr_typ_value x      bpr_typ y
+      bprintf b "va_arg %a, %a%a" bpr_typ_value x      bpr_typ y bpr_instr_metadata md
   | Getelementptr(inbounds, x, md) ->
-      bprintf b "getelementptr%a %a" (yes " inbounds") inbounds bpr_typ_value_list x
+      bprintf b "getelementptr%a %a%a" (yes " inbounds") inbounds bpr_typ_value_list x bpr_instr_metadata md
   | Shufflevector(x, md) ->
-      bprintf b "shufflevector %a" bpr_typ_value_list x
+      bprintf b "shufflevector %a%a" bpr_typ_value_list x bpr_instr_metadata md
   | Insertelement(x, md) ->
-      bprintf b "insertelement %a" bpr_typ_value_list x
+      bprintf b "insertelement %a%a" bpr_typ_value_list x bpr_instr_metadata md
   | Extractelement(x, md) ->
-      bprintf b "extractelement %a" bpr_typ_value_list x
+      bprintf b "extractelement %a%a" bpr_typ_value_list x bpr_instr_metadata md
   | Select(x, md) ->
-      bprintf b "select %a" bpr_typ_value_list x
+      bprintf b "select %a%a" bpr_typ_value_list x
+        bpr_instr_metadata md
   | Phi(ty, incoming, md) ->
       bprintf b "phi %a " bpr_typ ty;
       let first = ref true in
@@ -909,7 +920,8 @@ let bpr_instr b (nopt, i) =
         (fun (x, y) ->
           if not !first then bprintf b ", " else first := false;
           bprintf b "[ %a, %a ]" bpr_value x bpr_value y)
-        incoming
+        incoming;
+      bpr_instr_metadata b md
   | Landingpad(x, y, z, w, md) ->
       let bpr_landingpad b = function
         | Catch(typ, value) ->  bprintf b "catch %a %a" bpr_typ typ bpr_value value
@@ -917,69 +929,80 @@ let bpr_instr b (nopt, i) =
       let rec bpr b = function
         | [] -> ()
         | hd::tl -> bprintf b " %a" bpr_landingpad hd; bpr b tl in
-      bprintf b "landingpad %a personality %a%a%a" bpr_typ x bpr_typ_value y (yes " cleanup") z bpr w
+      bprintf b "landingpad %a personality %a%a%a%a" bpr_typ x bpr_typ_value y (yes " cleanup") z bpr w
+        bpr_instr_metadata md
   | Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs, md) ->
       if is_tail_call then bprintf b "tail ";
       bprintf b "call ";
       (opt bpr_callingconv) b callconv;
-      bprintf b "%a %a(%a)%a"
+      bprintf b "%a %a(%a)%a%a"
         bpr_typ callee_ty bpr_value callee_name bpr_arguments operands (before " " bpr_attribute) callattrs
+        bpr_instr_metadata md
   | Alloca(x, y, z, w, md) ->
       bprintf b "alloca ";
       if x then bprintf b "inalloca ";
       bpr_typ b y;
       (match z with None -> () | Some q -> bprintf b ", %a" bpr_typ_value q);
-      (match w with None -> () | Some q -> bprintf b ", align %d" q)
+      (match w with None -> () | Some q -> bprintf b ", align %d" q);
+      bpr_instr_metadata b md
   | Load(x, y, z, w, v, md) ->
       bprintf b "load %a%a%a" (yes "atomic ") x (yes "volatile ") y bpr_typ_value z;
       (match w with None -> () | Some(q, r) -> if q then bprintf b " singlethread"; bprintf b " %a" bpr_ordering r);
-      (match v with None -> () | Some q -> bprintf b ", align %d" q)
+      (match v with None -> () | Some q -> bprintf b ", align %d" q);
+      bpr_instr_metadata b md
   | Store(x, y, z, w, v, u, md) ->
       bprintf b "store %a%a%a, %a" (yes "atomic ") x (yes "volatile ") y bpr_typ_value z bpr_typ_value w;
       (match v with None -> () | Some(q, r) -> if q then bprintf b " singlethread"; bprintf b " %a" bpr_ordering r);
-      (match u with None -> () | Some q -> bprintf b ", align %d" q)
+      (match u with None -> () | Some q -> bprintf b ", align %d" q);
+      bpr_instr_metadata b md
   | Cmpxchg(x, y, z, w, v, u, t, md) ->
-      bprintf b "cmpxchg %a%a, %a, %a%a %a %a"
+      bprintf b "cmpxchg %a%a, %a, %a%a %a %a%a"
         (yes "volatile ") x bpr_typ_value y bpr_typ_value z bpr_typ_value w
         (yes " singlthread") v
         bpr_ordering u
         bpr_ordering t
+        bpr_instr_metadata md
   | Atomicrmw(x, y, z, w, v, u, md) ->
-      bprintf b "atomicrmw %a%a %a, %a%a %a"
+      bprintf b "atomicrmw %a%a %a, %a%a %a%a"
         (yes "volatile ") x
         bpr_binop y
         bpr_typ_value z
         bpr_typ_value w
         (yes " singlthread") v
         bpr_ordering u
+        bpr_instr_metadata md
   | Fence(x, y, md) ->
-      bprintf b "fence %a%a"
+      bprintf b "fence %a%a%a"
         (yes "singlthread ") x
         bpr_ordering y
+        bpr_instr_metadata md
   | Extractvalue(x, y, md) ->
-      bprintf b "extractvalue %a%a" bpr_typ_value x bpr_index_list y
+      bprintf b "extractvalue %a%a%a" bpr_typ_value x bpr_index_list y
+        bpr_instr_metadata md
   | Insertvalue(x, y, z, md) ->
-      bprintf b "insertvalue %a, %a%a" bpr_typ_value x bpr_typ_value y bpr_index_list z
+      bprintf b "insertvalue %a, %a%a%a" bpr_typ_value x bpr_typ_value y bpr_index_list z
+        bpr_instr_metadata md
   | Unreachable md ->
-      bprintf b "unreachable"
+      bprintf b "unreachable%a" bpr_instr_metadata md
   | Return(None, md) ->
-      bprintf b "ret void"
+      bprintf b "ret void%a" bpr_instr_metadata md
   | Return(Some(x, y), md) ->
-      bprintf b "ret %a %a" bpr_typ x bpr_value y
+      bprintf b "ret %a %a%a" bpr_typ x bpr_value y bpr_instr_metadata md
   | Br(x, None, md) ->
-      bprintf b "br %a" bpr_typ_value x
+      bprintf b "br %a%a" bpr_typ_value x bpr_instr_metadata md
   | Br(x, Some(y, z), md) ->
-      bprintf b "br %a, %a, %a" bpr_typ_value x bpr_typ_value y bpr_typ_value z
+      bprintf b "br %a, %a, %a%a" bpr_typ_value x bpr_typ_value y bpr_typ_value z bpr_instr_metadata md
   | Indirectbr(x, y, md) ->
-      bprintf b "indirectbr %a, [%a]" bpr_typ_value x bpr_typ_value_list y
+      bprintf b "indirectbr %a, [%a]%a" bpr_typ_value x bpr_typ_value_list y bpr_instr_metadata md
   | Resume(x, md) ->
-      bprintf b "resume %a" bpr_typ_value x
+      bprintf b "resume %a%a" bpr_typ_value x bpr_instr_metadata md
   | Switch(x, y, z, md) ->
-      bprintf b "switch %a, %a [%a]" bpr_typ_value x bpr_typ_value y
+      bprintf b "switch %a, %a [%a]%a" bpr_typ_value x bpr_typ_value y
         (between " "
            (fun b (c, d) -> bprintf b "%a, %a" bpr_typ_value c bpr_typ_value d)) z
+        bpr_instr_metadata md
   | Invoke(x, y, z, w, v, u, t, s, md) ->
-      bprintf b "invoke %a%a%a %a(%a)%a to %a unwind %a"
+      bprintf b "invoke %a%a%a %a(%a)%a to %a unwind %a%a"
         (opt bpr_callingconv) x
         bpr_attributes y
         bpr_typ z
@@ -987,7 +1010,8 @@ let bpr_instr b (nopt, i) =
         bpr_arguments v
         bpr_attributes u
         bpr_typ_value t
-        bpr_typ_value s);
+        bpr_typ_value s
+        bpr_instr_metadata md);
   bprintf b "\n"
 
 let bpr_block b {bname; binstrs} =
