@@ -683,7 +683,7 @@ let file2cu cil_extra_args file =
           failwith(sprintf "Error: failed to remove temporary directory %s, exit code %d" (Filename.quote temp_dir) ret);
         cil_file in
     (* Run clang *)
-    let ll_file = Filename.temp_file "mpcc" ".ll" in
+    let ll_file = Filename.temp_file "smpcc" ".ll" in
     let cmd =
       sprintf "clang -S %s -emit-llvm %s -o %s" options.optflag (Filename.quote src_file) (Filename.quote ll_file) in
     if options.verbose then
