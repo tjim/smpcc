@@ -1018,8 +1018,8 @@ let bpr_block b {bname; binstrs} =
   (* TODO: predecessor blocks *)
   (match bname with
     | Id(false, 0) -> () (* llvm does not print a label comment for block 0 *)
-    | Id(_, x) -> bprintf b "; <label>:%d%a\n" x pad_to_column 50
-    | Name(_, x) -> bprintf b "; <label>:%s%a\n" x pad_to_column 50);
+    | Id(_, x) -> bprintf b "; <label>:%d%a;\n" x pad_to_column 50
+    | Name(_, x) -> bprintf b "%s:%a;\n" x pad_to_column 50);
   List.iter (bpr_instr b) binstrs
 
 let bpr_function b f =
