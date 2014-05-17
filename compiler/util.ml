@@ -1014,13 +1014,45 @@ let bpr_instr b (nopt, i) =
         bpr_instr_metadata md);
   bprintf b "\n"
 
-let bpr_block b {bname; binstrs} =
+let bpr_block preds b {bname; binstrs} =
   (* TODO: predecessor blocks *)
+  let pred_list =
+    try
+      Hashtbl.find_all preds (Basicblock bname)
+    with _ -> [] in
+  let pred_list = List.rev pred_list in (* NB this is a guess *)
   (match bname with
     | Id(false, 0) -> () (* llvm does not print a label comment for block 0 *)
-    | Id(_, x) -> bprintf b "; <label>:%d%a;\n" x pad_to_column 50
-    | Name(_, x) -> bprintf b "%s:%a;\n" x pad_to_column 50);
+    | Id(_, x) -> bprintf b "; <label>:%d%a; preds = %a\n" x pad_to_column 50 (between ", " bpr_var) pred_list
+    | Name(_, x) -> bprintf b "%s:%a; preds = %a\n" x pad_to_column 50 (between ", " bpr_var) pred_list);
   List.iter (bpr_instr b) binstrs
+
+let predecessors f =
+  let result = Hashtbl.create 11 in
+  List.iter
+    (fun bl ->
+      let add target = Hashtbl.add result target bl.bname in
+      match List.rev bl.binstrs with
+      | (_,i)::_ ->
+          (match i with
+          | Br((_,target), None, _) ->
+              add target
+          | Br(_,Some((_,target1),(_,target2)),_) ->
+              add target1; add target2
+          | Indirectbr(_,targets,_) ->
+              List.iter
+                (fun (_,target) -> add target)
+                targets
+          | Switch(_,(_,default_target),targets,_) ->
+              add default_target;
+              List.iter
+                (fun (_,(_,target)) -> add target)
+                targets
+          | _ -> (* Not sure what do about Invoke and Resume *)
+              ())
+      | _ -> ())
+    f.fblocks;
+  result
 
 let bpr_function b f =
   bprintf b "\n";
@@ -1042,8 +1074,9 @@ let bpr_function b f =
 
     (before " " bpr_attribute) f.fattrs;
   if f.fblocks = [] then bprintf b "\n" else begin
+    let preds = predecessors f in
     bprintf b " {\n%a}\n"
-      (between "\n" bpr_block) f.fblocks;
+      (between "\n" (bpr_block preds)) f.fblocks;
   end
 
 let bpr_mdnode b x =
