@@ -11,7 +11,7 @@ type toplevel =
   | Alias of Util.ainfo
   | MDNodeDefn of Util.mdinfo
   | MDVarDefn of string * int list
-  | Attrgrp of string * Util.attribute list
+  | Attrgrp of int * Util.attribute list
 
 let list_of_string s =
   if String.length s < 2 || String.get s 0 <> '"' || String.get s (String.length s - 1) <> '"' then
@@ -67,7 +67,7 @@ let process_toplevels t =
 %token <string> APFloat
 %token <string> APInt
 %token <string> APSint
-%token <string> AttrGrpID
+%token <int> AttrGrpID
 %token Backslash
 %token Comma
 %token DotDotDot
@@ -806,7 +806,7 @@ call_attributes:
 | call_attribute call_attributes { $1::$2 }
 ;
 call_attribute:
-| AttrGrpID   { Util.Attrgrp(int_of_string $1) }
+| AttrGrpID   { Util.Attrgrp($1) }
 | Kw_noreturn { Util.Noreturn }
 | Kw_nounwind { Util.Nounwind }
 | Kw_readnone { Util.Readnone }
@@ -817,7 +817,7 @@ function_attributes:
 | function_attribute function_attributes { $1::$2 }
 ;
 function_attribute:
-| AttrGrpID                                { Util.Attrgrp(int_of_string $1) }
+| AttrGrpID                                { Util.Attrgrp($1) }
 | StringConstant Equal StringConstant      { Util.Attr($1, Some $3) }
 | Kw_alignstack Equal Lparen APInt Rparen  { Util.Alignstack(int_of_string $4) }
 | Kw_alwaysinline                          { Util.Alwaysinline     }

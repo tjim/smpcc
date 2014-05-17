@@ -377,7 +377,7 @@ type cunit = {
     mutable cglobals: ginfo list;
     mutable caliases: ainfo list;
     mutable cfuns: finfo list;
-    mutable cattrgrps: (string * attribute list) list;
+    mutable cattrgrps: (int * attribute list) list;
     mutable cmdvars: (string * int list) list;
     mutable cmdnodes: mdinfo list;
   }
@@ -504,7 +504,7 @@ let bpr_attributes =
   between " " bpr_attribute
 
 let bpr_attrgrp b (x, y) =
-  bprintf b "attributes #%s = { %a }\n" x bpr_attributes y
+  bprintf b "attributes #%d = { %a }\n" x bpr_attributes y
 
 let bpr_callingconv b = function
   | Ccc               -> bprintf b "ccc"
@@ -1050,6 +1050,32 @@ let bpr_mdnode b x =
   bprintf b "!%d = %a !%a\n" x.mdid bpr_typ x.mdtyp
     bpr_mdnodevector x.mdcontents
 
+module ASet = Set.Make(
+  struct
+    type t = attribute
+    let compare = compare
+  end)
+
+module ISet = Set.Make(
+  struct
+    type t = int
+    let compare = compare
+  end)
+
+let resolve_attributes groups attributes =
+  let rec loop result resolved =
+    function
+      | [] ->
+          result
+      | (Attrgrp i)::tl ->
+          if ISet.mem i resolved then
+            loop result resolved tl
+          else
+            loop result (ISet.add i resolved) ((List.assoc i groups) @ tl)
+      | hd::tl ->
+          loop (ASet.add hd result) resolved tl in
+  loop ASet.empty ISet.empty attributes
+
 let bpr_cu b cu =
   (match cu.cdatalayout with
   | None -> ()
@@ -1068,7 +1094,14 @@ let bpr_cu b cu =
   List.iter (bpr_global b) cu.cglobals;
   if cu.caliases <> [] then bprintf b "\n";
   List.iter (bpr_alias b) cu.caliases;
-  List.iter (bpr_function b) cu.cfuns;
+  List.iter
+    (fun f ->
+      let attributes = ASet.elements(resolve_attributes cu.cattrgrps f.fattrs) in
+      let attributes = List.filter (function | Attr _ -> false | _ -> true) attributes in
+      bprintf b "\n; Function Attrs: %a"
+        (between " " bpr_attribute) attributes;
+      bpr_function b f)
+    cu.cfuns;
   if cu.cattrgrps <> [] then bprintf b "\n";
   List.iter (bpr_attrgrp b) cu.cattrgrps;
   if cu.cmdvars <> [] then bprintf b "\n";
@@ -1338,3 +1371,4 @@ let value_map g f =
         {bname=bl.bname; binstrs=List.map (fun (nopt,i) -> (nopt, imap i)) bl.binstrs})
       f.fblocks));
   ()
+
