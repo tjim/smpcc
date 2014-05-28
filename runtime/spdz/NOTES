@@ -1,0 +1,78 @@
+Notes on "Practical Covertly Secure MPC for Dishonest Majority – or: Breaking the SPDZ Limits"
+
+INPUT
+
+In the offline phase the party j with an input establishes random (r, <r>).
+
+In the online phase the party j has an actual input x.  To establish shares of x, 
+it broadcasts (x-r) and sets
+
+    xj = rj + (x-r)
+
+    M(x)j = M(r)j + alphaj*(x-r)
+
+All other parties i<>j set
+
+    xi = ri
+
+    M(x)i = M(r)i + alphai*(x-r)
+
+Now we can check
+
+    x1 + ... + xn = r + (x - r) = x
+
+    M(x)1 + ... + M(x)n = M(r) + M(x-r)
+                        = M(r) + M(x) - M(r)
+                        = M(x)
+
+MULTIPLICATION
+
+Let there be n+1 parties 0...n and let 0 be a distinguished party.
+
+All parties share x and y and we want to share z = xy.
+
+The parties use a shared multiplication triple (a,b,c) (so that c = ab).
+
+All parties calculate
+    e = x-a
+    r = y-b
+by opening.
+
+That is, each party i calculates (xi - ai) and (yi - bi) and
+broadcasts them; then all parties can calculate e and r, without
+revealing any xi, ai, yi, or bi.
+
+Now each party i<>0 sets
+
+    zi = ci + (e * bi) + (r * ai)
+
+And the distinguished party 0 sets
+
+    z0 = c0 + (e * b0) + (r * a0) + (e * r)
+
+Then
+
+    z0 + ... + zn = (c0 + ... + cn) + e * (b0 + ... + bn) + r * (a0 + ... + an) + (e * r)
+                  = c + (e * b) + (r * a) + (e * r)
+                  = c + ((x-a) * b) + ((y-b) * a) + (e * r)
+                  = c + xb - ab + ya - ba + ((x-a) * (y - b))
+                  = c - 2ab + xb + ya + (xy - xb - ya + ab)
+                  = c - ab + xy
+                  = xy
+
+For the mac, all parties i (including the distinguished party 0) set
+
+    M(z)i = M(c)i + (e * M(b)i) + (r * M(a)i) + alphai * (e * r)
+
+Then
+
+    M(z)0 + ... + M(z)n = M(c) + e * M(b) + r * M(a) + M(e * r)
+                        = M(c) + (x-a) * M(b) + (y-b) * M(a) + M((x-a)*(y-b))
+                        = M(c) + (x-a) * M(b) + (y-b) * M(a) + M(x*x) + M(-xb) + M(-ya) + M(ab)
+                        = M(c) + x*M(b) - a*M(b) + y*M(a) - b*M(a) + M(x*x) - x*M(b) - y*M(a) + a*M(b)
+                        = M(c) - b*M(a) + M(x*x)
+                        = M(c) + M(-ab) + M(x*x)
+                        = M(c - ab + x*x)
+                        = M(x*x)
+
+as desired.
