@@ -179,6 +179,72 @@ func Sub32(io Io, a, b uint32) uint32 {
 	return result
 }
 
+func Uint8(io Io, a uint8) uint8 {
+	/* Alternately, party 0 could distribute random shares */
+	if io.Id() == 0 {
+		return a
+	}
+	return 0
+}
+
+func Uint32(io Io, a uint32) uint32 {
+	/* Alternately, party 0 could distribute random shares */
+	if io.Id() == 0 {
+		return a
+	}
+	return 0
+}
+
+func Select8(io Io, s bool, a, b uint8) uint8 {
+	var result uint8 = 0
+	for i := uint8(1); i > 0; i = i*2 {
+		ai := (a & i) > 0
+		bi := (b & i) > 0
+		if xor(bi, And1(io, s, xor(ai, bi))) {
+			result |= i
+		}
+	}
+	return result
+}
+
+func Select32(io Io, s bool, a, b uint32) uint32 {
+	var result uint32 = 0
+	for i := uint32(1); i > 0; i = i*2 {
+		ai := (a & i) > 0
+		bi := (b & i) > 0
+		if xor(bi, And1(io, s, xor(ai, bi))) {
+			result |= i
+		}
+	}
+	return result
+}
+
+func Mul8(io Io, a, b uint8) uint8 {
+	zeros := Uint8(io, 0)
+	b0 := (b & 1) > 0
+	result := Select8(io, b0, a, zeros)
+	for i := uint8(2); i > 0; i = i*2 {
+		bi := (b & i) > 0
+		a = a << 1
+		sum := Add8(io, result, a)
+		result = Select8(io, bi, sum, result)
+	}
+	return result
+}
+
+func Mul32(io Io, a, b uint32) uint32 {
+	zeros := Uint32(io, 0)
+	b0 := (b & 1) > 0
+	result := Select32(io, b0, a, zeros)
+	for i := uint32(2); i > 0; i = i*2 {
+		bi := (b & i) > 0
+		a = a << 1
+		sum := Add32(io, result, a)
+		result = Select32(io, bi, sum, result)
+	}
+	return result
+}
+
 /* mocked-up implementation of Io */
 type X struct {
 	id        int /* id of party, range is 0..n-1 */
@@ -469,15 +535,14 @@ func Example(n int) []X {
 }
 
 func RunExample() uint32 {
-	xs := Example(7)
+	xs := Example(1)
 	done := make(chan uint32, len(xs))
 	results := make([]uint32, len(xs))
 	for _, x := range xs {
 		go func(x X) {
-			y := Input32(x, 3)
-			z := Input32(x, 6)
-			Output32(x, Sub32(x, y, z))
-			done <- Output32(x, Add32(x, y, z))
+			y := Uint8(x, 3)
+			z := Uint8(x, 6)
+			done <- Output32(x, uint32(Mul8(x, y, z)))
 		}(x)
 	}
 	for i := range xs {
