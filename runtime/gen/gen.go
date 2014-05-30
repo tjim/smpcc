@@ -104,7 +104,7 @@ func Lshr(io GenVM, a []base.Wire, b int) []base.Wire {
 	return result[b:]
 }
 
-/* constant logical shift right; TODO: variable Ashr */
+/* constant arithmetic shift right; TODO: variable Ashr */
 func Ashr(io GenVM, a []base.Wire, b int) []base.Wire {
 	if len(a) <= b {
 		panic("Ashr() too far")

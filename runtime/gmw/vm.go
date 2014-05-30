@@ -373,6 +373,33 @@ func Mul32(io Io, a, b uint32) uint32 {
 	return result
 }
 
+/* constant shift left; TODO: variable Shl */
+func Shl8(io Io, a uint8, b uint) uint8 {
+	return a << b
+}
+
+func Shl32(io Io, a uint32, b uint) uint32 {
+	return a << b
+}
+
+/* constant logical shift right; TODO: variable Lshr */
+func Lshr8(io Io, a uint8, b uint) uint8 {
+	return a >> b
+}
+
+func Lshr32(io Io, a uint32, b uint) uint32 {
+	return a >> b
+}
+
+/* constant arithmetic shift right; TODO: variable Ashr */
+func Ashr8(io Io, a uint8, b uint) uint8 {
+	return uint8(int8(a) >> b)
+}
+
+func Ashr32(io Io, a uint32, b uint) uint32 {
+	return uint32(int32(a) >> b)
+}
+
 /* mocked-up implementation of Io */
 type X struct {
 	id        int /* id of party, range is 0..n-1 */
@@ -496,12 +523,6 @@ func (x X) Triple1() (a, b, c bool) {
 	x.triples1 = x.triples1[1:]
 	return result.a, result.b, result.c
 }
-
-//func (x X) Triple1b() (a, b, c bool) {
-//	a8, b8, c8 := x.Triple1()
-//	a, b, c = (a8 > 0), (b8 > 0), (c8 > 0)
-//	return
-//}
 
 func (x X) Open1(s bool) bool {
 	x.Broadcast1(s)
@@ -683,7 +704,7 @@ func RunExample() uint32 {
 	results := make([]uint32, len(xs))
 	for _, x := range xs {
 		go func(x X) {
-			done <- Output1(x, Icmp_slt8(x, Uint8(x, 127), Uint8(x, 5)))
+			done <- Output8(x, Lshr8(x, Uint8(x, 128), 7))
 		}(x)
 	}
 	for i := range xs {
