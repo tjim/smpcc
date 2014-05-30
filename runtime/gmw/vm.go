@@ -11,18 +11,22 @@ type Io interface {
 	Open1(bool) bool
 	Open8(uint8) uint8
 	Open32(uint32) uint32
+	Open64(uint64) uint64
 
 	Broadcast1(bool)
 	Broadcast8(uint8)
 	Broadcast32(uint32)
+	Broadcast64(uint64)
 
 	Receive1(party int) bool
 	Receive8(party int) uint8
 	Receive32(party int) uint32
+	Receive64(party int) uint64
 
 	Triple1() (a, b, c bool)
 	Triple8() (a, b, c uint8)
 	Triple32() (a, b, c uint32)
+	Triple64() (a, b, c uint64)
 }
 
 func xor(x, y bool) bool {
@@ -38,6 +42,10 @@ func Xor8(io Io, x, y uint8) uint8 {
 }
 
 func Xor32(io Io, x, y uint32) uint32 {
+	return x ^ y
+}
+
+func Xor64(io Io, x, y uint64) uint64 {
 	return x ^ y
 }
 
@@ -74,11 +82,15 @@ func And32(io Io, x, y uint32) uint32 {
 	}
 }
 
-func Not1(io Io, a bool) bool {
+func And64(io Io, x, y uint64) uint64 {
+	a, b, c := io.Triple64()
+	d := io.Open64(x ^ a)
+	e := io.Open64(y ^ b)
 	if io.Id() == 0 {
-		return !a
+		return c ^ d&b ^ e&a ^ d&e
+	} else {
+		return c ^ d&b ^ e&a
 	}
-	return a
 }
 
 func Or1(io Io, a, b bool) bool {
@@ -91,6 +103,17 @@ func Or8(io Io, a, b uint8) uint8 {
 
 func Or32(io Io, a, b uint32) uint32 {
 	return Not32(io, And32(io, Not32(io, a), Not32(io, b)))
+}
+
+func Or64(io Io, a, b uint64) uint64 {
+	return Not64(io, And64(io, Not64(io, a), Not64(io, b)))
+}
+
+func Not1(io Io, a bool) bool {
+	if io.Id() == 0 {
+		return !a
+	}
+	return a
 }
 
 func Not8(io Io, a uint8) uint8 {
@@ -107,16 +130,23 @@ func Not32(io Io, a uint32) uint32 {
 	return a
 }
 
+func Not64(io Io, a uint64) uint64 {
+	if io.Id() == 0 {
+		return 0xffffffffffffffff ^ a
+	}
+	return a
+}
+
 func Icmp_eq8(io Io, a, b uint8) bool {
 	bitwise_inequality := Xor8(io, a, b)
-	var treeor func (x, n uint8) bool
-	treeor = func (x, n uint8) bool {
+	var treeor func(x, n uint8) bool
+	treeor = func(x, n uint8) bool {
 		// compute OR on rightmost n bits of x
 		// invariant: bits to left of rightmost n bits are 0
 		if n == 1 {
 			return x > 0
 		}
-		half := n/2
+		half := n / 2
 		left := x >> half
 		right := x & ((1 << half) - 1)
 		return Or1(io, treeor(left, half), treeor(right, half))
@@ -126,14 +156,14 @@ func Icmp_eq8(io Io, a, b uint8) bool {
 
 func Icmp_eq32(io Io, a, b uint32) bool {
 	bitwise_inequality := Xor32(io, a, b)
-	var treeor func (x, n uint32) bool
-	treeor = func (x, n uint32) bool {
+	var treeor func(x, n uint32) bool
+	treeor = func(x, n uint32) bool {
 		// compute OR on rightmost n bits of x
 		// invariant: bits to left of rightmost n bits are 0
 		if n == 1 {
 			return x > 0
 		}
-		half := n/2
+		half := n / 2
 		left := x >> half
 		right := x & ((1 << half) - 1)
 		return Or1(io, treeor(left, half), treeor(right, half))
@@ -141,9 +171,26 @@ func Icmp_eq32(io Io, a, b uint32) bool {
 	return Not1(io, treeor(bitwise_inequality, uint32(32)))
 }
 
+func Icmp_eq64(io Io, a, b uint64) bool {
+	bitwise_inequality := Xor64(io, a, b)
+	var treeor func(x, n uint64) bool
+	treeor = func(x, n uint64) bool {
+		// compute OR on rightmost n bits of x
+		// invariant: bits to left of rightmost n bits are 0
+		if n == 1 {
+			return x > 0
+		}
+		half := n / 2
+		left := x >> half
+		right := x & ((1 << half) - 1)
+		return Or1(io, treeor(left, half), treeor(right, half))
+	}
+	return Not1(io, treeor(bitwise_inequality, uint64(32)))
+}
+
 func Icmp_ugt8(io Io, a, b uint8) bool {
 	c := false
-	for i := uint8(1); i > 0; i = i*2 {
+	for i := uint8(1); i > 0; i = i * 2 {
 		ai := (a & i) > 0
 		bi := (b & i) > 0
 		c = xor(ai, And1(io, xor(ai, c), xor(bi, c)))
@@ -153,7 +200,17 @@ func Icmp_ugt8(io Io, a, b uint8) bool {
 
 func Icmp_ugt32(io Io, a, b uint32) bool {
 	c := false
-	for i := uint32(1); i > 0; i = i*2 {
+	for i := uint32(1); i > 0; i = i * 2 {
+		ai := (a & i) > 0
+		bi := (b & i) > 0
+		c = xor(ai, And1(io, xor(ai, c), xor(bi, c)))
+	}
+	return c
+}
+
+func Icmp_ugt64(io Io, a, b uint64) bool {
+	c := false
+	for i := uint64(1); i > 0; i = i * 2 {
 		ai := (a & i) > 0
 		bi := (b & i) > 0
 		c = xor(ai, And1(io, xor(ai, c), xor(bi, c)))
@@ -169,10 +226,14 @@ func Icmp_ult32(io Io, a, b uint32) bool {
 	return Icmp_ugt32(io, b, a)
 }
 
+func Icmp_ult64(io Io, a, b uint64) bool {
+	return Icmp_ugt64(io, b, a)
+}
+
 func Icmp_sgt8(io Io, a, b uint8) bool {
 	highbit := uint8(1 << 7)
-	a_high, a_rest := (a & highbit) > 0, a ^ highbit
-	b_high, b_rest := (b & highbit) > 0, b ^ highbit
+	a_high, a_rest := (a&highbit) > 0, a^highbit
+	b_high, b_rest := (b&highbit) > 0, b^highbit
 	return Or1(io, And1(io, Not1(io, a_high), b_high), // a_high = 0, b_high = 1
 		And1(io, Not1(io, Xor1(io, a_high, b_high)), // a_high and b_high are the same
 			Icmp_ugt8(io, a_rest, b_rest))) // a_rest > b_rest (unsigned)
@@ -180,11 +241,20 @@ func Icmp_sgt8(io Io, a, b uint8) bool {
 
 func Icmp_sgt32(io Io, a, b uint32) bool {
 	highbit := uint32(1 << 31)
-	a_high, a_rest := (a & highbit) > 0, a ^ highbit
-	b_high, b_rest := (b & highbit) > 0, b ^ highbit
+	a_high, a_rest := (a&highbit) > 0, a^highbit
+	b_high, b_rest := (b&highbit) > 0, b^highbit
 	return Or1(io, And1(io, Not1(io, a_high), b_high), // a_high = 0, b_high = 1
 		And1(io, Not1(io, Xor1(io, a_high, b_high)), // a_high and b_high are the same
 			Icmp_ugt32(io, a_rest, b_rest))) // a_rest > b_rest (unsigned)
+}
+
+func Icmp_sgt64(io Io, a, b uint64) bool {
+	highbit := uint64(1 << 63)
+	a_high, a_rest := (a&highbit) > 0, a^highbit
+	b_high, b_rest := (b&highbit) > 0, b^highbit
+	return Or1(io, And1(io, Not1(io, a_high), b_high), // a_high = 0, b_high = 1
+		And1(io, Not1(io, Xor1(io, a_high, b_high)), // a_high and b_high are the same
+			Icmp_ugt64(io, a_rest, b_rest))) // a_rest > b_rest (unsigned)
 }
 
 func Icmp_slt8(io Io, a, b uint8) bool {
@@ -195,9 +265,13 @@ func Icmp_slt32(io Io, a, b uint32) bool {
 	return Icmp_sgt32(io, b, a)
 }
 
+func Icmp_slt64(io Io, a, b uint64) bool {
+	return Icmp_sgt64(io, b, a)
+}
+
 func Icmp_uge8(io Io, a, b uint8) bool {
 	c := true
-	for i := uint8(1); i > 0; i = i*2 {
+	for i := uint8(1); i > 0; i = i * 2 {
 		ai := (a & i) > 0
 		bi := (b & i) > 0
 		c = xor(ai, And1(io, xor(ai, c), xor(bi, c)))
@@ -207,7 +281,17 @@ func Icmp_uge8(io Io, a, b uint8) bool {
 
 func Icmp_uge32(io Io, a, b uint32) bool {
 	c := true
-	for i := uint32(1); i > 0; i = i*2 {
+	for i := uint32(1); i > 0; i = i * 2 {
+		ai := (a & i) > 0
+		bi := (b & i) > 0
+		c = xor(ai, And1(io, xor(ai, c), xor(bi, c)))
+	}
+	return c
+}
+
+func Icmp_uge64(io Io, a, b uint64) bool {
+	c := true
+	for i := uint64(1); i > 0; i = i * 2 {
 		ai := (a & i) > 0
 		bi := (b & i) > 0
 		c = xor(ai, And1(io, xor(ai, c), xor(bi, c)))
@@ -221,6 +305,10 @@ func Icmp_ule8(io Io, a, b uint8) bool {
 
 func Icmp_ule32(io Io, a, b uint32) bool {
 	return Icmp_uge32(io, b, a)
+}
+
+func Icmp_ule64(io Io, a, b uint64) bool {
+	return Icmp_uge64(io, b, a)
 }
 
 func Add8(io Io, a, b uint8) uint8 {
@@ -252,6 +340,27 @@ func Add32(io Io, a, b uint32) uint32 {
 	}
 	c := a0 && b0 /* carry bit */
 	for i := uint32(2); i > 0; i = i * 2 {
+		ai := (a & i) > 0
+		bi := (b & i) > 0
+		/* compute the result bit */
+		bi_xor_c := xor(bi, c)
+		if xor(ai, bi_xor_c) {
+			result |= i
+		}
+		/* compute the carry bit. */
+		c = xor(c, And1(io, xor(ai, c), bi_xor_c))
+	}
+	return result
+}
+
+func Add64(io Io, a, b uint64) uint64 {
+	var result uint64 = 0
+	var a0, b0 bool = (a & 1) > 0, (b & 1) > 0
+	if xor(a0, b0) {
+		result |= 1
+	}
+	c := a0 && b0 /* carry bit */
+	for i := uint64(2); i > 0; i = i * 2 {
 		ai := (a & i) > 0
 		bi := (b & i) > 0
 		/* compute the result bit */
@@ -307,6 +416,27 @@ func Sub32(io Io, a, b uint32) uint32 {
 	return result
 }
 
+func Sub64(io Io, a, b uint64) uint64 {
+	var result uint64 = 0
+	var a0, b0 bool = (a & 1) > 0, (b & 1) > 0
+	if xor(a0, b0) {
+		result |= 1
+	}
+	c := xor(a0, And1(io, Not1(io, a0), Not1(io, b0))) /* carry bit */
+	for i := uint64(2); i > 0; i = i * 2 {
+		ai := (a & i) > 0
+		bi := (b & i) > 0
+		/* compute the result bit */
+		bi_xor_c := xor(bi, c)
+		if Not1(io, xor(ai, bi_xor_c)) {
+			result |= i
+		}
+		/* compute the carry bit. */
+		c = xor(ai, And1(io, xor(ai, c), bi_xor_c))
+	}
+	return result
+}
+
 func Uint8(io Io, a uint8) uint8 {
 	/* Alternately, party 0 could distribute random shares */
 	if io.Id() == 0 {
@@ -323,9 +453,17 @@ func Uint32(io Io, a uint32) uint32 {
 	return 0
 }
 
+func Uint64(io Io, a uint64) uint64 {
+	/* Alternately, party 0 could distribute random shares */
+	if io.Id() == 0 {
+		return a
+	}
+	return 0
+}
+
 func Select8(io Io, s bool, a, b uint8) uint8 {
 	var result uint8 = 0
-	for i := uint8(1); i > 0; i = i*2 {
+	for i := uint8(1); i > 0; i = i * 2 {
 		ai := (a & i) > 0
 		bi := (b & i) > 0
 		if xor(bi, And1(io, s, xor(ai, bi))) {
@@ -337,7 +475,19 @@ func Select8(io Io, s bool, a, b uint8) uint8 {
 
 func Select32(io Io, s bool, a, b uint32) uint32 {
 	var result uint32 = 0
-	for i := uint32(1); i > 0; i = i*2 {
+	for i := uint32(1); i > 0; i = i * 2 {
+		ai := (a & i) > 0
+		bi := (b & i) > 0
+		if xor(bi, And1(io, s, xor(ai, bi))) {
+			result |= i
+		}
+	}
+	return result
+}
+
+func Select64(io Io, s bool, a, b uint64) uint64 {
+	var result uint64 = 0
+	for i := uint64(1); i > 0; i = i * 2 {
 		ai := (a & i) > 0
 		bi := (b & i) > 0
 		if xor(bi, And1(io, s, xor(ai, bi))) {
@@ -351,7 +501,7 @@ func Mul8(io Io, a, b uint8) uint8 {
 	zeros := Uint8(io, 0)
 	b0 := (b & 1) > 0
 	result := Select8(io, b0, a, zeros)
-	for i := uint8(2); i > 0; i = i*2 {
+	for i := uint8(2); i > 0; i = i * 2 {
 		bi := (b & i) > 0
 		a = a << 1
 		sum := Add8(io, result, a)
@@ -364,11 +514,24 @@ func Mul32(io Io, a, b uint32) uint32 {
 	zeros := Uint32(io, 0)
 	b0 := (b & 1) > 0
 	result := Select32(io, b0, a, zeros)
-	for i := uint32(2); i > 0; i = i*2 {
+	for i := uint32(2); i > 0; i = i * 2 {
 		bi := (b & i) > 0
 		a = a << 1
 		sum := Add32(io, result, a)
 		result = Select32(io, bi, sum, result)
+	}
+	return result
+}
+
+func Mul64(io Io, a, b uint64) uint64 {
+	zeros := Uint64(io, 0)
+	b0 := (b & 1) > 0
+	result := Select64(io, b0, a, zeros)
+	for i := uint64(2); i > 0; i = i * 2 {
+		bi := (b & i) > 0
+		a = a << 1
+		sum := Add64(io, result, a)
+		result = Select64(io, bi, sum, result)
 	}
 	return result
 }
@@ -382,12 +545,20 @@ func Shl32(io Io, a uint32, b uint) uint32 {
 	return a << b
 }
 
+func Shl64(io Io, a uint64, b uint) uint64 {
+	return a << b
+}
+
 /* constant logical shift right; TODO: variable Lshr */
 func Lshr8(io Io, a uint8, b uint) uint8 {
 	return a >> b
 }
 
 func Lshr32(io Io, a uint32, b uint) uint32 {
+	return a >> b
+}
+
+func Lshr64(io Io, a uint64, b uint) uint64 {
 	return a >> b
 }
 
@@ -400,176 +571,20 @@ func Ashr32(io Io, a uint32, b uint) uint32 {
 	return uint32(int32(a) >> b)
 }
 
-/* mocked-up implementation of Io */
-type X struct {
-	id        int /* id of party, range is 0..n-1 */
-	triples32 []struct{ a, b, c uint32 }
-	triples8  []struct{ a, b, c uint8 }
-	triples1  []struct{ a, b, c bool }
-	rchannels []chan uint32 /* channels for reading from other parties */
-	wchannels []chan uint32 /* channels for writing to other parties */
-	inputs    []uint32      /* inputs of this party */
+func Ashr64(io Io, a uint64, b uint) uint64 {
+	return uint64(int64(a) >> b)
 }
 
-func (x X) Id() int {
-	return x.id
+func Mask8(io Io, s bool, a uint8) uint8 {
+	return Select8(io, s, a, Uint8(io, 0))
 }
 
-func (x X) Triple32() (a, b, c uint32) {
-	result := x.triples32[0]
-	x.triples32 = x.triples32[1:]
-	return result.a, result.b, result.c
+func Mask32(io Io, s bool, a uint32) uint32 {
+	return Select32(io, s, a, Uint32(io, 0))
 }
 
-func (x X) Open32(s uint32) uint32 {
-	x.Broadcast32(s)
-	result := s
-	id := x.Id()
-	for i := range x.rchannels {
-		if i == id {
-			continue
-		}
-		result ^= x.Receive32(i)
-	}
-	return result
-}
-
-func (x X) Broadcast32(n uint32) {
-	id := x.Id()
-	fmt.Printf("%d: BROADCAST 0x%08x\n", id, n)
-	for i, ch := range x.wchannels {
-		if i == id {
-			continue
-		}
-		go func(ch chan<- uint32, i int) {
-			ch <- n
-			fmt.Printf("%d -- 0x%08x -> %d\n", id, n, i)
-		}(ch, i)
-	}
-}
-
-func (x X) Receive32(party int) uint32 {
-	id := x.Id()
-	if party == id {
-		return 0
-	}
-	ch := x.rchannels[party]
-	result := <-ch
-	fmt.Printf("%d <- 0x%08x -- %d\n", id, result, party)
-	return result
-}
-
-func (x X) Triple8() (a, b, c uint8) {
-	if len(x.triples8) == 0 {
-		a32, b32, c32 := x.Triple32()
-		x.triples8 = []struct{ a, b, c uint8 }{{uint8(a32 >> 0), uint8(b32 >> 0), uint8(c32 >> 0)},
-			{uint8(a32 >> 8), uint8(b32 >> 8), uint8(c32 >> 8)},
-			{uint8(a32 >> 16), uint8(b32 >> 16), uint8(c32 >> 16)},
-			{uint8(a32 >> 24), uint8(b32 >> 24), uint8(c32 >> 24)}}
-	}
-	result := x.triples8[0]
-	x.triples8 = x.triples8[1:]
-	return result.a, result.b, result.c
-}
-
-func (x X) Open8(s uint8) uint8 {
-	x.Broadcast8(s)
-	result := s
-	id := x.Id()
-	for i := range x.rchannels {
-		if i == id {
-			continue
-		}
-		result ^= x.Receive8(i)
-	}
-	return result
-}
-
-func (x X) Broadcast8(n uint8) {
-	id := x.Id()
-	fmt.Printf("%d: BROADCAST 0x%02x\n", id, n)
-	for i, ch := range x.wchannels {
-		if i == id {
-			continue
-		}
-		go func(ch chan<- uint32, i int) {
-			ch <- uint32(n)
-			fmt.Printf("%d -- 0x%02x -> %d\n", id, n, i)
-		}(ch, i)
-	}
-}
-
-func (x X) Receive8(party int) uint8 {
-	id := x.Id()
-	if party == id {
-		return 0
-	}
-	ch := x.rchannels[party]
-	result := <-ch
-	fmt.Printf("%d <- 0x%02x -- %d\n", id, result, party)
-	return uint8(result)
-}
-
-func (x X) Triple1() (a, b, c bool) {
-	if len(x.triples1) == 0 {
-		a32, b32, c32 := x.Triple32()
-		x.triples1 = make([]struct{ a, b, c bool }, 32)
-		for i := range x.triples1 {
-			ui := uint(i)
-			x.triples1[i] = struct{ a, b, c bool }{0 < (1 & (a32 >> ui)), 0 < (1 & (b32 >> ui)), 0 < (1 & (c32 >> ui))}
-		}
-	}
-	result := x.triples1[0]
-	x.triples1 = x.triples1[1:]
-	return result.a, result.b, result.c
-}
-
-func (x X) Open1(s bool) bool {
-	x.Broadcast1(s)
-	result := s
-	id := x.Id()
-	for i := range x.rchannels {
-		if i == id {
-			continue
-		}
-		result = xor(result, x.Receive1(i))
-	}
-	return result
-}
-
-func (x X) Broadcast1(n bool) {
-	var n32 uint32 = 0
-	if n {
-		n32 = 1
-	}
-	id := x.Id()
-	fmt.Printf("%d: BROADCAST 0x%1x\n", id, n32)
-	for i, ch := range x.wchannels {
-		if i == id {
-			continue
-		}
-		go func(ch chan<- uint32, i int) {
-			ch <- n32
-			fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
-		}(ch, i)
-	}
-}
-
-func (x X) Receive1(party int) bool {
-	id := x.Id()
-	if party == id {
-		return false
-	}
-	ch := x.rchannels[party]
-	result := <-ch
-	fmt.Printf("%d <- 0x%1x -- %d\n", id, result, party)
-	return result > 0
-}
-
-func (x X) GetInput() uint32 {
-	result := x.inputs[0]
-	x.inputs = x.inputs[1:]
-	return result
+func Mask64(io Io, s bool, a uint64) uint64 {
+	return Select64(io, s, a, Uint64(io, 0))
 }
 
 func Input32(io Io, party int) uint32 {
@@ -600,6 +615,210 @@ func Output8(io Io, x uint8) uint32 {
 func Output32(io Io, x uint32) uint32 {
 	result := io.Open32(x)
 	fmt.Printf("%d: RESULT 0x%08x\n", io.Id(), result)
+	return result
+}
+
+/* mocked-up implementation of Io */
+type X struct {
+	id        int /* id of party, range is 0..n-1 */
+	triples32 []struct{ a, b, c uint32 }
+	triples8  []struct{ a, b, c uint8 }
+	triples1  []struct{ a, b, c bool }
+	rchannels []chan uint32 /* channels for reading from other parties */
+	wchannels []chan uint32 /* channels for writing to other parties */
+	inputs    []uint32      /* inputs of this party */
+}
+
+func (x X) Id() int {
+	return x.id
+}
+
+func (x X) Triple1() (a, b, c bool) {
+	if len(x.triples1) == 0 {
+		a32, b32, c32 := x.Triple32()
+		x.triples1 = make([]struct{ a, b, c bool }, 32)
+		for i := range x.triples1 {
+			ui := uint(i)
+			x.triples1[i] = struct{ a, b, c bool }{0 < (1 & (a32 >> ui)), 0 < (1 & (b32 >> ui)), 0 < (1 & (c32 >> ui))}
+		}
+	}
+	result := x.triples1[0]
+	x.triples1 = x.triples1[1:]
+	return result.a, result.b, result.c
+}
+
+func (x X) Triple8() (a, b, c uint8) {
+	if len(x.triples8) == 0 {
+		a32, b32, c32 := x.Triple32()
+		x.triples8 = []struct{ a, b, c uint8 }{{uint8(a32 >> 0), uint8(b32 >> 0), uint8(c32 >> 0)},
+			{uint8(a32 >> 8), uint8(b32 >> 8), uint8(c32 >> 8)},
+			{uint8(a32 >> 16), uint8(b32 >> 16), uint8(c32 >> 16)},
+			{uint8(a32 >> 24), uint8(b32 >> 24), uint8(c32 >> 24)}}
+	}
+	result := x.triples8[0]
+	x.triples8 = x.triples8[1:]
+	return result.a, result.b, result.c
+}
+
+func (x X) Triple32() (a, b, c uint32) {
+	result := x.triples32[0]
+	x.triples32 = x.triples32[1:]
+	return result.a, result.b, result.c
+}
+
+func (x X) Triple64() (a, b, c uint64) {
+	a0, b0, c0 := x.Triple32()
+	a1, b1, c1 := x.Triple32()
+	return (uint64(a0) << 32) | uint64(a1), (uint64(b0) << 32) | uint64(b1), (uint64(c0) << 32) | uint64(c1)
+}
+
+func (x X) Open1(s bool) bool {
+	x.Broadcast1(s)
+	result := s
+	id := x.Id()
+	for i := range x.rchannels {
+		if i == id {
+			continue
+		}
+		result = xor(result, x.Receive1(i))
+	}
+	return result
+}
+
+func (x X) Open8(s uint8) uint8 {
+	x.Broadcast8(s)
+	result := s
+	id := x.Id()
+	for i := range x.rchannels {
+		if i == id {
+			continue
+		}
+		result ^= x.Receive8(i)
+	}
+	return result
+}
+
+func (x X) Open32(s uint32) uint32 {
+	x.Broadcast32(s)
+	result := s
+	id := x.Id()
+	for i := range x.rchannels {
+		if i == id {
+			continue
+		}
+		result ^= x.Receive32(i)
+	}
+	return result
+}
+
+func (x X) Open64(s uint64) uint64 {
+	x.Broadcast64(s)
+	result := s
+	id := x.Id()
+	for i := range x.rchannels {
+		if i == id {
+			continue
+		}
+		result ^= x.Receive64(i)
+	}
+	return result
+}
+
+func (x X) Broadcast1(n bool) {
+	var n32 uint32 = 0
+	if n {
+		n32 = 1
+	}
+	id := x.Id()
+	fmt.Printf("%d: BROADCAST 0x%1x\n", id, n32)
+	for i, ch := range x.wchannels {
+		if i == id {
+			continue
+		}
+		go func(ch chan<- uint32, i int) {
+			ch <- n32
+			fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
+		}(ch, i)
+	}
+}
+
+func (x X) Broadcast8(n uint8) {
+	id := x.Id()
+	fmt.Printf("%d: BROADCAST 0x%02x\n", id, n)
+	for i, ch := range x.wchannels {
+		if i == id {
+			continue
+		}
+		go func(ch chan<- uint32, i int) {
+			ch <- uint32(n)
+			fmt.Printf("%d -- 0x%02x -> %d\n", id, n, i)
+		}(ch, i)
+	}
+}
+
+func (x X) Broadcast32(n uint32) {
+	id := x.Id()
+	fmt.Printf("%d: BROADCAST 0x%08x\n", id, n)
+	for i, ch := range x.wchannels {
+		if i == id {
+			continue
+		}
+		go func(ch chan<- uint32, i int) {
+			ch <- n
+			fmt.Printf("%d -- 0x%08x -> %d\n", id, n, i)
+		}(ch, i)
+	}
+}
+
+func (x X) Broadcast64(n uint64) {
+	n0 := uint32(n >> 32)
+	n1 := uint32(n)
+	x.Broadcast32(n0)
+	x.Broadcast32(n1)
+}
+
+func (x X) Receive1(party int) bool {
+	id := x.Id()
+	if party == id {
+		return false
+	}
+	ch := x.rchannels[party]
+	result := <-ch
+	fmt.Printf("%d <- 0x%1x -- %d\n", id, result, party)
+	return result > 0
+}
+
+func (x X) Receive8(party int) uint8 {
+	id := x.Id()
+	if party == id {
+		return 0
+	}
+	ch := x.rchannels[party]
+	result := <-ch
+	fmt.Printf("%d <- 0x%02x -- %d\n", id, result, party)
+	return uint8(result)
+}
+
+func (x X) Receive32(party int) uint32 {
+	id := x.Id()
+	if party == id {
+		return 0
+	}
+	ch := x.rchannels[party]
+	result := <-ch
+	fmt.Printf("%d <- 0x%08x -- %d\n", id, result, party)
+	return result
+}
+
+func (x X) Receive64(party int) uint64 {
+	n0 := x.Receive32(party)
+	n1 := x.Receive32(party)
+	return (uint64(n0) << 32) | uint64(n1)
+}
+
+func (x X) GetInput() uint32 {
+	result := x.inputs[0]
+	x.inputs = x.inputs[1:]
 	return result
 }
 
@@ -690,7 +909,7 @@ func Example(n int) []X {
 			X{id,
 				triples32[id],
 				make([]struct{ a, b, c uint8 }, 0),
-			        make([]struct{ a, b, c bool }, 0),
+				make([]struct{ a, b, c bool }, 0),
 				rchannels[id],
 				wchannels[id],
 				inputs}
