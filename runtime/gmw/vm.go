@@ -81,6 +81,18 @@ func Not1(io Io, a bool) bool {
 	return a
 }
 
+func Or1(io Io, a, b bool) bool {
+	return Not1(io, And1(io, Not1(io, a), Not1(io, b)))
+}
+
+func Or8(io Io, a, b uint8) uint8 {
+	return Not8(io, And8(io, Not8(io, a), Not8(io, b)))
+}
+
+func Or32(io Io, a, b uint32) uint32 {
+	return Not32(io, And32(io, Not32(io, a), Not32(io, b)))
+}
+
 func Not8(io Io, a uint8) uint8 {
 	if io.Id() == 0 {
 		return 0xff ^ a
@@ -93,6 +105,122 @@ func Not32(io Io, a uint32) uint32 {
 		return 0xffffffff ^ a
 	}
 	return a
+}
+
+func Icmp_eq8(io Io, a, b uint8) bool {
+	bitwise_inequality := Xor8(io, a, b)
+	var treeor func (x, n uint8) bool
+	treeor = func (x, n uint8) bool {
+		// compute OR on rightmost n bits of x
+		// invariant: bits to left of rightmost n bits are 0
+		if n == 1 {
+			return x > 0
+		}
+		half := n/2
+		left := x >> half
+		right := x & ((1 << half) - 1)
+		return Or1(io, treeor(left, half), treeor(right, half))
+	}
+	return Not1(io, treeor(bitwise_inequality, uint8(8)))
+}
+
+func Icmp_eq32(io Io, a, b uint32) bool {
+	bitwise_inequality := Xor32(io, a, b)
+	var treeor func (x, n uint32) bool
+	treeor = func (x, n uint32) bool {
+		// compute OR on rightmost n bits of x
+		// invariant: bits to left of rightmost n bits are 0
+		if n == 1 {
+			return x > 0
+		}
+		half := n/2
+		left := x >> half
+		right := x & ((1 << half) - 1)
+		return Or1(io, treeor(left, half), treeor(right, half))
+	}
+	return Not1(io, treeor(bitwise_inequality, uint32(32)))
+}
+
+func Icmp_ugt8(io Io, a, b uint8) bool {
+	c := false
+	for i := uint8(1); i > 0; i = i*2 {
+		ai := (a & i) > 0
+		bi := (b & i) > 0
+		c = xor(ai, And1(io, xor(ai, c), xor(bi, c)))
+	}
+	return c
+}
+
+func Icmp_ugt32(io Io, a, b uint32) bool {
+	c := false
+	for i := uint32(1); i > 0; i = i*2 {
+		ai := (a & i) > 0
+		bi := (b & i) > 0
+		c = xor(ai, And1(io, xor(ai, c), xor(bi, c)))
+	}
+	return c
+}
+
+func Icmp_ult8(io Io, a, b uint8) bool {
+	return Icmp_ugt8(io, b, a)
+}
+
+func Icmp_ult32(io Io, a, b uint32) bool {
+	return Icmp_ugt32(io, b, a)
+}
+
+func Icmp_sgt8(io Io, a, b uint8) bool {
+	highbit := uint8(1 << 7)
+	a_high, a_rest := (a & highbit) > 0, a ^ highbit
+	b_high, b_rest := (b & highbit) > 0, b ^ highbit
+	return Or1(io, And1(io, Not1(io, a_high), b_high), // a_high = 0, b_high = 1
+		And1(io, Not1(io, Xor1(io, a_high, b_high)), // a_high and b_high are the same
+			Icmp_ugt8(io, a_rest, b_rest))) // a_rest > b_rest (unsigned)
+}
+
+func Icmp_sgt32(io Io, a, b uint32) bool {
+	highbit := uint32(1 << 31)
+	a_high, a_rest := (a & highbit) > 0, a ^ highbit
+	b_high, b_rest := (b & highbit) > 0, b ^ highbit
+	return Or1(io, And1(io, Not1(io, a_high), b_high), // a_high = 0, b_high = 1
+		And1(io, Not1(io, Xor1(io, a_high, b_high)), // a_high and b_high are the same
+			Icmp_ugt32(io, a_rest, b_rest))) // a_rest > b_rest (unsigned)
+}
+
+func Icmp_slt8(io Io, a, b uint8) bool {
+	return Icmp_sgt8(io, b, a)
+}
+
+func Icmp_slt32(io Io, a, b uint32) bool {
+	return Icmp_sgt32(io, b, a)
+}
+
+func Icmp_uge8(io Io, a, b uint8) bool {
+	c := true
+	for i := uint8(1); i > 0; i = i*2 {
+		ai := (a & i) > 0
+		bi := (b & i) > 0
+		c = xor(ai, And1(io, xor(ai, c), xor(bi, c)))
+	}
+	return c
+}
+
+func Icmp_uge32(io Io, a, b uint32) bool {
+	c := true
+	for i := uint32(1); i > 0; i = i*2 {
+		ai := (a & i) > 0
+		bi := (b & i) > 0
+		c = xor(ai, And1(io, xor(ai, c), xor(bi, c)))
+	}
+	return c
+}
+
+func Icmp_ule8(io Io, a, b uint8) bool {
+	return Icmp_uge8(io, b, a)
+}
+
+func Icmp_ule32(io Io, a, b uint32) bool {
+	return Icmp_uge32(io, b, a)
 }
 
 func Add8(io Io, a, b uint8) uint8 {
@@ -433,6 +561,21 @@ func Input32(io Io, party int) uint32 {
 	}
 }
 
+func Output1(io Io, x bool) uint32 {
+	var result uint32 = 0
+	if io.Open1(x) {
+		result = 1
+	}
+	fmt.Printf("%d: RESULT 0x%1x\n", io.Id(), result)
+	return result
+}
+
+func Output8(io Io, x uint8) uint32 {
+	result := uint32(io.Open8(x))
+	fmt.Printf("%d: RESULT 0x%02x\n", io.Id(), result)
+	return result
+}
+
 func Output32(io Io, x uint32) uint32 {
 	result := io.Open32(x)
 	fmt.Printf("%d: RESULT 0x%08x\n", io.Id(), result)
@@ -535,14 +678,12 @@ func Example(n int) []X {
 }
 
 func RunExample() uint32 {
-	xs := Example(1)
+	xs := Example(3)
 	done := make(chan uint32, len(xs))
 	results := make([]uint32, len(xs))
 	for _, x := range xs {
 		go func(x X) {
-			y := Uint8(x, 3)
-			z := Uint8(x, 6)
-			done <- Output32(x, uint32(Mul8(x, y, z)))
+			done <- Output1(x, Icmp_slt8(x, Uint8(x, 127), Uint8(x, 5)))
 		}(x)
 	}
 	for i := range xs {
