@@ -818,7 +818,10 @@ begin
       run_phases m.ctyps f;
       if options.output = None then
         options.output <- Some(Filename.basename (Filename.chop_suffix file ".c"));
-      Gobe.print_function_circuit m f
+      if options.circuitlib = Some "gmw" then
+        Gmw.print_function_circuit m f
+      else
+        Gobe.print_function_circuit m f
     end
     else begin
       let toggle_before =

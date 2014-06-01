@@ -4,6 +4,9 @@ import "fmt"
 import "math/big"
 import "crypto/rand"
 
+var log_results bool = false
+var log_communication bool = false
+
 type Io interface {
 	Id() int
 	GetInput() uint32
@@ -27,6 +30,9 @@ type Io interface {
 	Triple8() (a, b, c uint8)
 	Triple32() (a, b, c uint32)
 	Triple64() (a, b, c uint64)
+
+	InitRam([]byte)
+	Ram() []byte
 }
 
 func xor(x, y bool) bool {
@@ -461,6 +467,18 @@ func Uint64(io Io, a uint64) uint64 {
 	return 0
 }
 
+func Int8(io Io, a int8) uint8 {
+	return Uint8(io, uint8(a))
+}
+
+func Int32(io Io, a int32) uint32 {
+	return Uint32(io, uint32(a))
+}
+
+func Int64(io Io, a int64) uint64 {
+	return Uint64(io, uint64(a))
+}
+
 func Select8(io Io, s bool, a, b uint8) uint8 {
 	var result uint8 = 0
 	for i := uint8(1); i > 0; i = i * 2 {
@@ -602,20 +620,177 @@ func Output1(io Io, x bool) uint32 {
 	if io.Open1(x) {
 		result = 1
 	}
-	fmt.Printf("%d: RESULT 0x%1x\n", io.Id(), result)
+	if log_results {
+		fmt.Printf("%d: RESULT 0x%1x\n", io.Id(), result)
+	}
 	return result
 }
 
 func Output8(io Io, x uint8) uint32 {
 	result := uint32(io.Open8(x))
-	fmt.Printf("%d: RESULT 0x%02x\n", io.Id(), result)
+	if log_results {
+		fmt.Printf("%d: RESULT 0x%02x\n", io.Id(), result)
+	}
 	return result
 }
 
 func Output32(io Io, x uint32) uint32 {
 	result := io.Open32(x)
-	fmt.Printf("%d: RESULT 0x%08x\n", io.Id(), result)
+	if log_results {
+		fmt.Printf("%d: RESULT 0x%08x\n", io.Id(), result)
+	}
 	return result
+}
+
+func TreeXor1(io Io, x ...bool) bool {
+	switch len(x) {
+	case 0:
+		panic("TreeXor with no arguments")
+	case 1:
+		return x[0]
+	case 2:
+		return Xor1(io, x[0], x[1])
+	default:
+		mid := len(x) / 2
+		return Xor1(io, TreeXor1(io, x[:mid]...), TreeXor1(io, x[mid:]...))
+	}
+	panic("unreachable")
+}
+
+func TreeXor8(io Io, x ...uint8) uint8 {
+	switch len(x) {
+	case 0:
+		panic("TreeXor with no arguments")
+	case 1:
+		return x[0]
+	case 2:
+		return Xor8(io, x[0], x[1])
+	default:
+		mid := len(x) / 2
+		return Xor8(io, TreeXor8(io, x[:mid]...), TreeXor8(io, x[mid:]...))
+	}
+	panic("unreachable")
+}
+
+func TreeXor32(io Io, x ...uint32) uint32 {
+	switch len(x) {
+	case 0:
+		panic("TreeXor with no arguments")
+	case 1:
+		return x[0]
+	case 2:
+		return Xor32(io, x[0], x[1])
+	default:
+		mid := len(x) / 2
+		return Xor32(io, TreeXor32(io, x[:mid]...), TreeXor32(io, x[mid:]...))
+	}
+	panic("unreachable")
+}
+
+func TreeXor64(io Io, x ...uint64) uint64 {
+	switch len(x) {
+	case 0:
+		panic("TreeXor with no arguments")
+	case 1:
+		return x[0]
+	case 2:
+		return Xor64(io, x[0], x[1])
+	default:
+		mid := len(x) / 2
+		return Xor64(io, TreeXor64(io, x[:mid]...), TreeXor64(io, x[mid:]...))
+	}
+	panic("unreachable")
+}
+
+// NB Printf() reveals the active block as well as the values of its arguments
+func Printf(io Io, mask bool, f string, args ...uint64) {
+	if !io.Open1(mask) {
+		return
+	}
+	fargs := make([]interface{}, len(args))
+	for i := 0; i < len(args); i++ {
+		fargs[i] = io.Open64(args[i])
+	}
+	if io.Id() == 0 {
+		fmt.Printf(f, fargs...)
+	}
+}
+
+func Zext32_64(io Io, a uint32) uint64 {
+	return uint64(a)
+}
+
+// Switch(io, s, dflt, c0, c1, ...) tests s.
+// If s == 0 it returns c0, if s == 1 it returns c1, etc.
+// If s is not the index of any c, it returns dflt.
+func Switch32(io Io, s, dflt uint32, cases ...uint32) uint32 {
+	if len(cases) == 0 {
+		return dflt
+	}
+	masks := make([]bool, len(cases))
+	masked_cases := make([]uint32, len(cases))
+	for i := 0; i < len(cases); i++ {
+		masks[i] = Icmp_eq32(io, s, Uint32(io, uint32(i)))
+		masked_cases[i] = Mask32(io, masks[i], cases[i])
+	}
+	m := TreeXor1(io, masks...)
+	x := TreeXor32(io, masked_cases...)
+	return Select32(io, m, x, dflt)
+}
+
+func Reveal1(io Io, a bool) bool {
+	return io.Open1(a)
+}
+
+func Reveal8(io Io, a uint8) uint8 {
+	return io.Open8(a)
+}
+
+func Reveal32(io Io, a uint32) uint32 {
+	return io.Open32(a)
+}
+
+func Reveal64(io Io, a uint64) uint64 {
+	return io.Open64(a)
+}
+
+/* This (temporary) implementation reveals the memory access pattern but not memory contents */
+func Load(io Io, loc uint64, eltsize uint32) uint64 {
+	address := int(Reveal64(io, loc))
+	bytes := int(Reveal32(io, eltsize))
+	if io.Id() == 0 {
+		fmt.Printf("Loading Ram[0x%08x]<%d>\n", address, bytes)
+	}
+	switch bytes {
+	default:
+		panic(fmt.Sprintf("Load: bad element size %d", bytes))
+	case 1, 2, 4, 8:
+	}
+	x := uint64(0)
+	ram := io.Ram()
+	for j := 0; j < bytes; j++ {
+		byte_j := uint64(ram[address+j])
+		x += byte_j << uint(j*8)
+	}
+	return x
+}
+
+func Store(io Io, loc uint64, eltsize uint32, x uint32) {
+	address := int(Reveal64(io, loc))
+	bytes := int(Reveal32(io, eltsize))
+	if io.Id() == 0 {
+		fmt.Printf("Storing Ram[0x%08x]<%d>\n", address, bytes)
+	}
+	switch bytes {
+	default:
+		panic(fmt.Sprintf("Store: bad element size %d", bytes))
+	case 1, 2, 4, 8:
+	}
+	ram := io.Ram()
+	for j := 0; j < bytes; j++ {
+		byte_j := byte(x>>uint(j*8)) & 0xff
+		ram[address+j] = byte_j
+	}
 }
 
 /* mocked-up implementation of Io */
@@ -627,13 +802,14 @@ type X struct {
 	rchannels []chan uint32 /* channels for reading from other parties */
 	wchannels []chan uint32 /* channels for writing to other parties */
 	inputs    []uint32      /* inputs of this party */
+	ram       []byte
 }
 
-func (x X) Id() int {
+func (x *X) Id() int {
 	return x.id
 }
 
-func (x X) Triple1() (a, b, c bool) {
+func (x *X) Triple1() (a, b, c bool) {
 	if len(x.triples1) == 0 {
 		a32, b32, c32 := x.Triple32()
 		x.triples1 = make([]struct{ a, b, c bool }, 32)
@@ -647,7 +823,7 @@ func (x X) Triple1() (a, b, c bool) {
 	return result.a, result.b, result.c
 }
 
-func (x X) Triple8() (a, b, c uint8) {
+func (x *X) Triple8() (a, b, c uint8) {
 	if len(x.triples8) == 0 {
 		a32, b32, c32 := x.Triple32()
 		x.triples8 = []struct{ a, b, c uint8 }{{uint8(a32 >> 0), uint8(b32 >> 0), uint8(c32 >> 0)},
@@ -660,19 +836,19 @@ func (x X) Triple8() (a, b, c uint8) {
 	return result.a, result.b, result.c
 }
 
-func (x X) Triple32() (a, b, c uint32) {
+func (x *X) Triple32() (a, b, c uint32) {
 	result := x.triples32[0]
 	x.triples32 = x.triples32[1:]
 	return result.a, result.b, result.c
 }
 
-func (x X) Triple64() (a, b, c uint64) {
+func (x *X) Triple64() (a, b, c uint64) {
 	a0, b0, c0 := x.Triple32()
 	a1, b1, c1 := x.Triple32()
 	return (uint64(a0) << 32) | uint64(a1), (uint64(b0) << 32) | uint64(b1), (uint64(c0) << 32) | uint64(c1)
 }
 
-func (x X) Open1(s bool) bool {
+func (x *X) Open1(s bool) bool {
 	x.Broadcast1(s)
 	result := s
 	id := x.Id()
@@ -685,7 +861,7 @@ func (x X) Open1(s bool) bool {
 	return result
 }
 
-func (x X) Open8(s uint8) uint8 {
+func (x *X) Open8(s uint8) uint8 {
 	x.Broadcast8(s)
 	result := s
 	id := x.Id()
@@ -698,7 +874,7 @@ func (x X) Open8(s uint8) uint8 {
 	return result
 }
 
-func (x X) Open32(s uint32) uint32 {
+func (x *X) Open32(s uint32) uint32 {
 	x.Broadcast32(s)
 	result := s
 	id := x.Id()
@@ -711,7 +887,7 @@ func (x X) Open32(s uint32) uint32 {
 	return result
 }
 
-func (x X) Open64(s uint64) uint64 {
+func (x *X) Open64(s uint64) uint64 {
 	x.Broadcast64(s)
 	result := s
 	id := x.Id()
@@ -724,102 +900,128 @@ func (x X) Open64(s uint64) uint64 {
 	return result
 }
 
-func (x X) Broadcast1(n bool) {
+func (x *X) Broadcast1(n bool) {
 	var n32 uint32 = 0
 	if n {
 		n32 = 1
 	}
 	id := x.Id()
-	fmt.Printf("%d: BROADCAST 0x%1x\n", id, n32)
+	if log_communication {
+		fmt.Printf("%d: BROADCAST 0x%1x\n", id, n32)
+	}
 	for i, ch := range x.wchannels {
 		if i == id {
 			continue
 		}
 		go func(ch chan<- uint32, i int) {
 			ch <- n32
-			fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
+			if log_communication {
+				fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
+			}
 		}(ch, i)
 	}
 }
 
-func (x X) Broadcast8(n uint8) {
+func (x *X) Broadcast8(n uint8) {
 	id := x.Id()
-	fmt.Printf("%d: BROADCAST 0x%02x\n", id, n)
+	if log_communication {
+		fmt.Printf("%d: BROADCAST 0x%02x\n", id, n)
+	}
 	for i, ch := range x.wchannels {
 		if i == id {
 			continue
 		}
 		go func(ch chan<- uint32, i int) {
 			ch <- uint32(n)
-			fmt.Printf("%d -- 0x%02x -> %d\n", id, n, i)
+			if log_communication {
+				fmt.Printf("%d -- 0x%02x -> %d\n", id, n, i)
+			}
 		}(ch, i)
 	}
 }
 
-func (x X) Broadcast32(n uint32) {
+func (x *X) Broadcast32(n uint32) {
 	id := x.Id()
-	fmt.Printf("%d: BROADCAST 0x%08x\n", id, n)
+	if log_communication {
+		fmt.Printf("%d: BROADCAST 0x%08x\n", id, n)
+	}
 	for i, ch := range x.wchannels {
 		if i == id {
 			continue
 		}
 		go func(ch chan<- uint32, i int) {
 			ch <- n
-			fmt.Printf("%d -- 0x%08x -> %d\n", id, n, i)
+			if log_communication {
+				fmt.Printf("%d -- 0x%08x -> %d\n", id, n, i)
+			}
 		}(ch, i)
 	}
 }
 
-func (x X) Broadcast64(n uint64) {
+func (x *X) Broadcast64(n uint64) {
 	n0 := uint32(n >> 32)
 	n1 := uint32(n)
 	x.Broadcast32(n0)
 	x.Broadcast32(n1)
 }
 
-func (x X) Receive1(party int) bool {
+func (x *X) Receive1(party int) bool {
 	id := x.Id()
 	if party == id {
 		return false
 	}
 	ch := x.rchannels[party]
 	result := <-ch
-	fmt.Printf("%d <- 0x%1x -- %d\n", id, result, party)
+	if log_communication {
+		fmt.Printf("%d <- 0x%1x -- %d\n", id, result, party)
+	}
 	return result > 0
 }
 
-func (x X) Receive8(party int) uint8 {
+func (x *X) Receive8(party int) uint8 {
 	id := x.Id()
 	if party == id {
 		return 0
 	}
 	ch := x.rchannels[party]
 	result := <-ch
-	fmt.Printf("%d <- 0x%02x -- %d\n", id, result, party)
+	if log_communication {
+		fmt.Printf("%d <- 0x%02x -- %d\n", id, result, party)
+	}
 	return uint8(result)
 }
 
-func (x X) Receive32(party int) uint32 {
+func (x *X) Receive32(party int) uint32 {
 	id := x.Id()
 	if party == id {
 		return 0
 	}
 	ch := x.rchannels[party]
 	result := <-ch
-	fmt.Printf("%d <- 0x%08x -- %d\n", id, result, party)
+	if log_communication {
+		fmt.Printf("%d <- 0x%08x -- %d\n", id, result, party)
+	}
 	return result
 }
 
-func (x X) Receive64(party int) uint64 {
+func (x *X) Receive64(party int) uint64 {
 	n0 := x.Receive32(party)
 	n1 := x.Receive32(party)
 	return (uint64(n0) << 32) | uint64(n1)
 }
 
-func (x X) GetInput() uint32 {
+func (x *X) GetInput() uint32 {
 	result := x.inputs[0]
 	x.inputs = x.inputs[1:]
 	return result
+}
+
+func (x *X) InitRam(contents []byte) {
+	x.ram = contents
+}
+
+func (x *X) Ram() []byte {
+	return x.ram
 }
 
 func rand32() uint32 {
@@ -868,10 +1070,10 @@ func triple32(n int) []struct{ a, b, c uint32 } {
 	return result
 }
 
-func Example(n int) []X {
+func Example(n int) []*X {
 	/* triples */
 	triples32 := make([][]struct{ a, b, c uint32 }, n)
-	num_triples := 200
+	num_triples := 8*4096
 	for i, _ := range triples32 {
 		triples32[i] = make([]struct{ a, b, c uint32 }, num_triples)
 	}
@@ -901,18 +1103,19 @@ func Example(n int) []X {
 	}
 
 	/* final result */
-	result := make([]X, n)
+	result := make([]*X, n)
 	for id := range result {
 		inputs := make([]uint32, 1)
 		inputs[0] = uint32(id)
 		result[id] =
-			X{id,
+			&X{id,
 				triples32[id],
 				make([]struct{ a, b, c uint8 }, 0),
 				make([]struct{ a, b, c bool }, 0),
 				rchannels[id],
 				wchannels[id],
-				inputs}
+				inputs,
+				nil}
 	}
 	return result
 }
@@ -922,7 +1125,7 @@ func RunExample() uint32 {
 	done := make(chan uint32, len(xs))
 	results := make([]uint32, len(xs))
 	for _, x := range xs {
-		go func(x X) {
+		go func(x *X) {
 			done <- Output8(x, Lshr8(x, Uint8(x, 128), 7))
 		}(x)
 	}
