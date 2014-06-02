@@ -10,7 +10,7 @@ let string_constants = Hashtbl.create 10
 
 let roundup_bitwidth typ =
   let w = State.bitwidth typ in
-  if w mod 8 = 0 then w else begin
+  if w = 1 || w mod 8 = 0 then w else begin
     let w' = w + (8 - w mod 8) in
     w'
   end
@@ -31,7 +31,7 @@ let rec bpr_gmw_value b (typ, value) =
   | Basicblock bl ->
       bprintf b "Uint%d(io, %d)" (State.get_bl_bits()) (State.bl_num bl)
   | Int x ->
-      bprintf b "Int%d(io, %s)" (roundup_bitwidth typ) (Big_int.string_of_big_int x)
+      bprintf b "Uint%d(io, %s)" (roundup_bitwidth typ) (Big_int.string_of_big_int x)
   | Zero ->
       bprintf b "Uint%d(io, 0) /* CAUTION: zero */" (roundup_bitwidth typ)
   | Null ->
@@ -182,10 +182,17 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
   end);
   declared_vars
 
+let bpr_sharetyp b typ =
+  let w = roundup_bitwidth typ in
+  if w = 1 then
+    bprintf b "bool"
+  else
+    bprintf b "uint%d" w
+
 let bpr_gmw_block_args print_types b bl =
   let fv = free_of_block bl in
   if print_types then
-    VSet.iter (fun var -> bprintf b ", %s uint%d" (Gobe.govar var) (roundup_bitwidth (State.typ_of_var var))) fv
+    VSet.iter (fun var -> bprintf b ", %s %a" (Gobe.govar var) bpr_sharetyp (State.typ_of_var var)) fv
   else
     VSet.iter (fun var -> bprintf b ", %s" (Gobe.govar var)) fv
 
@@ -244,7 +251,16 @@ let bpr_gmw_block b blocks_fv bl =
     VSet.iter
       (fun var ->
         let value = Var var in
-        bprintf b "\tch <- uint64(Mask%d(io, mask, %a))\n" (roundup_bitwidth (State.typ_of_var var)) bpr_gmw_value (State.typ_of_var var, value))
+        let typ = State.typ_of_var var in
+        let width = roundup_bitwidth (State.typ_of_var var) in
+        if width = 1 then begin
+          bprintf b "\tif Mask%d(io, mask, %a) {\n" width bpr_gmw_value (typ, value);
+          bprintf b "\t\tch <- 1\n";
+          bprintf b "\t} else {\n";
+          bprintf b "\t\tch <- 0\n";
+          bprintf b "\t}\n"
+        end else
+          bprintf b "\tch <- uint64(Mask%d(io, mask, %a))\n" width bpr_gmw_value (typ, value))
       outputs
   end;
   bprintf b "}\n\n"
@@ -300,11 +316,18 @@ let bpr_main b f =
         bprintf b "\t\tmask_%d := (<- ch%d) > 0\n" (State.bl_num bl.bname) (State.bl_num bl.bname);
       VSet.iter
         (fun var ->
-          bprintf b "\t\t%s_%d := uint%d(<- ch%d)\n"
-            (Gobe.govar var)
-            (State.bl_num bl.bname)
-            (roundup_bitwidth (State.typ_of_var var))
-            (State.bl_num bl.bname))
+          let w = (roundup_bitwidth (State.typ_of_var var)) in
+          if w = 1 then
+          bprintf b "\t\t%s_%d := (<- ch%d) > 0\n"
+              (Gobe.govar var)
+              (State.bl_num bl.bname)
+              (State.bl_num bl.bname)
+          else
+            bprintf b "\t\t%s_%d := uint%d(<- ch%d)\n"
+              (Gobe.govar var)
+              (State.bl_num bl.bname)
+              w
+              (State.bl_num bl.bname))
         outputs)
     blocks;
   VSet.iter
@@ -344,7 +367,7 @@ let bpr_main b f =
   end;
   bprintf b "\n";
   bprintf b "\t\t/* are we done? */\n";
-  bprintf b "\t\tdone = Reveal8(io, _attsrcIsDone) > 0\n";
+  bprintf b "\t\tdone = Reveal1(io, _attsrcIsDone)\n";
   bprintf b "\t}\n";
   bprintf b "\tanswer := Reveal32(io, _attsrcAnswer)\n";
   bprintf b "\tfmt.Printf(\"%%d: %%v\\n\", io.Id(), answer)\n";

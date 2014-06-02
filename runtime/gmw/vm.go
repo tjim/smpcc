@@ -443,6 +443,14 @@ func Sub64(io Io, a, b uint64) uint64 {
 	return result
 }
 
+func Uint1(io Io, a uint8) bool {
+	/* Alternately, party 0 could distribute random shares */
+	if io.Id() == 0 {
+		return a > 0
+	}
+	return false
+}
+
 func Uint8(io Io, a uint8) uint8 {
 	/* Alternately, party 0 could distribute random shares */
 	if io.Id() == 0 {
@@ -467,16 +475,8 @@ func Uint64(io Io, a uint64) uint64 {
 	return 0
 }
 
-func Int8(io Io, a int8) uint8 {
-	return Uint8(io, uint8(a))
-}
-
-func Int32(io Io, a int32) uint32 {
-	return Uint32(io, uint32(a))
-}
-
-func Int64(io Io, a int64) uint64 {
-	return Uint64(io, uint64(a))
+func Select1(io Io, s bool, a, b bool) bool {
+	return xor(b, And1(io, s, xor(a, b)))
 }
 
 func Select8(io Io, s bool, a, b uint8) uint8 {
@@ -591,6 +591,10 @@ func Ashr32(io Io, a uint32, b uint) uint32 {
 
 func Ashr64(io Io, a uint64, b uint) uint64 {
 	return uint64(int64(a) >> b)
+}
+
+func Mask1(io Io, s bool, a bool) bool {
+	return Select1(io, s, a, Uint1(io, 0))
 }
 
 func Mask8(io Io, s bool, a uint8) uint8 {
