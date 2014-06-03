@@ -752,6 +752,7 @@ begin
   let (x,args) = getopt "-Ofast" args            in if x then options.optflag <- "-Ofast";
   let (x,args) = getopt "-O4" args               in if x then options.optflag <- "-O4";
   let (x,args) = getopt "-v" args                in options.verbose <- x;
+  let (x,args) = getopt "-run" args              in options.run <- x;
   let (cil_extra_args,args) = getallopts args    in
   if options.help then
     (printf "Usage: ./smpcc foo.c [options]\n";
@@ -763,6 +764,7 @@ begin
      printf "         -circuitlib <lib>           Specify the circuit library (default is yao)\n";
      printf "         -fname <function name>      Specify the function to compile (default is first function)\n";
      printf "         -o <file name>              Specify the output file (default is standard out)\n";
+     printf "         -run                        Compile and run the program immediately\n";
      printf "         -fv                         Print the free variables of the function\n";
      printf "         -ram                        Print the RAM assignment\n";
      printf "         -pr                         Print the LLVM assembly language of the file\n";
@@ -816,12 +818,28 @@ begin
                     m.cfuns)) in
     if not options.delta then begin
       run_phases m.ctyps f;
-      if options.output = None then
+      if options.run then
+        options.output <- Some(Filename.temp_file "smpcc" ".c")
+      else if options.output = None then
         options.output <- Some(Filename.basename (Filename.chop_suffix file ".c"));
       if options.circuitlib = Some "gmw" then
         Gmw.print_function_circuit m f
       else
-        Gobe.print_function_circuit m f
+        Gobe.print_function_circuit m f;
+      if options.run then begin
+        let prefix = match options.output with Some x -> x | None -> failwith "impossible" in
+        if options.circuitlib = Some "gmw" then begin
+          ignore(Sys.command(Printf.sprintf "go run %s_blocks.go %s_main.go" prefix prefix));
+          Sys.remove (Printf.sprintf "%s_blocks.go" prefix);
+          Sys.remove (Printf.sprintf "%s_main.go" prefix)
+        end else begin
+          ignore(Sys.command(Printf.sprintf "go run %s_gen.go %s_eval.go %s_main.go" prefix prefix prefix));
+          Sys.remove (Printf.sprintf "%s_gen.go" prefix);
+          Sys.remove (Printf.sprintf "%s_eval.go" prefix);
+          Sys.remove (Printf.sprintf "%s_main.go" prefix)
+        end;
+        Sys.remove (Printf.sprintf "%s" prefix)
+      end
     end
     else begin
       let toggle_before =

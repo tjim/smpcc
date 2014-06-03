@@ -17,6 +17,7 @@ type options = {
     mutable phi: bool;
     mutable optflag: string;
     mutable verbose: bool;
+    mutable run: bool;
   }
 
 let options = {
@@ -38,6 +39,7 @@ let options = {
   phi = false;
   optflag = "-O1";
   verbose = false;
+  run = false;
 }
 
 let pr_output_file suffix s =
