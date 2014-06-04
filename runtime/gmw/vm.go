@@ -4,6 +4,7 @@ import "fmt"
 import "math/big"
 import "crypto/rand"
 
+var log_mem bool = true
 var log_results bool = false
 var log_communication bool = false
 
@@ -20,6 +21,11 @@ type Io interface {
 	Broadcast8(uint8)
 	Broadcast32(uint32)
 	Broadcast64(uint64)
+
+	Send1(party int, x bool)
+	Send8(party int, x uint8)
+	Send32(party int, x uint32)
+	Send64(party int, x uint64)
 
 	Receive1(party int) bool
 	Receive8(party int) uint8
@@ -720,6 +726,19 @@ func Printf(io Io, mask bool, f string, args ...uint64) {
 	}
 }
 
+func Printf32(io Io, mask bool, f string, args ...uint32) {
+	if !io.Open1(mask) {
+		return
+	}
+	fargs := make([]interface{}, len(args))
+	for i := 0; i < len(args); i++ {
+		fargs[i] = io.Open32(args[i])
+	}
+	if io.Id() == 0 {
+		fmt.Printf(f, fargs...)
+	}
+}
+
 func Zext32_64(io Io, a uint32) uint64 {
 	return uint64(a)
 }
@@ -762,8 +781,8 @@ func Reveal64(io Io, a uint64) uint64 {
 func Load(io Io, loc uint64, eltsize uint32) uint64 {
 	address := int(Reveal64(io, loc))
 	bytes := int(Reveal32(io, eltsize))
-	if io.Id() == 0 {
-		fmt.Printf("Loading Ram[0x%08x]<%d>\n", address, bytes)
+	if log_mem && io.Id() == 0 {
+		fmt.Printf("Loading Ram[0x%08x]<%d>", address, bytes)
 	}
 	switch bytes {
 	default:
@@ -775,6 +794,12 @@ func Load(io Io, loc uint64, eltsize uint32) uint64 {
 	for j := 0; j < bytes; j++ {
 		byte_j := uint64(ram[address+j])
 		x += byte_j << uint(j*8)
+	}
+	if log_mem {
+		y := Reveal64(io, x)
+		if io.Id() == 0 {
+			fmt.Printf(" = 0x%x\n", y)
+		}
 	}
 	return x
 }
@@ -917,12 +942,10 @@ func (x *X) Broadcast1(n bool) {
 		if i == id {
 			continue
 		}
-		go func(ch chan<- uint32, i int) {
-			ch <- n32
-			if log_communication {
-				fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
-			}
-		}(ch, i)
+		ch <- n32
+		if log_communication {
+			fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
+		}
 	}
 }
 
@@ -935,12 +958,10 @@ func (x *X) Broadcast8(n uint8) {
 		if i == id {
 			continue
 		}
-		go func(ch chan<- uint32, i int) {
-			ch <- uint32(n)
-			if log_communication {
-				fmt.Printf("%d -- 0x%02x -> %d\n", id, n, i)
-			}
-		}(ch, i)
+		ch <- uint32(n)
+		if log_communication {
+			fmt.Printf("%d -- 0x%02x -> %d\n", id, n, i)
+		}
 	}
 }
 
@@ -953,12 +974,10 @@ func (x *X) Broadcast32(n uint32) {
 		if i == id {
 			continue
 		}
-		go func(ch chan<- uint32, i int) {
-			ch <- n
-			if log_communication {
-				fmt.Printf("%d -- 0x%08x -> %d\n", id, n, i)
-			}
-		}(ch, i)
+		ch <- n
+		if log_communication {
+			fmt.Printf("%d -- 0x%08x -> %d\n", id, n, i)
+		}
 	}
 }
 
@@ -969,29 +988,49 @@ func (x *X) Broadcast64(n uint64) {
 	x.Broadcast32(n1)
 }
 
-func (x *X) Receive1(party int) bool {
+func (x *X) Send1(party int, n bool) {
+	var n32 uint32 = 0
+	if n {
+		n32 = 1
+	}
+	x.Send32(party, n32)
+}
+
+func (x *X) Send8(party int, n uint8) {
+	var n32 uint32 = uint32(n)
 	id := x.Id()
 	if party == id {
-		return false
+		return
 	}
-	ch := x.rchannels[party]
-	result := <-ch
+	x.Send32(party, n32)
+}
+
+func (x *X) Send32(party int, n32 uint32) {
+	id := x.Id()
+	if party == id {
+		return
+	}
+	ch := x.wchannels[party]
+	ch <- n32
 	if log_communication {
-		fmt.Printf("%d <- 0x%1x -- %d\n", id, result, party)
+		fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, party)
 	}
+}
+
+func (x *X) Send64(party int, n uint64) {
+	n0 := uint32(n >> 32)
+	n1 := uint32(n)
+	x.Send32(party, n0)
+	x.Send32(party, n1)
+}
+
+func (x *X) Receive1(party int) bool {
+	result := x.Receive32(party)
 	return result > 0
 }
 
 func (x *X) Receive8(party int) uint8 {
-	id := x.Id()
-	if party == id {
-		return 0
-	}
-	ch := x.rchannels[party]
-	result := <-ch
-	if log_communication {
-		fmt.Printf("%d <- 0x%02x -- %d\n", id, result, party)
-	}
+	result := x.Receive32(party)
 	return uint8(result)
 }
 
@@ -1100,7 +1139,7 @@ func Example(n int) []*X {
 			if i == j {
 				continue
 			}
-			ch := make(chan uint32)
+			ch := make(chan uint32, n)
 			rchannels[i][j] = ch
 			wchannels[j][i] = ch
 		}
