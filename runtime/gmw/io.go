@@ -7,6 +7,7 @@ import "crypto/rand"
 var log_mem bool = true
 var log_results bool = false
 var log_communication bool = false
+var check_split = false
 
 type Io interface {
 	Id() int
@@ -85,6 +86,9 @@ func (x *X) Triple8() (a, b, c uint8) {
 }
 
 func (x *X) Triple32() (a, b, c uint32) {
+	if len(x.triples32) == 0 {
+		panic("Not enough triples")
+	}
 	result := x.triples32[0]
 	x.triples32 = x.triples32[1:]
 	return result.a, result.b, result.c
@@ -259,7 +263,10 @@ func (x *X) Receive32(party int) uint32 {
 		return 0
 	}
 	ch := x.rchannels[party]
-	result := <-ch
+	result, ok := <-ch
+	if !ok {
+		panic("channel closed")
+	}
 	if log_communication {
 		fmt.Printf("%d <- 0x%08x -- %d\n", id, result, party)
 	}
@@ -308,12 +315,14 @@ func split_uint32(x uint32, n int) []uint32 {
 		result[i] = xi
 	}
 	result[0] = x
-	var y uint32 = 0
-	for _, s := range result {
-		y ^= s
-	}
-	if y != x0 {
-		panic("NOT EQUAL")
+	if check_split {
+		var y uint32 = 0
+		for _, s := range result {
+			y ^= s
+		}
+		if y != x0 {
+			panic("NOT EQUAL")
+		}
 	}
 	return result
 }
@@ -326,7 +335,7 @@ func triple32(n int) []struct{ a, b, c uint32 } {
 	b_shares := split_uint32(b, n)
 	c_shares := split_uint32(c, n)
 	result := make([]struct{ a, b, c uint32 }, n)
-	for i, _ := range result {
+	for i := range result {
 		result[i] = struct{ a, b, c uint32 }{a_shares[i], b_shares[i], c_shares[i]}
 	}
 	return result
@@ -336,7 +345,7 @@ func Example(n int) []*X {
 	/* triples */
 	triples32 := make([][]struct{ a, b, c uint32 }, n)
 	num_triples := 8 * 4096
-	for i, _ := range triples32 {
+	for i := range triples32 {
 		triples32[i] = make([]struct{ a, b, c uint32 }, num_triples)
 	}
 	for j := 0; j < num_triples; j++ {
