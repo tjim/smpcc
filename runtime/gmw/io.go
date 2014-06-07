@@ -11,6 +11,7 @@ var check_split = false
 
 type Io interface {
 	Id() int
+	N() int /* number of parties */
 	GetInput() uint32
 
 	Open1(bool) bool
@@ -44,6 +45,7 @@ type Io interface {
 
 /* mocked-up implementation of Io */
 type X struct {
+	n         int /* number of parties */
 	id        int /* id of party, range is 0..n-1 */
 	triples32 []struct{ a, b, c uint32 }
 	triples8  []struct{ a, b, c uint8 }
@@ -52,6 +54,10 @@ type X struct {
 	wchannels []chan uint32 /* channels for writing to other parties */
 	inputs    []uint32      /* inputs of this party */
 	ram       []byte
+}
+
+func (x *X) N() int {
+	return x.n
 }
 
 func (x *X) Id() int {
@@ -379,7 +385,8 @@ func Example(n int) []*X {
 		inputs := make([]uint32, 1)
 		inputs[0] = uint32(id)
 		result[id] =
-			&X{id,
+			&X{n,
+				id,
 				triples32[id],
 				make([]struct{ a, b, c uint8 }, 0),
 				make([]struct{ a, b, c bool }, 0),

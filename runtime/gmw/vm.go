@@ -577,13 +577,19 @@ func Mask64(io Io, s bool, a uint64) uint64 {
 }
 
 func Input32(io Io, party int) uint32 {
-	/* TODO: party should distribute random shares */
 	id := io.Id()
 	if id == party {
 		X := io.GetInput()
-		return X
+		shares := split_uint32(X, io.N())
+		for i := range shares {
+			if i == id {
+				continue
+			}
+			io.Send32(i, shares[i])
+		}
+		return shares[id]
 	} else {
-		return 0
+		return io.Receive32(party)
 	}
 }
 
