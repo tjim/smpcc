@@ -707,6 +707,10 @@ func Printf32(io Io, mask bool, f string, args ...uint32) {
 	}
 }
 
+func Zext8_32(io Io, a uint8) uint32 {
+	return uint32(a)
+}
+
 func Zext32_64(io Io, a uint32) uint64 {
 	return uint64(a)
 }
