@@ -1,6 +1,7 @@
 /* aes encryption example */
 /* LICENSE: LGPL */
 /* Compile in nettle (http://www.lysator.liu.se/~nisse/nettle/) source directory with gcc -E */
+/* Must use gcc on Linux b/c on Mac OS X you will encounter CIL errors */
 
 //#define OUTPUT
 
@@ -22,8 +23,13 @@ int main() {
   aes_set_encrypt_key(&ctx, AES_BLOCK_SIZE, key);
   aes_encrypt(&ctx, AES_BLOCK_SIZE, ciphertext, plaintext);
 #ifdef OUTPUT
-  printf("%.*s\n", AES_BLOCK_SIZE, plaintext);
-  printf("%.*s\n", AES_BLOCK_SIZE, ciphertext);
+  printf("Expected: 14f5fe746966f292651c2288bbff4609\n");
+  printf("Actual:   ");
+  int i;
+  for (i = 0; i < 16; i++) {
+    printf("%02x", ciphertext[i]);
+  }
+  printf("\n");
 #endif
   return 0;
 }
