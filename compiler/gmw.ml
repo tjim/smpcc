@@ -94,14 +94,14 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
         failwith "Error: first argument of printf must be a string constant")
   | Call(_,_,_,_,Var(Name(true, "puts")),[_,_,Int x],_,_) ->
       (try
-        let s = String.escaped(Hashtbl.find string_constants  (Big_int.int_of_big_int x)) in
+        let s = String.escaped(Hashtbl.find string_constants (Big_int.int_of_big_int x)) in
         bprintf b "Printf(io, mask, \"%s\\n\")\n" s (* puts adds a newline *)
       with _ ->
         failwith "Error: argument of puts must be a string constant")
-  | Call(_,_,_,_,Var(Name(true, "putchar")),[typ,_,value],_,_) ->
-               bprintf b "Printf(io, mask, \"%%c\", %a)\n" bpr_gmw_value (typ, value)
+  | Call(_,_,_,_,Var(Name(true, "putchar")),[typ,_,Int x],_,_) ->
+      bprintf b "Printf(io, mask, \"\\x%02x\")\n" (Big_int.int_of_big_int x)
   | Call(_,_,_,_,Var(Name(true, "input")),[typ,_,value],_,_) ->
-        bprintf b "InputFrom(io, mask, %a)\n" bpr_gmw_value (typ, value)
+      bprintf b "InputFrom(io, mask, %a)\n" bpr_gmw_value (typ, value)
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.start")),_,_,_) ->
       ()
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.end")),_,_,_) ->
