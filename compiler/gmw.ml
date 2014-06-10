@@ -31,7 +31,11 @@ let rec bpr_gmw_value b (typ, value) =
   | Basicblock bl ->
       bprintf b "Uint%d(io, %d)" (State.get_bl_bits()) (State.bl_num bl)
   | Int x ->
-      bprintf b "Uint%d(io, %s)" (roundup_bitwidth typ) (Big_int.string_of_big_int x)
+      if Big_int.sign_big_int x < 0 then
+        (* We can't use a negative constant as an unsigned int in go, e.g., uint32(-1).  Use (1<<32)-1 instead. *)
+        bprintf b "Uint%d(io, (1<<%d)%s)" (roundup_bitwidth typ) (roundup_bitwidth typ) (Big_int.string_of_big_int x)
+      else
+        bprintf b "Uint%d(io, %s)" (roundup_bitwidth typ) (Big_int.string_of_big_int x)
   | Zero ->
       bprintf b "Uint%d(io, 0) /* CAUTION: zero */" (roundup_bitwidth typ)
   | Null ->
@@ -159,7 +163,7 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
         bprintf b "%a\n" bpr_gmw_value (ty,op)
       else if bits_result > bits_op then
         (* NB our oTypes do not have signed/unsigned versions so we zextend for now *)
-        bprintf b "Zext(io, %a, %d)\n" bpr_gmw_value (ty,op) bits_result
+        bprintf b "Zext%d_%d(io, %a)\n" bits_op bits_result bpr_gmw_value (ty,op)
       else (* bits_result < bits_op *)
         bprintf b "uint%d(%a)\n" bits_result bpr_gmw_value (ty,op);
   | Select([x;(typ,y);z],_) -> (* TODO: maybe enforce 3 args in datatype? *)
@@ -175,7 +179,15 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
       bprintf b "Switch%d(io, %a, %a, %a)\n" (roundup_bitwidth (fst op0)) bpr_gmw_value op0 bpr_gmw_value op1
         (between ", " bpr_gmw_value) cases
   | Trunc(x, ty,_) ->
-      bprintf b "%a[:%d]\n" bpr_gmw_value x (roundup_bitwidth ty)
+      let bits_result = roundup_bitwidth ty in
+      (match bits_result with
+      | 1 ->
+          bprintf b "(%a > 0)\n" bpr_gmw_value x
+      | 8
+      | 32
+      | 64 ->
+          bprintf b "uint%d(%a)\n" bits_result bpr_gmw_value x
+      | _ -> failwith(Printf.sprintf "Cannot truncate to %d" bits_result))
   | _ -> begin
       eprintf "Error: unsupported %s\n" (spr bpr_instr (nopt,i));
       bprintf b "Unsupported(\"UNSUPPORTED %a\")\n" bpr_instr (nopt,i)
