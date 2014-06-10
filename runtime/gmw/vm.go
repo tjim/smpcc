@@ -772,6 +772,8 @@ func Load(io Io, loc uint64, eltsize uint32) uint64 {
 		if io.Id() == 0 {
 			fmt.Printf(" = 0x%x\n", y)
 		}
+	} else {
+		fmt.Printf("\n")
 	}
 	return x
 }
@@ -780,7 +782,7 @@ func Store(io Io, loc uint64, eltsize uint32, x uint32) {
 	address := int(Reveal64(io, loc))
 	bytes := int(Reveal32(io, eltsize))
 	if io.Id() == 0 {
-		fmt.Printf("Storing Ram[0x%08x]<%d>\n", address, bytes)
+		fmt.Printf("Storing Ram[0x%08x]<%d>", address, bytes)
 	}
 	switch bytes {
 	default:
@@ -788,6 +790,14 @@ func Store(io Io, loc uint64, eltsize uint32, x uint32) {
 	case 1, 2, 4, 8:
 	}
 	ram := io.Ram()
+	if log_mem {
+		y := Reveal32(io, x)
+		if io.Id() == 0 {
+			fmt.Printf(" = 0x%x\n", y)
+		}
+	} else {
+		fmt.Printf("\n")
+	}
 	for j := 0; j < bytes; j++ {
 		byte_j := byte(x>>uint(j*8)) & 0xff
 		ram[address+j] = byte_j
