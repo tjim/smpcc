@@ -158,7 +158,7 @@ func Icmp_eq64(io Io, a, b uint64) bool {
 		right := x & ((1 << half) - 1)
 		return Or1(io, treeor(left, half), treeor(right, half))
 	}
-	return Not1(io, treeor(bitwise_inequality, uint64(32)))
+	return Not1(io, treeor(bitwise_inequality, uint64(64)))
 }
 
 func Icmp_ugt8(io Io, a, b uint8) bool {
