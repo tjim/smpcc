@@ -290,7 +290,7 @@ func Add8(io Io, a, b uint8) uint8 {
 	if xor(a0, b0) {
 		result |= 1
 	}
-	c := a0 && b0 /* carry bit */
+	c := And1(io, a0, b0) /* carry bit */
 	for i := uint8(2); i > 0; i = i * 2 {
 		ai := (a & i) > 0
 		bi := (b & i) > 0
@@ -311,7 +311,7 @@ func Add32(io Io, a, b uint32) uint32 {
 	if xor(a0, b0) {
 		result |= 1
 	}
-	c := a0 && b0 /* carry bit */
+	c := And1(io, a0, b0) /* carry bit */
 	for i := uint32(2); i > 0; i = i * 2 {
 		ai := (a & i) > 0
 		bi := (b & i) > 0
@@ -332,7 +332,7 @@ func Add64(io Io, a, b uint64) uint64 {
 	if xor(a0, b0) {
 		result |= 1
 	}
-	c := a0 && b0 /* carry bit */
+	c := And1(io, a0, b0) /* carry bit */
 	for i := uint64(2); i > 0; i = i * 2 {
 		ai := (a & i) > 0
 		bi := (b & i) > 0
