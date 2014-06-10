@@ -350,7 +350,7 @@ func triple32(n int) []struct{ a, b, c uint32 } {
 func Example(n int) []*X {
 	/* triples */
 	triples32 := make([][]struct{ a, b, c uint32 }, n)
-	num_triples := 8 * 4096
+	num_triples := 16 * 4096
 	for i := range triples32 {
 		triples32[i] = make([]struct{ a, b, c uint32 }, num_triples)
 	}
