@@ -347,10 +347,16 @@ func triple32(n int) []struct{ a, b, c uint32 } {
 	return result
 }
 
+//var num_triples int = 16 * 4096
+var num_triples int = 64 * 1024
+func UsedTriples32(x *X) int {
+	return num_triples - len(x.triples32)
+}
+
 func Example(n int) []*X {
 	/* triples */
 	triples32 := make([][]struct{ a, b, c uint32 }, n)
-	num_triples := 16 * 4096
+
 	for i := range triples32 {
 		triples32[i] = make([]struct{ a, b, c uint32 }, num_triples)
 	}
