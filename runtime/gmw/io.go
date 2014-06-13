@@ -333,6 +333,24 @@ func split_uint32(x uint32, n int) []uint32 {
 	return result
 }
 
+func triple32TwoParties(num_triples int) []struct{ a, b, c uint32 } {
+	id := x.Id()
+	// arbitrarily decide who is sender and who is receiver
+
+	if log_communication {
+		fmt.Printf("%d: triple32TwoParties\n", id)
+	}
+	for i, ch := range x.wchannels {
+		if i == id {
+			continue
+		}
+		ch <- n32
+		if log_communication {
+			fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
+		}
+	}
+}
+
 /* create n shares of a multiplication triple */
 func triple32(n int) []struct{ a, b, c uint32 } {
 	a, b := rand32(), rand32()
@@ -349,6 +367,7 @@ func triple32(n int) []struct{ a, b, c uint32 } {
 
 //var num_triples int = 16 * 4096
 var num_triples int = 64 * 1024
+
 func UsedTriples32(x *X) int {
 	return num_triples - len(x.triples32)
 }
