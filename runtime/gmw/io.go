@@ -340,15 +340,22 @@ func split_uint32(x uint32, n int) []uint32 {
 	return result
 }
 
+/* Code assumes that only one of (thisPartyId, otherPartyId) and (otherPartyId, thisPartyId) will be queried */
 func triple32TwoParties(num_triples, thisPartyId, otherPartyId int,
 	otSender *ot.Sender, otReceiver *ot.Receiver) []Triple {
 
-	// arbitrarily decide who is sender and who is receiver
+	result := make([]Triple, num_triples)
 
 	if log_communication {
 		fmt.Printf("%d: triple32TwoParties\n", thisPartyId)
 	}
-	// generate triples
+
+	if thisPartyId < otherPartyId {
+
+	} else {
+
+	}
+
 	return nil
 }
 
