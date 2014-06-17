@@ -3,6 +3,8 @@ package gmw
 import "fmt"
 import "math/big"
 import "crypto/rand"
+import "github.com/tjim/smpcc/runtime/ot"
+import "github.com/tjim/smpcc/runtime/base"
 
 var log_mem bool = true
 var log_results bool = false
@@ -333,7 +335,9 @@ func split_uint32(x uint32, n int) []uint32 {
 	return result
 }
 
-func triple32TwoParties(num_triples int) []struct{ a, b, c uint32 } {
+func triple32TwoParties(num_triples, otherPartyId int,
+	otSender *ot.Sender, otReceiver *ot.Receiver) []struct{ a, b, c uint32 } {
+
 	id := x.Id()
 	// arbitrarily decide who is sender and who is receiver
 
@@ -384,6 +388,30 @@ func Example(n int) []*X {
 		for i, t := range shares_of_a_triple {
 			triples32[i][j] = t
 		}
+	}
+
+	/* OT based triples */
+	for i := 0; i < n; i++ {
+		otChans := OTChans{
+			make(chan ot.PublicKey, 100),
+			make(chan big.Int, 100),
+			make(chan ot.HashedElGamalCiph, 100),
+
+			make(chan []byte, 100),
+			make(chan ot.Selector, 100),
+			make(chan ot.NPReceiverParams, 1),
+		}
+
+		// Triples share size
+		tripleShareSize := 32
+
+		npRecvr := ot.NewNPReceiver(ot.NP_MSG_LEN, rcvParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
+		otSender := ot.NewExtendSender(otChans.OtExtChan, otChans.OtExtSelChan, npRecvr, ot.SEC_PARAM,
+			tripleShareSize, ot.NUM_PAIRS)
+		npSndr := ot.NewNPSender(ot.NP_MSG_LEN, sndParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
+		otRecvr := ot.NewExtendReceiver(otChans.OtExtChan, otChans.OtExtSelChan, npSndr, ot.SEC_PARAM,
+			tripleShareSize, ot.NUM_PAIRS)
+
 	}
 
 	/* channels */
