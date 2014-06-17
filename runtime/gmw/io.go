@@ -45,11 +45,16 @@ type Io interface {
 	Ram() []byte
 }
 
+/* Triple */
+type Triple struct {
+	a, b, c uint32
+}
+
 /* mocked-up implementation of Io */
 type X struct {
 	n         int /* number of parties */
 	id        int /* id of party, range is 0..n-1 */
-	triples32 []struct{ a, b, c uint32 }
+	triples32 []Triple
 	triples8  []struct{ a, b, c uint8 }
 	triples1  []struct{ a, b, c bool }
 	rchannels []chan uint32 /* channels for reading from other parties */
@@ -336,7 +341,7 @@ func split_uint32(x uint32, n int) []uint32 {
 }
 
 func triple32TwoParties(num_triples, otherPartyId int,
-	otSender *ot.Sender, otReceiver *ot.Receiver) []struct{ a, b, c uint32 } {
+	otSender *ot.Sender, otReceiver *ot.Receiver) []Triple {
 
 	id := x.Id()
 	// arbitrarily decide who is sender and who is receiver
@@ -356,15 +361,15 @@ func triple32TwoParties(num_triples, otherPartyId int,
 }
 
 /* create n shares of a multiplication triple */
-func triple32(n int) []struct{ a, b, c uint32 } {
+func triple32(n int) []Triple {
 	a, b := rand32(), rand32()
 	c := a & b
 	a_shares := split_uint32(a, n)
 	b_shares := split_uint32(b, n)
 	c_shares := split_uint32(c, n)
-	result := make([]struct{ a, b, c uint32 }, n)
+	result := make([]Triple, n)
 	for i := range result {
-		result[i] = struct{ a, b, c uint32 }{a_shares[i], b_shares[i], c_shares[i]}
+		result[i] = Triple{a_shares[i], b_shares[i], c_shares[i]}
 	}
 	return result
 }
@@ -378,10 +383,10 @@ func UsedTriples32(x *X) int {
 
 func Example(n int) []*X {
 	/* triples */
-	triples32 := make([][]struct{ a, b, c uint32 }, n)
+	triples32 := make([][]Triple, n)
 
 	for i := range triples32 {
-		triples32[i] = make([]struct{ a, b, c uint32 }, num_triples)
+		triples32[i] = make([]Triple, num_triples)
 	}
 	for j := 0; j < num_triples; j++ {
 		shares_of_a_triple := triple32(n)
@@ -391,28 +396,37 @@ func Example(n int) []*X {
 	}
 
 	/* OT based triples */
-	for i := 0; i < n; i++ {
-		otChans := OTChans{
-			make(chan ot.PublicKey, 100),
-			make(chan big.Int, 100),
-			make(chan ot.HashedElGamalCiph, 100),
-
-			make(chan []byte, 100),
-			make(chan ot.Selector, 100),
-			make(chan ot.NPReceiverParams, 1),
-		}
-
-		// Triples share size
-		tripleShareSize := 32
-
-		npRecvr := ot.NewNPReceiver(ot.NP_MSG_LEN, rcvParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
-		otSender := ot.NewExtendSender(otChans.OtExtChan, otChans.OtExtSelChan, npRecvr, ot.SEC_PARAM,
-			tripleShareSize, ot.NUM_PAIRS)
-		npSndr := ot.NewNPSender(ot.NP_MSG_LEN, sndParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
-		otRecvr := ot.NewExtendReceiver(otChans.OtExtChan, otChans.OtExtSelChan, npSndr, ot.SEC_PARAM,
-			tripleShareSize, ot.NUM_PAIRS)
-
+	otRChannels := make([][]ot.Receiver, n)
+	otSChannels := make([][]ot.Sender, n)
+	for i := range otRChannels {
+		otRChannels[i] = make([]ot.Receiver, n)
+		otSChannels[i] = make([]ot.Sender, n)
 	}
+	for i := 0; i < n; i++ {
+		for j := 0; j < i; j++ {
+			otChans := OTChans{
+				make(chan ot.PublicKey, 100),
+				make(chan big.Int, 100),
+				make(chan ot.HashedElGamalCiph, 100),
+
+				make(chan []byte, 100),
+				make(chan ot.Selector, 100),
+				make(chan ot.NPReceiverParams, 1),
+			}
+
+			// Triples share size
+			tripleShareSize := 32
+
+			npRecvr := ot.NewNPReceiver(ot.NP_MSG_LEN, rcvParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
+			otSChannels[i][j] = ot.NewExtendSender(otChans.OtExtChan, otChans.OtExtSelChan, npRecvr, ot.SEC_PARAM,
+				tripleShareSize, ot.NUM_PAIRS)
+			npSndr := ot.NewNPSender(ot.NP_MSG_LEN, sndParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
+			otRChannels[i][j] = ot.NewExtendReceiver(otChans.OtExtChan, otChans.OtExtSelChan, npSndr, ot.SEC_PARAM,
+				tripleShareSize, ot.NUM_PAIRS)
+
+		}
+	}
+	twoPartyTriples := triple32TwoParties(num_triples, otherPartyId, otSender, otReceiver)
 
 	/* channels */
 	rchannels := make([] /*n*/ [] /*n*/ chan uint32, n)
