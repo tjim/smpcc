@@ -107,3 +107,17 @@ Here 9 is an input supplied by the generator and 2 is an input
 supplied by the evaluator.
 
 See the examples directory for some more complicated examples.
+
+## GMW
+
+We have a simulated (non-networked) implementation of GMW using boolean circuits.
+To use compile like this:
+
+    $ smpcc foo.c -circuitlib gmw
+
+Within the c file you can read an input by declaring
+
+    extern unsigned int input(unsigned int);
+
+Then you read from party n with input(n).
+
