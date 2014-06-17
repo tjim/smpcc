@@ -340,24 +340,16 @@ func split_uint32(x uint32, n int) []uint32 {
 	return result
 }
 
-func triple32TwoParties(num_triples, otherPartyId int,
+func triple32TwoParties(num_triples, thisPartyId, otherPartyId int,
 	otSender *ot.Sender, otReceiver *ot.Receiver) []Triple {
 
-	id := x.Id()
 	// arbitrarily decide who is sender and who is receiver
 
 	if log_communication {
-		fmt.Printf("%d: triple32TwoParties\n", id)
+		fmt.Printf("%d: triple32TwoParties\n", thisPartyId)
 	}
-	for i, ch := range x.wchannels {
-		if i == id {
-			continue
-		}
-		ch <- n32
-		if log_communication {
-			fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
-		}
-	}
+	// generate triples
+	return nil
 }
 
 /* create n shares of a multiplication triple */
@@ -402,9 +394,11 @@ func Example(n int) []*X {
 		otRChannels[i] = make([]ot.Receiver, n)
 		otSChannels[i] = make([]ot.Sender, n)
 	}
+
+	fmt.Println("Creating pairwise OT channels.")
 	for i := 0; i < n; i++ {
 		for j := 0; j < i; j++ {
-			otChans := OTChans{
+			otChans := base.OTChans{
 				make(chan ot.PublicKey, 100),
 				make(chan big.Int, 100),
 				make(chan ot.HashedElGamalCiph, 100),
@@ -417,6 +411,7 @@ func Example(n int) []*X {
 			// Triples share size
 			tripleShareSize := 32
 
+			sndParams, rcvParams := ot.GenNPParams(ot.NP_MSG_LEN)
 			npRecvr := ot.NewNPReceiver(ot.NP_MSG_LEN, rcvParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
 			otSChannels[i][j] = ot.NewExtendSender(otChans.OtExtChan, otChans.OtExtSelChan, npRecvr, ot.SEC_PARAM,
 				tripleShareSize, ot.NUM_PAIRS)
@@ -426,7 +421,16 @@ func Example(n int) []*X {
 
 		}
 	}
-	twoPartyTriples := triple32TwoParties(num_triples, otherPartyId, otSender, otReceiver)
+
+	fmt.Println("Generating pairwise triples.")
+	for i := 0; i < n; i++ {
+		for j := 0; j < i; j++ {
+			twoPartyTriples := triple32TwoParties(num_triples, i, j, &otSChannels[i][j], &otRChannels[i][j])
+			if log_communication {
+				fmt.Printf("Triples: %v\n", twoPartyTriples)
+			}
+		}
+	}
 
 	/* channels */
 	rchannels := make([] /*n*/ [] /*n*/ chan uint32, n)
