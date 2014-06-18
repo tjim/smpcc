@@ -22,7 +22,7 @@ extern unsigned int input(unsigned int);
 int main() {
   unsigned int bidder = 0;
   unsigned int ultimate = input(0);
-  unsigned int penultimate = ultimate;
+  unsigned int penultimate = 0;
 
   for (unsigned int i = 1; i < NUM_PARTIES; i++) {
     unsigned int bid = input(i);
