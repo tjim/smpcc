@@ -342,21 +342,66 @@ func split_uint32(x uint32, n int) []uint32 {
 
 /* Code assumes that only one of (thisPartyId, otherPartyId) and (otherPartyId, thisPartyId) will be queried */
 func triple32TwoParties(num_triples, thisPartyId, otherPartyId int,
-	otSender *ot.Sender, otReceiver *ot.Receiver) []Triple {
+	thisSender ot.Sender, thisReceiver ot.Receiver) []Triple {
+
+	fmt.Printf("%d, %d: triple32TwoParties\n", thisPartyId, otherPartyId)
+
+	if thisReceiver == nil {
+		panic("this receiver is nil")
+	}
+
+	if thisSender == nil {
+		panic("this sender is nil")
+	}
 
 	result := make([]Triple, num_triples)
 
-	if log_communication {
-		fmt.Printf("%d: triple32TwoParties\n", thisPartyId)
+	// tripleShareSize := 32
+	for i := 0; i < num_triples; i++ {
+		var a, b, c uint32
+		if thisPartyId < otherPartyId {
+			// invocation 1 of algorithm 1 from ALSZ13
+			a = rand32() % 2
+			fmt.Printf("Party %d is waiting to receive from %d\n", thisPartyId, otherPartyId)
+			u_bytes := thisReceiver.Receive(ot.Selector(a))
+			fmt.Printf("Party %d received from %d\n", thisPartyId, otherPartyId)
+			u := uint32(u_bytes[0] + (u_bytes[1] >> 8) + (u_bytes[1] >> 16) + (u_bytes[1] >> 24))
+
+			// invocation 2 of algorithm 1 from ALSZ13
+			x_0_int := rand32()
+			x_0 := []byte{byte(x_0_int), byte(x_0_int << 8), byte(x_0_int << 16), byte(x_0_int << 24)}
+			x_1_int := rand32()
+			x_1 := []byte{byte(x_1_int), byte(x_1_int << 8), byte(x_1_int << 16), byte(x_1_int << 24)}
+			thisSender.Send(x_0, x_1)
+			v := x_0_int
+			b = x_0_int ^ x_1_int
+
+			// Computing the triple
+			c = (a * b) ^ u ^ v
+		} else {
+			// invocation 2 of algorithm 1 from ALSZ13
+			x_0_int := rand32()
+			x_0 := []byte{byte(x_0_int), byte(x_0_int << 8), byte(x_0_int << 16), byte(x_0_int << 24)}
+			x_1_int := rand32()
+			x_1 := []byte{byte(x_1_int), byte(x_1_int << 8), byte(x_1_int << 16), byte(x_1_int << 24)}
+			fmt.Printf("Party %d is waiting to send to %d\n", thisPartyId, otherPartyId)
+			thisSender.Send(x_0, x_1)
+			fmt.Printf("Party %d sent to %d\n", thisPartyId, otherPartyId)
+			v := x_0_int
+			b = x_0_int ^ x_1_int
+
+			// invocation 1 of algorithm 1 from ALSZ13
+			a = rand32() % 2
+			u_bytes := thisReceiver.Receive(ot.Selector(a))
+			u := uint32(u_bytes[0] + (u_bytes[1] >> 8) + (u_bytes[1] >> 16) + (u_bytes[1] >> 24))
+
+			// Computing the triple
+			c = (a * b) ^ u ^ v
+		}
+		result[i] = Triple{a, b, c}
 	}
 
-	if thisPartyId < otherPartyId {
-
-	} else {
-
-	}
-
-	return nil
+	return result
 }
 
 /* create n shares of a multiplication triple */
@@ -404,7 +449,10 @@ func Example(n int) []*X {
 
 	fmt.Println("Creating pairwise OT channels.")
 	for i := 0; i < n; i++ {
-		for j := 0; j < i; j++ {
+		for j := 0; j < n; j++ {
+			if i == j {
+				continue
+			}
 			otChans := base.OTChans{
 				make(chan ot.PublicKey, 100),
 				make(chan big.Int, 100),
@@ -425,18 +473,24 @@ func Example(n int) []*X {
 			npSndr := ot.NewNPSender(ot.NP_MSG_LEN, sndParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
 			otRChannels[i][j] = ot.NewExtendReceiver(otChans.OtExtChan, otChans.OtExtSelChan, npSndr, ot.SEC_PARAM,
 				tripleShareSize, ot.NUM_PAIRS)
-
+		}
+	}
+	twoPartyTriplesChan := make(chan []Triple, 10000)
+	fmt.Println("Generating pairwise triples.")
+	for i := 0; i < n; i++ {
+		for j := 0; j < n; j++ {
+			if i == j {
+				continue
+			}
+			go func(num_triples, thisPartyId, otherPartyId int,
+				thisSender ot.Sender, thisReceiver ot.Receiver) {
+				twoPartyTriplesChan <- triple32TwoParties(num_triples, thisPartyId, otherPartyId, thisSender, thisReceiver)
+			}(num_triples, i, j, otSChannels[i][j], otRChannels[i][j])
 		}
 	}
 
-	fmt.Println("Generating pairwise triples.")
-	for i := 0; i < n; i++ {
-		for j := 0; j < i; j++ {
-			twoPartyTriples := triple32TwoParties(num_triples, i, j, &otSChannels[i][j], &otRChannels[i][j])
-			if log_communication {
-				fmt.Printf("Triples: %v\n", twoPartyTriples)
-			}
-		}
+	for i := 0; i < n*n; i++ {
+		fmt.Printf("Triples: %v\n", <-twoPartyTriplesChan)
 	}
 
 	/* channels */
