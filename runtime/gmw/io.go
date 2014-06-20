@@ -419,7 +419,8 @@ func triple32(n int) []Triple {
 }
 
 //var num_triples int = 16 * 4096
-var num_triples int = 64 * 1024
+// var num_triples int = 64 * 1024
+var num_triples int = 10
 
 func UsedTriples32(x *X) int {
 	return num_triples - len(x.triples32)
@@ -471,7 +472,7 @@ func Example(n int) []*X {
 			otSChannels[i][j] = ot.NewExtendSender(otChans.OtExtChan, otChans.OtExtSelChan, npRecvr, ot.SEC_PARAM,
 				tripleShareSize, ot.NUM_PAIRS)
 			npSndr := ot.NewNPSender(ot.NP_MSG_LEN, sndParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
-			otRChannels[i][j] = ot.NewExtendReceiver(otChans.OtExtChan, otChans.OtExtSelChan, npSndr, ot.SEC_PARAM,
+			otRChannels[j][i] = ot.NewExtendReceiver(otChans.OtExtChan, otChans.OtExtSelChan, npSndr, ot.SEC_PARAM,
 				tripleShareSize, ot.NUM_PAIRS)
 		}
 	}
@@ -489,7 +490,7 @@ func Example(n int) []*X {
 		}
 	}
 
-	for i := 0; i < n*n; i++ {
+	for i := 0; i < n*(n-1); i++ {
 		fmt.Printf("Triples: %v\n", <-twoPartyTriplesChan)
 	}
 
