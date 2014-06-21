@@ -362,9 +362,9 @@ func triple32TwoParties(num_triples, thisPartyId, otherPartyId int,
 		if thisPartyId < otherPartyId {
 			// invocation 1 of algorithm 1 from ALSZ13
 			a = rand32() % 2
-			fmt.Printf("Party %d is waiting to receive from %d\n", thisPartyId, otherPartyId)
+			// fmt.Printf("Party %d is waiting to receive from %d\n", thisPartyId, otherPartyId)
 			u_bytes := thisReceiver.Receive(ot.Selector(a))
-			fmt.Printf("Party %d received from %d\n", thisPartyId, otherPartyId)
+			// fmt.Printf("Party %d received from %d\n", thisPartyId, otherPartyId)
 			u := uint32(u_bytes[0] + (u_bytes[1] >> 8) + (u_bytes[1] >> 16) + (u_bytes[1] >> 24))
 
 			// invocation 2 of algorithm 1 from ALSZ13
@@ -384,9 +384,9 @@ func triple32TwoParties(num_triples, thisPartyId, otherPartyId int,
 			x_0 := []byte{byte(x_0_int), byte(x_0_int << 8), byte(x_0_int << 16), byte(x_0_int << 24)}
 			x_1_int := rand32()
 			x_1 := []byte{byte(x_1_int), byte(x_1_int << 8), byte(x_1_int << 16), byte(x_1_int << 24)}
-			fmt.Printf("Party %d is waiting to send to %d\n", thisPartyId, otherPartyId)
+			// fmt.Printf("Party %d is waiting to send to %d\n", thisPartyId, otherPartyId)
 			thisSender.Send(x_0, x_1)
-			fmt.Printf("Party %d sent to %d\n", thisPartyId, otherPartyId)
+			// fmt.Printf("Party %d sent to %d\n", thisPartyId, otherPartyId)
 			v := x_0_int
 			b = x_0_int ^ x_1_int
 
@@ -419,8 +419,9 @@ func triple32(n int) []Triple {
 }
 
 //var num_triples int = 16 * 4096
-// var num_triples int = 64 * 1024
-var num_triples int = 10
+var num_triples int = 64 * 1024
+
+// var num_triples int = 10
 
 func UsedTriples32(x *X) int {
 	return num_triples - len(x.triples32)
@@ -439,6 +440,7 @@ func Example(n int) []*X {
 			triples32[i][j] = t
 		}
 	}
+	fmt.Printf("Fake triples %v\n", triples32)
 
 	/* OT based triples */
 	otRChannels := make([][]ot.Receiver, n)
@@ -491,7 +493,8 @@ func Example(n int) []*X {
 	}
 
 	for i := 0; i < n*(n-1); i++ {
-		fmt.Printf("Triples: %v\n", <-twoPartyTriplesChan)
+		x := <-twoPartyTriplesChan
+		fmt.Printf("Triples received: %d\n", len(x))
 	}
 
 	/* channels */
