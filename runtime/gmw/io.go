@@ -359,46 +359,48 @@ func triple32TwoParties(num_triples, thisPartyId, otherPartyId int,
 	// tripleShareSize := 32
 	for i := 0; i < num_triples; i++ {
 		var a, b, c uint32
-		if thisPartyId < otherPartyId {
-			// invocation 1 of algorithm 1 from ALSZ13
-			a = rand32() % 2
-			// fmt.Printf("Party %d is waiting to receive from %d\n", thisPartyId, otherPartyId)
-			u_bytes := thisReceiver.Receive(ot.Selector(a))
-			// fmt.Printf("Party %d received from %d\n", thisPartyId, otherPartyId)
-			u := uint32(u_bytes[0] + (u_bytes[1] >> 8) + (u_bytes[1] >> 16) + (u_bytes[1] >> 24))
+		for j := 0; j < 32; j++ {
+			if thisPartyId < otherPartyId {
+				// invocation 1 of algorithm 1 from ALSZ13
+				a = rand32() % 2
+				// fmt.Printf("Party %d is waiting to receive from %d\n", thisPartyId, otherPartyId)
+				u_bytes := thisReceiver.Receive(ot.Selector(a))
+				// fmt.Printf("Party %d received from %d\n", thisPartyId, otherPartyId)
+				u := uint32(u_bytes[0])
 
-			// invocation 2 of algorithm 1 from ALSZ13
-			x_0_int := rand32()
-			x_0 := []byte{byte(x_0_int), byte(x_0_int << 8), byte(x_0_int << 16), byte(x_0_int << 24)}
-			x_1_int := rand32()
-			x_1 := []byte{byte(x_1_int), byte(x_1_int << 8), byte(x_1_int << 16), byte(x_1_int << 24)}
-			thisSender.Send(x_0, x_1)
-			v := x_0_int
-			b = x_0_int ^ x_1_int
+				// invocation 2 of algorithm 1 from ALSZ13
+				x_0_int := rand32() % 2
+				x_0 := []byte{byte(x_0_int)}
+				x_1_int := rand32() % 2
+				x_1 := []byte{byte(x_1_int)}
+				thisSender.Send(x_0, x_1)
+				v := x_0_int
+				b = x_0_int ^ x_1_int
 
-			// Computing the triple
-			c = (a * b) ^ u ^ v
-		} else {
-			// invocation 2 of algorithm 1 from ALSZ13
-			x_0_int := rand32()
-			x_0 := []byte{byte(x_0_int), byte(x_0_int << 8), byte(x_0_int << 16), byte(x_0_int << 24)}
-			x_1_int := rand32()
-			x_1 := []byte{byte(x_1_int), byte(x_1_int << 8), byte(x_1_int << 16), byte(x_1_int << 24)}
-			// fmt.Printf("Party %d is waiting to send to %d\n", thisPartyId, otherPartyId)
-			thisSender.Send(x_0, x_1)
-			// fmt.Printf("Party %d sent to %d\n", thisPartyId, otherPartyId)
-			v := x_0_int
-			b = x_0_int ^ x_1_int
+				// Computing the triple
+				c = (a * b) ^ u ^ v
+			} else {
+				// invocation 2 of algorithm 1 from ALSZ13
+				x_0_int := rand32() % 2
+				x_0 := []byte{byte(x_0_int)}
+				x_1_int := rand32() % 2
+				x_1 := []byte{byte(x_1_int)}
+				// fmt.Printf("Party %d is waiting to send to %d\n", thisPartyId, otherPartyId)
+				thisSender.Send(x_0, x_1)
+				// fmt.Printf("Party %d sent to %d\n", thisPartyId, otherPartyId)
+				v := x_0_int
+				b = x_0_int ^ x_1_int
 
-			// invocation 1 of algorithm 1 from ALSZ13
-			a = rand32() % 2
-			u_bytes := thisReceiver.Receive(ot.Selector(a))
-			u := uint32(u_bytes[0] + (u_bytes[1] >> 8) + (u_bytes[1] >> 16) + (u_bytes[1] >> 24))
+				// invocation 1 of algorithm 1 from ALSZ13
+				a = rand32() % 2
+				u_bytes := thisReceiver.Receive(ot.Selector(a))
+				u := uint32(u_bytes[0])
 
-			// Computing the triple
-			c = (a * b) ^ u ^ v
+				// Computing the triple
+				c = (a * b) ^ u ^ v
+			}
+			result[i] = Triple{(result[i].a << 1) | a, (result[i].b << 1) | b, (result[i].c << 1) | c}
 		}
-		result[i] = Triple{a, b, c}
 	}
 
 	return result
@@ -418,8 +420,9 @@ func triple32(n int) []Triple {
 	return result
 }
 
-//var num_triples int = 16 * 4096
-var num_triples int = 64 * 1024
+var num_triples int = 16 * 4096
+
+// var num_triples int = 1
 
 // var num_triples int = 10
 
@@ -440,7 +443,7 @@ func Example(n int) []*X {
 			triples32[i][j] = t
 		}
 	}
-	fmt.Printf("Fake triples %v\n", triples32)
+	// fmt.Printf("Fake triples %v\n", triples32)
 
 	/* OT based triples */
 	otRChannels := make([][]ot.Receiver, n)
@@ -467,7 +470,7 @@ func Example(n int) []*X {
 			}
 
 			// Triples share size
-			tripleShareSize := 32
+			tripleShareSize := 8
 
 			sndParams, rcvParams := ot.GenNPParams(ot.NP_MSG_LEN)
 			npRecvr := ot.NewNPReceiver(ot.NP_MSG_LEN, rcvParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
@@ -495,6 +498,7 @@ func Example(n int) []*X {
 	for i := 0; i < n*(n-1); i++ {
 		x := <-twoPartyTriplesChan
 		fmt.Printf("Triples received: %d\n", len(x))
+		// fmt.Printf("Triple value %v\n", x)
 	}
 
 	/* channels */
