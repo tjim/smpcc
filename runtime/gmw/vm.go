@@ -576,10 +576,14 @@ func Mask64(io Io, s bool, a uint64) uint64 {
 	return Select64(io, s, a, Uint64(io, 0))
 }
 
-func Input32(io Io, party int) uint32 {
+func Input32(io Io, mask bool, party uint32, next_arg func() uint32) uint32 {
+	if !io.Open1(mask) {
+		return 0
+	}
 	id := io.Id()
-	if id == party {
-		X := io.GetInput()
+	party = io.Open32(party)
+	if id == int(party) {
+		X := next_arg()
 		shares := split_uint32(X, io.N())
 		for i := range shares {
 			if i == id {
@@ -589,7 +593,8 @@ func Input32(io Io, party int) uint32 {
 		}
 		return shares[id]
 	} else {
-		return io.Receive32(party)
+		X := io.Receive32(int(party))
+		return X
 	}
 }
 

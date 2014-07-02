@@ -101,7 +101,7 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
   | Call(_,_,_,_,Var(Name(true, "putchar")),[typ,_,Int x],_,_) ->
       bprintf b "Printf(io, mask, \"\\x%02x\")\n" (Big_int.int_of_big_int x)
   | Call(_,_,_,_,Var(Name(true, "input")),[typ,_,value],_,_) ->
-      bprintf b "InputFrom(io, mask, %a)\n" bpr_gmw_value (typ, value)
+      bprintf b "Input32(io, mask, %a, next_arg)\n" bpr_gmw_value (typ, value)
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.start")),_,_,_) ->
       ()
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.end")),_,_,_) ->
@@ -497,14 +497,14 @@ let print_function_circuit m f =
   bprintf b "		defer pprof.StopCPUProfile()\n";
   bprintf b "	}\n";
   bprintf b "}\n";
-  bprintf b "func next_arg() uint64 {\n";
+  bprintf b "func next_arg() uint32 {\n";
   bprintf b "\tif len(args) <= 0 {\n";
   bprintf b "\t\tpanic(\"Not enough command-line arguments\")\n";
   bprintf b "\t}\n";
   bprintf b "\targ := 0\n";
   bprintf b "\tfmt.Sscanf(args[0], \"%%d\", &arg)\n";
   bprintf b "\targs = args[1:]\n";
-  bprintf b "\treturn uint64(arg)\n";
+  bprintf b "\treturn uint32(arg)\n";
   bprintf b "}\n";
   bprintf b "\n";
   bprintf b "var %s_done = make(chan bool, 1)\n" (Gobe.govar f.fname);
