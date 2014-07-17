@@ -19,7 +19,7 @@ type YaoState struct {
 	io base.Genio
 }
 
-func NewYaoState(io base.Genio) YaoState {
+func NewState(io base.Genio) YaoState {
 	return YaoState{io}
 }
 

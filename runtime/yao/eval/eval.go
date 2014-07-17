@@ -10,6 +10,10 @@ type YaoState struct {
 	io base.Evalio
 }
 
+func NewState(io base.Evalio) YaoState {
+	return YaoState{io}
+}
+
 func IO(id int) (gen.YaoState, YaoState) {
 	io := base.NewChanio()
 	gchan := make(chan base.GenX, 1)
@@ -22,7 +26,7 @@ func IO(id int) (gen.YaoState, YaoState) {
 	}()
 	gio := <-gchan
 	eio := <-echan
-	return gen.NewYaoState(&gio), YaoState{&eio}
+	return gen.NewState(&gio), YaoState{&eio}
 }
 
 var const0 base.Key
