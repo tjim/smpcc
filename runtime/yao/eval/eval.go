@@ -3,11 +3,17 @@ package eval
 import "github.com/tjim/smpcc/runtime/base"
 import "github.com/tjim/smpcc/runtime/yao/gen"
 import "github.com/tjim/smpcc/runtime/ot"
+import basegen "github.com/tjim/smpcc/runtime/gen"
+import baseeval "github.com/tjim/smpcc/runtime/eval"
 import "math/rand"
 
 /* YaoState implements the EvalVM interface */
 type YaoState struct {
 	io base.Evalio
+}
+
+func NewState(io base.Evalio) YaoState {
+	return YaoState{io}
 }
 
 func IO(id int) (gen.YaoState, YaoState) {
@@ -22,7 +28,18 @@ func IO(id int) (gen.YaoState, YaoState) {
 	}()
 	gio := <-gchan
 	eio := <-echan
-	return gen.NewYaoState(&gio), YaoState{&eio}
+	return gen.NewState(&gio), YaoState{&eio}
+}
+
+func IOs(n int) ([]basegen.GenVM, []baseeval.EvalVM) {
+	result1 := make([]basegen.GenVM, n)
+	result2 := make([]baseeval.EvalVM, n)
+	for i := 0; i < n; i++ {
+		gio, eio := IO(i)
+		result1[i] = gio
+		result2[i] = eio
+	}
+	return result1, result2
 }
 
 var const0 base.Key
