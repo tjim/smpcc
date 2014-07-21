@@ -341,10 +341,10 @@ func split_uint32(x uint32, n int) []uint32 {
 }
 
 /* Code assumes that only one of (thisPartyId, otherPartyId) and (otherPartyId, thisPartyId) will be queried */
-func triple32TwoParties(num_triples, thisPartyId, otherPartyId int,
+func triples32TwoParties(num_triples, thisPartyId, otherPartyId int,
 	thisSender ot.Sender, thisReceiver ot.Receiver) []Triple {
 
-	fmt.Printf("%d, %d: triple32TwoParties\n", thisPartyId, otherPartyId)
+	fmt.Printf("%d, %d: triples32TwoParties\n", thisPartyId, otherPartyId)
 
 	if thisReceiver == nil {
 		panic("this receiver is nil")
@@ -404,6 +404,91 @@ func triple32TwoParties(num_triples, thisPartyId, otherPartyId int,
 	}
 
 	return result
+}
+
+func triple32TwoParties(a, b uint32, thisPartyId, otherPartyId int,
+	thisSender ot.Sender, thisReceiver ot.Receiver) Triple {
+
+	fmt.Printf("%d, %d: triples32TwoParties\n", thisPartyId, otherPartyId)
+
+	if thisReceiver == nil {
+		panic("this receiver is nil")
+	}
+
+	if thisSender == nil {
+		panic("this sender is nil")
+	}
+
+	result := Triple{}
+
+	// tripleShareSize := 32
+	var c uint32
+	for j := 0; j < 32; j++ {
+		if thisPartyId < otherPartyId {
+			// invocation 1 of algorithm 1 from ALSZ13
+			a_bit := (a >> uint(j)) % 2
+			b_bit := (b >> uint(j)) % 2
+			// fmt.Printf("Party %d is waiting to receive from %d\n", thisPartyId, otherPartyId)
+			u_bytes := thisReceiver.Receive(ot.Selector(a_bit))
+			// fmt.Printf("Party %d received from %d\n", thisPartyId, otherPartyId)
+			u := uint32(u_bytes[0])
+
+			// invocation 2 of algorithm 1 from ALSZ13
+			x_0_int := rand32() % 2
+			x_0 := []byte{byte(x_0_int)}
+			x_1_int := x_0_int ^ b_bit
+			x_1 := []byte{byte(x_1_int)}
+			thisSender.Send(x_0, x_1)
+			v := x_0_int
+
+			// Computing the triple
+			c = (a_bit * b_bit) ^ u ^ v
+		} else {
+			// invocation 2 of algorithm 1 from ALSZ13
+			a_bit := (a >> uint(j)) % 2
+			b_bit := (b >> uint(j)) % 2
+			x_0_int := rand32() % 2
+			x_0 := []byte{byte(x_0_int)}
+			x_1_int := x_0_int ^ b_bit
+			x_1 := []byte{byte(x_1_int)}
+			// fmt.Printf("Party %d is waiting to send to %d\n", thisPartyId, otherPartyId)
+			thisSender.Send(x_0, x_1)
+			// fmt.Printf("Party %d sent to %d\n", thisPartyId, otherPartyId)
+			v := x_0_int
+
+			// invocation 1 of algorithm 1 from ALSZ13
+			a = rand32() % 2
+			u_bytes := thisReceiver.Receive(ot.Selector(a))
+			u := uint32(u_bytes[0])
+
+			// Computing the triple
+			c = (a_bit * b_bit) ^ u ^ v
+		}
+		result = Triple{(result.a << 1) | a, (result.b << 1) | b, (result.c << 1) | c}
+	}
+
+	return result
+}
+
+func triple32Secure(n int, thisPartyId int, senders []ot.Sender, receivers []ot.Receiver) Triple {
+	a := rand32()
+	b := rand32()
+	pairwiseTriples := make([]Triple, n)
+	for i := 0; i < n; i++ {
+		if i == thisPartyId {
+			continue
+		}
+		pairwiseTriples[i] = triple32TwoParties(a, b, thisPartyId, i, senders[i], receivers[i])
+		if (pairwiseTriples[i].a != a) || (pairwiseTriples[i].b != b) {
+			panic("Secure triple generation triples don't match")
+		}
+	}
+	result := Triple{a, b, 0}
+	for i := 0; i < n; i++ {
+		result.c += pairwiseTriples[i].c
+	}
+
+	return nil
 }
 
 /* create n shares of a multiplication triple */
@@ -481,25 +566,25 @@ func Example(n int) []*X {
 				tripleShareSize, ot.NUM_PAIRS)
 		}
 	}
-	twoPartyTriplesChan := make(chan []Triple, 10000)
-	fmt.Println("Generating pairwise triples.")
-	for i := 0; i < n; i++ {
-		for j := 0; j < n; j++ {
-			if i == j {
-				continue
-			}
-			go func(num_triples, thisPartyId, otherPartyId int,
-				thisSender ot.Sender, thisReceiver ot.Receiver) {
-				twoPartyTriplesChan <- triple32TwoParties(num_triples, thisPartyId, otherPartyId, thisSender, thisReceiver)
-			}(num_triples, i, j, otSChannels[i][j], otRChannels[i][j])
-		}
-	}
+	// twoPartyTriplesChan := make(chan []Triple, 10000)
+	// fmt.Println("Generating pairwise triples.")
+	// for i := 0; i < n; i++ {
+	// 	for j := 0; j < n; j++ {
+	// 		if i == j {
+	// 			continue
+	// 		}
+	// 		go func(num_triples, thisPartyId, otherPartyId int,
+	// 			thisSender ot.Sender, thisReceiver ot.Receiver) {
+	// 			twoPartyTriplesChan <- triples32TwoParties(num_triples, thisPartyId, otherPartyId, thisSender, thisReceiver)
+	// 		}(10, i, j, otSChannels[i][j], otRChannels[i][j])
+	// 	}
+	// }
 
-	for i := 0; i < n*(n-1); i++ {
-		x := <-twoPartyTriplesChan
-		fmt.Printf("Triples received: %d\n", len(x))
-		// fmt.Printf("Triple value %v\n", x)
-	}
+	// for i := 0; i < n*(n-1); i++ {
+	// 	x := <-twoPartyTriplesChan
+	// 	fmt.Printf("Triples received: %d\n", len(x))
+	// 	// fmt.Printf("Triple value %v\n", x)
+	// }
 
 	/* channels */
 	rchannels := make([] /*n*/ [] /*n*/ chan uint32, n)
