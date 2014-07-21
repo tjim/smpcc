@@ -473,22 +473,27 @@ func triple32TwoParties(a, b uint32, thisPartyId, otherPartyId int,
 func triple32Secure(n int, thisPartyId int, senders []ot.Sender, receivers []ot.Receiver) Triple {
 	a := rand32()
 	b := rand32()
-	pairwiseTriples := make([]Triple, n)
+	pairwiseTriples1 := make([]Triple, n)
+	pairwiseTriples2 := make([]Triple, n)
 	for i := 0; i < n; i++ {
 		if i == thisPartyId {
 			continue
 		}
-		pairwiseTriples[i] = triple32TwoParties(a, b, thisPartyId, i, senders[i], receivers[i])
-		if (pairwiseTriples[i].a != a) || (pairwiseTriples[i].b != b) {
+		pairwiseTriples1[i] = triple32TwoParties(a, b, thisPartyId, i, senders[i], receivers[i])
+		if (pairwiseTriples1[i].a != a) || (pairwiseTriples1[i].b != b) {
+			panic("Secure triple generation triples don't match")
+		}
+		pairwiseTriples2[i] = triple32TwoParties(b, a, thisPartyId, i, senders[i], receivers[i])
+		if (pairwiseTriples2[i].a != a) || (pairwiseTriples2[i].b != b) {
 			panic("Secure triple generation triples don't match")
 		}
 	}
 	result := Triple{a, b, 0}
 	for i := 0; i < n; i++ {
-		result.c += pairwiseTriples[i].c
+		result.c += pairwiseTriples1[i].c + pairwiseTriples2[i].c
 	}
 
-	return nil
+	return result
 }
 
 /* create n shares of a multiplication triple */
