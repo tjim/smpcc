@@ -406,91 +406,55 @@ func triples32TwoParties(num_triples, thisPartyId, otherPartyId int,
 	return result
 }
 
-func triple32TwoParties(a, b uint32, thisPartyId, otherPartyId int,
-	thisSender ot.Sender, thisReceiver ot.Receiver) Triple {
+func piMulR(val uin32, thisReceiver ot.Receiver) uint32 {
+	result := 0
 
-	fmt.Printf("%d, %d: triples32TwoParties\n", thisPartyId, otherPartyId)
-
-	if thisReceiver == nil {
-		panic("this receiver is nil")
+	for i := 0; i < 32; i++ {
+		a_bit := (val >> uint(i)) % 2
+		u_bytes := thisReceiver.Receive(ot.Selector(a_bit))
+		u := uint32(u_bytes[0])
+		result = (result << 1) | u
 	}
 
-	if thisSender == nil {
-		panic("this sender is nil")
-	}
+	return result
+}
 
-	result := Triple{}
+func piMulS(val uin32, thisSender ot.Sender) uint32 {
+	result := 0
 
-	// tripleShareSize := 32
-	var c uint32
-	for j := 0; j < 32; j++ {
-		if thisPartyId < otherPartyId {
-			// invocation 1 of algorithm 1 from ALSZ13
-			a_bit := (a >> uint(j)) % 2
-			b_bit := (b >> uint(j)) % 2
-			// fmt.Printf("Party %d is waiting to receive from %d\n", thisPartyId, otherPartyId)
-			u_bytes := thisReceiver.Receive(ot.Selector(a_bit))
-			// fmt.Printf("Party %d received from %d\n", thisPartyId, otherPartyId)
-			u := uint32(u_bytes[0])
+	for i := 0; i < 32; i++ {
+		b_bit := (val >> uint(i)) % 2
+		x_0_int := rand32() % 2
+		x_0 := []byte{byte(x_0_int)}
+		x_1_int := x_0_int ^ b_bit
+		x_1 := []byte{byte(x_1_int)}
+		thisSender.Send(x_0, x_1)
+		v := x_0_int
 
-			// invocation 2 of algorithm 1 from ALSZ13
-			x_0_int := rand32() % 2
-			x_0 := []byte{byte(x_0_int)}
-			x_1_int := x_0_int ^ b_bit
-			x_1 := []byte{byte(x_1_int)}
-			thisSender.Send(x_0, x_1)
-			v := x_0_int
-
-			// Computing the triple
-			c = (a_bit * b_bit) ^ u ^ v
-		} else {
-			// invocation 2 of algorithm 1 from ALSZ13
-			a_bit := (a >> uint(j)) % 2
-			b_bit := (b >> uint(j)) % 2
-			x_0_int := rand32() % 2
-			x_0 := []byte{byte(x_0_int)}
-			x_1_int := x_0_int ^ b_bit
-			x_1 := []byte{byte(x_1_int)}
-			// fmt.Printf("Party %d is waiting to send to %d\n", thisPartyId, otherPartyId)
-			thisSender.Send(x_0, x_1)
-			// fmt.Printf("Party %d sent to %d\n", thisPartyId, otherPartyId)
-			v := x_0_int
-
-			// invocation 1 of algorithm 1 from ALSZ13
-			a = rand32() % 2
-			u_bytes := thisReceiver.Receive(ot.Selector(a))
-			u := uint32(u_bytes[0])
-
-			// Computing the triple
-			c = (a_bit * b_bit) ^ u ^ v
-		}
-		result = Triple{(result.a << 1) | a, (result.b << 1) | b, (result.c << 1) | c}
+		result = (result << 1) | v
 	}
 
 	return result
 }
 
 func triple32Secure(n int, thisPartyId int, senders []ot.Sender, receivers []ot.Receiver) Triple {
+	// Notation is from figure 9, DO10, and Algorithm 1 from ALSZ13
 	a := rand32()
 	b := rand32()
-	pairwiseTriples1 := make([]Triple, n)
-	pairwiseTriples2 := make([]Triple, n)
+
+	d := make([]uint32, n)
+	e := make([]uint32, n)
 	for i := 0; i < n; i++ {
-		if i == thisPartyId {
+		if i == n {
 			continue
 		}
-		pairwiseTriples1[i] = triple32TwoParties(a, b, thisPartyId, i, senders[i], receivers[i])
-		if (pairwiseTriples1[i].a != a) || (pairwiseTriples1[i].b != b) {
-			panic("Secure triple generation triples don't match")
-		}
-		pairwiseTriples2[i] = triple32TwoParties(b, a, thisPartyId, i, senders[i], receivers[i])
-		if (pairwiseTriples2[i].a != a) || (pairwiseTriples2[i].b != b) {
-			panic("Secure triple generation triples don't match")
-		}
+		d[i] = piMulR(a, receivers[i])
+		e[i] = piMulS(b, senders[i])
 	}
+
 	result := Triple{a, b, 0}
 	for i := 0; i < n; i++ {
-		result.c += pairwiseTriples1[i].c + pairwiseTriples2[i].c
+		result.c += d[i] + e[i]
 	}
 
 	return result
