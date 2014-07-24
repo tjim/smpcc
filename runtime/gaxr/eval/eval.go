@@ -8,6 +8,8 @@ import (
 
 import "github.com/tjim/smpcc/runtime/gaxr/gen"
 import "github.com/tjim/smpcc/runtime/ot"
+import basegen "github.com/tjim/smpcc/runtime/gen"
+import baseeval "github.com/tjim/smpcc/runtime/eval"
 import "math/rand"
 
 type ConcurrentId int64
@@ -41,6 +43,17 @@ func IO(id int64) (gen.GaxState, GaxState) {
 	gio := <-gchan
 	eio := <-echan
 	return gen.NewGaxState(&gio, gen.ConcurrentId(id)), GaxState{&eio, ConcurrentId(id), 0}
+}
+
+func IOs(n int) ([]basegen.GenVM, []baseeval.EvalVM) {
+	result1 := make([]basegen.GenVM, n)
+	result2 := make([]baseeval.EvalVM, n)
+	for i := 0; i < n; i++ {
+		gio, eio := IO(int64(i))
+		result1[i] = gio
+		result2[i] = eio
+	}
+	return result1, result2
 }
 
 var const0 base.Key

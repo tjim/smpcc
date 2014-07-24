@@ -325,17 +325,17 @@ let bpr_main b f =
     (fun bl ->
       let outputs = outputs_of_block blocks_fv bl in
       if not(VSet.is_empty (VSet.diff outputs State.V.special)) then
-        bprintf b "\t\tmask_%d := (<- ch%d) > 0\n" (State.bl_num bl.bname) (State.bl_num bl.bname);
+        bprintf b "\t\tmask_%d := (<-ch%d) > 0\n" (State.bl_num bl.bname) (State.bl_num bl.bname);
       VSet.iter
         (fun var ->
           let w = (roundup_bitwidth (State.typ_of_var var)) in
           if w = 1 then
-          bprintf b "\t\t%s_%d := (<- ch%d) > 0\n"
+          bprintf b "\t\t%s_%d := (<-ch%d) > 0\n"
               (Gobe.govar var)
               (State.bl_num bl.bname)
               (State.bl_num bl.bname)
           else
-            bprintf b "\t\t%s_%d := uint%d(<- ch%d)\n"
+            bprintf b "\t\t%s_%d := uint%d(<-ch%d)\n"
               (Gobe.govar var)
               (State.bl_num bl.bname)
               w
@@ -510,9 +510,9 @@ let print_function_circuit m f =
   bprintf b "var %s_done = make(chan bool, 1)\n" (Gobe.govar f.fname);
   bprintf b "\n";
   bprintf b "func main() {\n";
-  bprintf b "start_time := time.Now()\n";
+  bprintf b "\tstart_time := time.Now()\n";
   bprintf b "\tif log_stats {\n";
-  bprintf b "\t\tfmt.Printf(\"Starting triple generation\\n\")";
+  bprintf b "\t\tfmt.Printf(\"Starting triple generation\\n\")\n";
   bprintf b "\t}\n";
   bprintf b "\tinit_args()\n";
   let num_parties = 3 in (* hard coded for now *)
@@ -544,13 +544,13 @@ let print_function_circuit m f =
   bprintf b "\t\tused_triples := 0\n";
   bprintf b "\t\tfmt.Printf(\"Main block used %%5d 32-bit triples\\n\", gmw.UsedTriples32(io[0]))\n";
   bprintf b "\t\tused_triples += gmw.UsedTriples32(io[0])\n";
-  bprintf b "\t\tfor i,io_block := range ios[0] {\n";
+  bprintf b "\t\tfor i, io_block := range ios[0] {\n";
   bprintf b "\t\t\tused := gmw.UsedTriples32(io_block.(*gmw.X))\n";
   bprintf b "\t\t\tfmt.Printf(\"Block %%2d used %%5d 32-bit triples\\n\", i, used)\n";
   bprintf b "\t\t\tused_triples += used\n";
   bprintf b "\t\t}\n";
   bprintf b "\t\tfmt.Printf(\"Total 32-bit triples: %%d\\n\", used_triples)\n";
-  bprintf b "\t\tfmt.Printf(\"Total AND-gates: %%d (+-64)\\n\", used_triples * 32)\n";
+  bprintf b "\t\tfmt.Printf(\"Total AND-gates: %%d (+-64)\\n\", used_triples*32)\n";
   bprintf b "\t}\n";
   bprintf b "}\n";
   let main_go = Buffer.contents b in

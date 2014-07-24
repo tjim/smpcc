@@ -108,6 +108,21 @@ supplied by the evaluator.
 
 See the examples directory for some more complicated examples.
 
+## Garbled circuit back ends
+
+The compiler has several back ends for garbled circuits:
+
+* yao: classic Yao-style garbled circuits
+* yaor: Yao with row reduction
+* gax: from the paper "Efficient Garbling from a Fixed-Key Blockcipher", by Bellare, Hoang, Keelveedhi, Rogaway. IEEE Security and Privacy 20
+13.
+* gaxr: GaX with row reduction
+
+The default is yao.  To compile for another back end, use the
+-circuitlib flag, e.g.:
+
+    $ smpcc foo.c -circuitlib gaxr
+
 ## GMW
 
 We have a simulated (non-networked) implementation of GMW using boolean circuits.

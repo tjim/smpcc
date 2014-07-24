@@ -261,11 +261,10 @@ let bpr_main b f is_gen =
   let blocks = f.fblocks in
   let blocks_fv = List.fold_left VSet.union VSet.empty
       (List.map free_of_block blocks) in
-  let blockios = String.concat "" (List.map (fun bl -> sprintf ", io%d" (State.bl_num bl.bname)) blocks) in
-  bprintf b "func %s_main(io%s %s) {\n" (gen_or_eval is_gen) blockios (io_type is_gen);
+  bprintf b "func %s_main(ios []%s) {\n" (gen_or_eval is_gen) (io_type is_gen);
   bprintf b "\n";
   if is_gen then
-    bprintf b "\tinitialize_ram(io)\n\n";
+    bprintf b "\tinitialize_ram(ios[0])\n\n";
   bprintf b "\t/* create output channels */\n";
   List.iter
     (fun bl ->
@@ -277,7 +276,7 @@ let bpr_main b f is_gen =
   bprintf b "\t/* special variables */\n";
   VSet.iter
     (fun var ->
-      bprintf b "\t%s := Uint(io, 0, %d)\n" (govar var) (State.bitwidth (State.typ_of_var var));
+      bprintf b "\t%s := Uint(ios[0], 0, %d)\n" (govar var) (State.bitwidth (State.typ_of_var var));
     )
     (VSet.add (State.V.attsrcStateO()) (* if there is only one block this is used but not assigned *)
        (VSet.inter State.V.special (assigned_of_blocks blocks)));
@@ -285,7 +284,7 @@ let bpr_main b f is_gen =
   bprintf b "\t/* block free variables */\n";
   VSet.iter
     (fun var ->
-      bprintf b "\t%s := Uint(io, 0, %d)\n" (govar var) (State.bitwidth (State.typ_of_var var));
+      bprintf b "\t%s := Uint(ios[0], 0, %d)\n" (govar var) (State.bitwidth (State.typ_of_var var));
     )
     blocks_fv;
   bprintf b "\n";
@@ -295,10 +294,10 @@ let bpr_main b f is_gen =
   bprintf b "\t\t/* one goroutine invocation per block */\n";
   List.iter
     (fun bl ->
-      bprintf b "\t\tgo %s%d(io%d, ch%d, _attsrcStateO%a)\n"
+      bprintf b "\t\tgo %s%d(ios[%d], ch%d, _attsrcStateO%a)\n"
         (gen_or_eval is_gen)
         (State.bl_num bl.bname)
-        (State.bl_num bl.bname)
+        (State.bl_num bl.bname + 1)
         (State.bl_num bl.bname)
         bpr_go_block_args bl)
     blocks;
@@ -322,12 +321,12 @@ let bpr_main b f is_gen =
       let sources = List.filter (fun bl -> VSet.mem var (outputs_of_block blocks_fv bl)) blocks in
       if VSet.mem var State.V.special then
         (* specials are assigned 0 unless the active block assigned them *)
-        bprintf b "\t\t%s = TreeXor(io, %s)\n"
+        bprintf b "\t\t%s = TreeXor(ios[0], %s)\n"
           (govar var)
           (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (govar var) (State.bl_num bl.bname)) sources))
       else
         (* non-specials keep their value from before the blocks unless the active block assigned them *)
-        bprintf b "\t\t%s = Select(io, TreeXor(io, %s), TreeXor(io, %s), %s)\n"
+        bprintf b "\t\t%s = Select(ios[0], TreeXor(ios[0], %s), TreeXor(ios[0], %s), %s)\n"
           (govar var)
           (String.concat ", " (List.map (fun bl -> sprintf "mask_%d" (State.bl_num bl.bname)) sources))
           (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (govar var) (State.bl_num bl.bname)) sources))
@@ -337,23 +336,23 @@ let bpr_main b f is_gen =
     (* We need to load from memory iff some block uses attsrcMemRes *)
     bprintf b "\n";
     bprintf b "\t\t/* load from memory if necessary */\n";
-    bprintf b "\t\tif Reveal(io, Icmp_eq(io, _attsrcMemAct, Uint(io, 1, 2)))[0] {\n";
-    bprintf b "\t\t\t_attsrcMemRes = Load(io, _attsrcMemLoc, _attsrcMemSize)\n";
+    bprintf b "\t\tif Reveal(ios[0], Icmp_eq(ios[0], _attsrcMemAct, Uint(ios[0], 1, 2)))[0] {\n";
+    bprintf b "\t\t\t_attsrcMemRes = Load(ios[0], _attsrcMemLoc, _attsrcMemSize)\n";
     bprintf b "\t\t}\n";
   end;
   if VSet.mem State.V.attsrcMemVal (outputs_of_blocks blocks) then begin
     (* We need to store to memory iff some block assigns attsrcMemVal *)
     bprintf b "\n";
     bprintf b "\t\t/* store to memory if necessary */\n";
-    bprintf b "\t\tif Reveal(io, Icmp_eq(io, _attsrcMemAct, Uint(io, 2, 2)))[0] {\n";
-    bprintf b "\t\t\tStore(io, _attsrcMemLoc, _attsrcMemSize, _attsrcMemVal)\n";
+    bprintf b "\t\tif Reveal(ios[0], Icmp_eq(ios[0], _attsrcMemAct, Uint(ios[0], 2, 2)))[0] {\n";
+    bprintf b "\t\t\tStore(ios[0], _attsrcMemLoc, _attsrcMemSize, _attsrcMemVal)\n";
     bprintf b "\t\t}\n";
   end;
   bprintf b "\n";
   bprintf b "\t\t/* are we done? */\n";
-  bprintf b "\t\tdone = Reveal(io, _attsrcIsDone)[0]\n";
+  bprintf b "\t\tdone = Reveal(ios[0], _attsrcIsDone)[0]\n";
   bprintf b "\t}\n";
-  bprintf b "\tanswer := RevealInt32(io, _attsrcAnswer)\n";
+  bprintf b "\tanswer := RevealInt32(ios[0], _attsrcAnswer)\n";
   bprintf b "\tfmt.Printf(\"%s: %%v\\n\", answer)\n" (gen_or_eval is_gen);
   bprintf b "\t%s_done <- true\n" (govar f.fname);
   bprintf b "}\n";
@@ -490,14 +489,9 @@ let print_function_circuit m f =
   bprintf b "\n";
   bprintf b "func main() {\n";
   bprintf b "\tinit_args()\n";
-  let blocknums = List.map (fun bl -> State.bl_num bl.bname) f.fblocks in
-  bprintf b "\tgio, eio := eval.IO(-1)\n";
-  List.iter
-    (fun n ->
-      bprintf b "\tgio%d, eio%d := eval.IO(%d)\n" n n n)
-    blocknums;
-  bprintf b "\tgo gen_main(gio, %s)\n" (String.concat ", " (List.map (fun n -> sprintf "gio%d" n) blocknums));
-  bprintf b "\tgo eval_main(eio, %s)\n" (String.concat ", " (List.map (fun n -> sprintf "eio%d" n) blocknums));
+  bprintf b "\tgios, eios := eval.IOs(%d)\n" (List.length f.fblocks + 1);
+  bprintf b "\tgo gen_main(gios)\n";
+  bprintf b "\tgo eval_main(eios)\n";
   bprintf b "\t<-%s_done\n" (govar f.fname);
   bprintf b "\t<-%s_done\n" (govar f.fname);
   bprintf b "\n";
