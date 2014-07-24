@@ -485,20 +485,6 @@ func UsedTriples32(x *X) int {
 }
 
 func Example(n int) []*X {
-	/* triples */
-	triples32 := make([][]Triple, n)
-
-	for i := range triples32 {
-		triples32[i] = make([]Triple, num_triples)
-	}
-	for j := 0; j < num_triples; j++ {
-		shares_of_a_triple := triple32(n)
-		for i, t := range shares_of_a_triple {
-			triples32[i][j] = t
-		}
-	}
-	// fmt.Printf("Fake triples %v\n", triples32)
-
 	/* OT based triples */
 	otRChannels := make([][]ot.Receiver, n)
 	otSChannels := make([][]ot.Sender, n)
@@ -535,6 +521,21 @@ func Example(n int) []*X {
 				tripleShareSize, ot.NUM_PAIRS)
 		}
 	}
+
+	/* triples */
+	triples32 := make([][]Triple, n)
+
+	for i := range triples32 {
+		triples32[i] = make([]Triple, num_triples)
+	}
+	for j := 0; j < num_triples; j++ {
+		shares_of_a_triple := triple32(n)
+		for i, t := range shares_of_a_triple {
+			triples32[i][j] = t
+		}
+	}
+	// fmt.Printf("Fake triples %v\n", triples32)
+
 	// twoPartyTriplesChan := make(chan []Triple, 10000)
 	// fmt.Println("Generating pairwise triples.")
 	// for i := 0; i < n; i++ {
