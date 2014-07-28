@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 
-echo "pacman -Sy --needed --noconfirm base-devel git llvm-ocaml clang go colordiff mercurial"
-pacman -Sy --needed --noconfirm base-devel git llvm-ocaml clang go colordiff mercurial
-echo "cp -pr /vagrant/arch/ocaml-findlib /tmp/ocaml-findlib"
-cp -pr /vagrant/arch/ocaml-findlib /tmp/ocaml-findlib
-echo "cd /tmp/ocaml-findlib; makepkg --asroot --noconfirm -i -s"
-cd /tmp/ocaml-findlib; makepkg --asroot --noconfirm -i -s
+echo "pacman -Sy --noconfirm"
+pacman -Sy --noconfirm
+echo "pacman -S --noconfirm archlinux-keyring"
+pacman -S --noconfirm archlinux-keyring
+echo "pacman -Su --noconfirm"
+pacman -Su --noconfirm
+echo "pacman -S --needed --noconfirm base-devel git llvm-ocaml ocaml-findlib clang go colordiff mercurial"
+pacman -S --needed --noconfirm base-devel git llvm-ocaml ocaml-findlib clang go colordiff mercurial
 echo "git clone https://github.com/kerneis/cil; cd cil; ./configure; make; make install"
 git clone https://github.com/kerneis/cil; cd cil; ./configure; make; make install
 echo "cp -pr /vagrant/cilext /tmp/cilext"
