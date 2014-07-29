@@ -753,6 +753,7 @@ begin
   let (x,args) = getopt "-O4" args               in if x then options.optflag <- "-O4";
   let (x,args) = getopt "-v" args                in options.verbose <- x;
   let (x,args) = getopt "-run" args              in options.run <- x;
+  let (x,args) = getopt "-sim" args              in options.sim <- x;
   let (cil_extra_args,args) = getallopts args    in
   if options.help then
     (printf "Usage: ./smpcc foo.c [options]\n";
@@ -765,6 +766,7 @@ begin
      printf "         -fname <function name>      Specify the function to compile (default is first function)\n";
      printf "         -o <file name>              Specify the output file (default is standard out)\n";
      printf "         -run                        Compile and run the program immediately\n";
+     printf "         -sim                        Compile for simulation\n";
      printf "         -fv                         Print the free variables of the function\n";
      printf "         -ram                        Print the RAM assignment\n";
      printf "         -pr                         Print the LLVM assembly language of the file\n";

@@ -11,9 +11,7 @@ func NewGenio(nu chan base.Chanio) base.Genio {
 	io := base.NewChanio()
 	//	defer close(io.Tchan)
 	//	defer close(io.Kchan)
-	log.Printf("Writing to nu...\n")
 	nu <- *io
-	log.Printf("DONE writing to nu\n")
 	return base.NewGenX(io)
 }
 
