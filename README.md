@@ -76,7 +76,7 @@ Then you can compile and run the program as follows:
     eval: 5
     gen: 5
     Done
-    $ 
+    $
 
 This runs the program in a single process; the generator and evaluator
 run as different (sets of) goroutines.  smpcc can also produce go
@@ -85,26 +85,30 @@ programs that run the generator and evaluator on different machines.
 You can supply input to the program over the command line.  Put the
 following in foo.c:
 
-    extern int gen_int();
-    extern int eval_int();
+    extern int input(int);
 
     int main() {
-      int x = gen_int();
-      int y = eval_int();
+      int x = 2 * input(0);
+      int y = input(1);
       return x+y;
     }
+
+Here input() is a function that reads input from one of the two
+parties.  The argument to input() identifies the party; for a
+two-party back end it should be 0 or 1; for an n-party back end it
+should be between 0 and n-1.
 
 Then you can do
 
     $ smpcc foo.c
     $ go run *.go 9 2
-    eval: 11
-    gen: 11
+    eval: 20
+    gen: 20
     Done
-    $ 
+    $
 
-Here 9 is an input supplied by the generator and 2 is an input
-supplied by the evaluator.
+Here 9 is an input supplied by the generator (party 0) and 2 is an
+input supplied by the evaluator (party 1).
 
 See the examples directory for some more complicated examples.
 
@@ -135,4 +139,3 @@ Within the c file you can read an input by declaring
     extern unsigned int input(unsigned int);
 
 Then you read from party n with input(n).
-
