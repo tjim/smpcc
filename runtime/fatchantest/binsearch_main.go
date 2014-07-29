@@ -4,6 +4,8 @@ import "github.com/tjim/smpcc/runtime/base"
 import "github.com/tjim/smpcc/runtime/fatchanio"
 import "github.com/tjim/smpcc/runtime/yao/eval"
 import "github.com/tjim/smpcc/runtime/yao/gen"
+import baseeval "github.com/tjim/smpcc/runtime/eval"
+import basegen "github.com/tjim/smpcc/runtime/gen"
 import "os"
 import "log"
 
@@ -12,7 +14,7 @@ var _main_done = make(chan bool, 1)
 func eval_binsearch(nu chan base.Chanio) {
 	log.Printf("Starting eval")
 
-	ios := make([]eval.YaoState, 14)
+	ios := make([]baseeval.EvalVM, 14)
 
 	for i := range ios {
 		io := <-nu
@@ -21,7 +23,7 @@ func eval_binsearch(nu chan base.Chanio) {
 	}
 
 	log.Printf("Starting eval_main\n")
-	go eval_main(ios[0], ios[1], ios[2], ios[3], ios[4], ios[5], ios[6], ios[7], ios[8], ios[9], ios[10], ios[11], ios[12], ios[13])
+	go eval_main(ios)
 	<- _main_done
 	log.Printf("Eval done\n")
 }
@@ -31,14 +33,14 @@ func gen_binsearch(nu chan base.Chanio) {
 	defer close(nu)
 
 	log.Printf("Generating new genios\n")
-	ios := make([]gen.YaoState, 14)
+	ios := make([]basegen.GenVM, 14)
 	for i := range ios {
 		io := fatchanio.NewGenio(nu)
 		ios[i] = gen.NewState(io)
 	}
 
 	log.Printf("Starting gen_main\n")
-	go gen_main(ios[0], ios[1], ios[2], ios[3], ios[4], ios[5], ios[6], ios[7], ios[8], ios[9], ios[10], ios[11], ios[12], ios[13])
+	go gen_main(ios)
 	<- _main_done
 	log.Printf("Gen done\n")
 }

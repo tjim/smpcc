@@ -4,7 +4,7 @@ import . "github.com/tjim/smpcc/runtime/eval"
 import "github.com/tjim/smpcc/runtime/base"
 import "fmt"
 
-func eval_main(io, io0, io1, io2, io3, io4, io5, io6, io7, io8, io9, io10, io11, io12 EvalVM) {
+func eval_main(ios []EvalVM) {
 
 	/* create output channels */
 	ch0 := make(chan []base.Key, 1)
@@ -22,42 +22,42 @@ func eval_main(io, io0, io1, io2, io3, io4, io5, io6, io7, io8, io9, io10, io11,
 	ch12 := make(chan []base.Key, 2)
 
 	/* special variables */
-	_attsrcAnswer := Uint(io, 0, 32)
-	_attsrcIsDone := Uint(io, 0, 1)
-	_attsrcMemAct := Uint(io, 0, 2)
-	_attsrcMemLoc := Uint(io, 0, 64)
-	_attsrcMemSize := Uint(io, 0, 32)
-	_attsrcStateO := Uint(io, 0, 32)
+	_attsrcAnswer := Uint(ios[0], 0, 32)
+	_attsrcIsDone := Uint(ios[0], 0, 1)
+	_attsrcMemAct := Uint(ios[0], 0, 2)
+	_attsrcMemLoc := Uint(ios[0], 0, 64)
+	_attsrcMemSize := Uint(ios[0], 0, 32)
+	_attsrcStateO := Uint(ios[0], 0, 32)
 
 	/* block free variables */
-	_5 := Uint(io, 0, 32)
-	_8 := Uint(io, 0, 32)
-	___search_left_0 := Uint(io, 0, 32)
-	__search___retres7_0 := Uint(io, 0, 32)
-	__search_left_01 := Uint(io, 0, 32)
-	__search_ret_site_0 := Uint(io, 0, 32)
-	__search_right_0_ := Uint(io, 0, 32)
-	__search_right_02 := Uint(io, 0, 32)
-	__search_v_0 := Uint(io, 0, 32)
-	_attsrcMemRes := Uint(io, 0, 64)
+	_5 := Uint(ios[0], 0, 32)
+	_8 := Uint(ios[0], 0, 32)
+	___search_left_0 := Uint(ios[0], 0, 32)
+	__search___retres7_0 := Uint(ios[0], 0, 32)
+	__search_left_01 := Uint(ios[0], 0, 32)
+	__search_ret_site_0 := Uint(ios[0], 0, 32)
+	__search_right_0_ := Uint(ios[0], 0, 32)
+	__search_right_02 := Uint(ios[0], 0, 32)
+	__search_v_0 := Uint(ios[0], 0, 32)
+	_attsrcMemRes := Uint(ios[0], 0, 64)
 
 	done := false
 	for !done {
 
 		/* one goroutine invocation per block */
-		go eval0(io0, ch0, _attsrcStateO)
-		go eval1(io1, ch1, _attsrcStateO)
-		go eval2(io2, ch2, _attsrcStateO, __search_left_01, __search_right_02)
-		go eval3(io3, ch3, _attsrcStateO, __search_v_0, _attsrcMemRes)
-		go eval4(io4, ch4, _attsrcStateO, _5, _8, __search_left_01, __search_right_02, __search_v_0)
-		go eval5(io5, ch5, _attsrcStateO, __search___retres7_0, __search_ret_site_0)
-		go eval6(io6, ch6, _attsrcStateO)
-		go eval7(io7, ch7, _attsrcStateO, ___search_left_0, __search_right_0_)
-		go eval8(io8, ch8, _attsrcStateO)
-		go eval9(io9, ch9, _attsrcStateO)
-		go eval10(io10, ch10, _attsrcStateO)
-		go eval11(io11, ch11, _attsrcStateO)
-		go eval12(io12, ch12, _attsrcStateO)
+		go eval0(ios[1], ch0, _attsrcStateO)
+		go eval1(ios[2], ch1, _attsrcStateO)
+		go eval2(ios[3], ch2, _attsrcStateO, __search_left_01, __search_right_02)
+		go eval3(ios[4], ch3, _attsrcStateO, __search_v_0, _attsrcMemRes)
+		go eval4(ios[5], ch4, _attsrcStateO, _5, _8, __search_left_01, __search_right_02, __search_v_0)
+		go eval5(ios[6], ch5, _attsrcStateO, __search___retres7_0, __search_ret_site_0)
+		go eval6(ios[7], ch6, _attsrcStateO)
+		go eval7(ios[8], ch7, _attsrcStateO, ___search_left_0, __search_right_0_)
+		go eval8(ios[9], ch8, _attsrcStateO)
+		go eval9(ios[10], ch9, _attsrcStateO)
+		go eval10(ios[11], ch10, _attsrcStateO)
+		go eval11(ios[12], ch11, _attsrcStateO)
+		go eval12(ios[13], ch12, _attsrcStateO)
 
 		/* mux the outputs*/
 		_attsrcStateO_0 := <- ch0
@@ -100,31 +100,31 @@ func eval_main(io, io0, io1, io2, io3, io4, io5, io6, io7, io8, io9, io10, io11,
 		mask_12 := <- ch12
 		__search___retres7_0_12 := <- ch12
 		_attsrcStateO_12 := <- ch12
-		_5 = Select(io, TreeXor(io, mask_2), TreeXor(io, _5_2), _5)
-		_8 = Select(io, TreeXor(io, mask_3), TreeXor(io, _8_3), _8)
-		___search_left_0 = Select(io, TreeXor(io, mask_4), TreeXor(io, ___search_left_0_4), ___search_left_0)
-		__search___retres7_0 = Select(io, TreeXor(io, mask_8, mask_12), TreeXor(io, __search___retres7_0_8, __search___retres7_0_12), __search___retres7_0)
-		__search_left_01 = Select(io, TreeXor(io, mask_7, mask_9), TreeXor(io, __search_left_01_7, __search_left_01_9), __search_left_01)
-		__search_ret_site_0 = Select(io, TreeXor(io, mask_10, mask_11), TreeXor(io, __search_ret_site_0_10, __search_ret_site_0_11), __search_ret_site_0)
-		__search_right_0_ = Select(io, TreeXor(io, mask_4), TreeXor(io, __search_right_0__4), __search_right_0_)
-		__search_right_02 = Select(io, TreeXor(io, mask_7, mask_9), TreeXor(io, __search_right_02_7, __search_right_02_9), __search_right_02)
-		__search_v_0 = Select(io, TreeXor(io, mask_10, mask_11), TreeXor(io, __search_v_0_10, __search_v_0_11), __search_v_0)
-		_attsrcAnswer = TreeXor(io, _attsrcAnswer_6)
-		_attsrcIsDone = TreeXor(io, _attsrcIsDone_6)
-		_attsrcMemAct = TreeXor(io, _attsrcMemAct_2)
-		_attsrcMemLoc = TreeXor(io, _attsrcMemLoc_2)
-		_attsrcMemSize = TreeXor(io, _attsrcMemSize_2)
-		_attsrcStateO = TreeXor(io, _attsrcStateO_0, _attsrcStateO_1, _attsrcStateO_2, _attsrcStateO_3, _attsrcStateO_4, _attsrcStateO_5, _attsrcStateO_7, _attsrcStateO_8, _attsrcStateO_9, _attsrcStateO_10, _attsrcStateO_11, _attsrcStateO_12)
+		_5 = Select(ios[0], TreeXor(ios[0], mask_2), TreeXor(ios[0], _5_2), _5)
+		_8 = Select(ios[0], TreeXor(ios[0], mask_3), TreeXor(ios[0], _8_3), _8)
+		___search_left_0 = Select(ios[0], TreeXor(ios[0], mask_4), TreeXor(ios[0], ___search_left_0_4), ___search_left_0)
+		__search___retres7_0 = Select(ios[0], TreeXor(ios[0], mask_8, mask_12), TreeXor(ios[0], __search___retres7_0_8, __search___retres7_0_12), __search___retres7_0)
+		__search_left_01 = Select(ios[0], TreeXor(ios[0], mask_7, mask_9), TreeXor(ios[0], __search_left_01_7, __search_left_01_9), __search_left_01)
+		__search_ret_site_0 = Select(ios[0], TreeXor(ios[0], mask_10, mask_11), TreeXor(ios[0], __search_ret_site_0_10, __search_ret_site_0_11), __search_ret_site_0)
+		__search_right_0_ = Select(ios[0], TreeXor(ios[0], mask_4), TreeXor(ios[0], __search_right_0__4), __search_right_0_)
+		__search_right_02 = Select(ios[0], TreeXor(ios[0], mask_7, mask_9), TreeXor(ios[0], __search_right_02_7, __search_right_02_9), __search_right_02)
+		__search_v_0 = Select(ios[0], TreeXor(ios[0], mask_10, mask_11), TreeXor(ios[0], __search_v_0_10, __search_v_0_11), __search_v_0)
+		_attsrcAnswer = TreeXor(ios[0], _attsrcAnswer_6)
+		_attsrcIsDone = TreeXor(ios[0], _attsrcIsDone_6)
+		_attsrcMemAct = TreeXor(ios[0], _attsrcMemAct_2)
+		_attsrcMemLoc = TreeXor(ios[0], _attsrcMemLoc_2)
+		_attsrcMemSize = TreeXor(ios[0], _attsrcMemSize_2)
+		_attsrcStateO = TreeXor(ios[0], _attsrcStateO_0, _attsrcStateO_1, _attsrcStateO_2, _attsrcStateO_3, _attsrcStateO_4, _attsrcStateO_5, _attsrcStateO_7, _attsrcStateO_8, _attsrcStateO_9, _attsrcStateO_10, _attsrcStateO_11, _attsrcStateO_12)
 
 		/* load from memory if necessary */
-		if Reveal(io, Icmp_eq(io, _attsrcMemAct, Uint(io, 1, 2)))[0] {
-			_attsrcMemRes = Load(io, _attsrcMemLoc, _attsrcMemSize)
+		if Reveal(ios[0], Icmp_eq(ios[0], _attsrcMemAct, Uint(ios[0], 1, 2)))[0] {
+			_attsrcMemRes = Load(ios[0], _attsrcMemLoc, _attsrcMemSize)
 		}
 
 		/* are we done? */
-		done = Reveal(io, _attsrcIsDone)[0]
+		done = Reveal(ios[0], _attsrcIsDone)[0]
 	}
-	answer := RevealInt32(io, _attsrcAnswer)
+	answer := RevealInt32(ios[0], _attsrcAnswer)
 	fmt.Printf("eval: %v\n", answer)
 	_main_done <- true
 }
