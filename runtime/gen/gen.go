@@ -299,26 +299,21 @@ func Printf(io GenVM, mask []base.Wire, f string, args ...[]base.Wire) {
 	fmt.Printf(f, fargs...)
 }
 
-// NB Gen_int() reveals the active block
-func InputFrom0(io GenVM, mask []base.Wire, next_arg func() uint64) []base.Wire {
+// NB Input32() reveals the active block
+func Input32(io GenVM, mask []base.Wire, party []base.Wire, next_arg func() uint64) []base.Wire {
 	if len(mask) != 1 {
-		panic("Gen_int")
+		panic("Input32")
 	}
 	if !Reveal(io, mask)[0] {
 		return Uint(io, 0, 32)
 	}
-	return ShareTo1(io, next_arg(), 32)
-}
-
-// NB Eval_int() reveals the active block
-func InputFrom1(io GenVM, mask []base.Wire) []base.Wire {
-	if len(mask) != 1 {
-		panic("Eval_int")
+	if 0 == RevealUint32(io, party) {
+		// input from party 0 == gen
+		return ShareTo1(io, next_arg(), 32)
+	} else {
+		// input from party 1 == eval
+		return ShareTo0(io, 32)
 	}
-	if !Reveal(io, mask)[0] {
-		return Uint(io, 0, 32)
-	}
-	return ShareTo0(io, 32)
 }
 
 // Switch(io, s, dflt, c0, c1, ...) tests s.
