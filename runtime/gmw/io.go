@@ -448,8 +448,13 @@ func triple32Secure(n int, thisPartyId int, senders []ot.Sender, receivers []ot.
 		if i == n {
 			continue
 		}
-		d[i] = piMulR(a, receivers[i])
-		e[i] = piMulS(b, senders[i])
+		if thisPartyId > i {
+			d[i] = piMulR(a, receivers[i])
+			e[i] = piMulS(b, senders[i])
+		} else {
+			e[i] = piMulS(b, senders[i])
+			d[i] = piMulR(a, receivers[i])
+		}
 	}
 
 	result := Triple{a, b, 0}
@@ -474,11 +479,11 @@ func triple32(n int) []Triple {
 	return result
 }
 
-var num_triples int = 16 * 4096
+// var num_triples int = 16 * 4096
 
 // var num_triples int = 1
 
-// var num_triples int = 10
+var num_triples int = 10
 
 func UsedTriples32(x *X) int {
 	return num_triples - len(x.triples32)
@@ -528,33 +533,21 @@ func Example(n int) []*X {
 	for i := range triples32 {
 		triples32[i] = make([]Triple, num_triples)
 	}
-	for j := 0; j < num_triples; j++ {
-		shares_of_a_triple := triple32(n)
-		for i, t := range shares_of_a_triple {
-			triples32[i][j] = t
+
+	done := make(chan bool, 100)
+
+	for triple_i := 0; triple_i < num_triples; triple_i++ {
+		for i := 0; i < n; i++ {
+			go func() {
+				triples32[i][triple_i] = triple32Secure(n, i, otSChannels[i], otRChannels[i])
+				done <- true
+			}()
 		}
 	}
-	// fmt.Printf("Fake triples %v\n", triples32)
-
-	// twoPartyTriplesChan := make(chan []Triple, 10000)
-	// fmt.Println("Generating pairwise triples.")
-	// for i := 0; i < n; i++ {
-	// 	for j := 0; j < n; j++ {
-	// 		if i == j {
-	// 			continue
-	// 		}
-	// 		go func(num_triples, thisPartyId, otherPartyId int,
-	// 			thisSender ot.Sender, thisReceiver ot.Receiver) {
-	// 			twoPartyTriplesChan <- triples32TwoParties(num_triples, thisPartyId, otherPartyId, thisSender, thisReceiver)
-	// 		}(10, i, j, otSChannels[i][j], otRChannels[i][j])
-	// 	}
-	// }
-
-	// for i := 0; i < n*(n-1); i++ {
-	// 	x := <-twoPartyTriplesChan
-	// 	fmt.Printf("Triples received: %d\n", len(x))
-	// 	// fmt.Printf("Triple value %v\n", x)
-	// }
+	for i := 0; i < n; i++ {
+		<-done
+	}
+	fmt.Println("Obtained all triples")
 
 	/* channels */
 	rchannels := make([] /*n*/ [] /*n*/ chan uint32, n)
