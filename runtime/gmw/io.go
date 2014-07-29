@@ -406,11 +406,12 @@ func triples32TwoParties(num_triples, thisPartyId, otherPartyId int,
 	return result
 }
 
-func piMulR(val uin32, thisReceiver ot.Receiver) uint32 {
-	result := 0
+func piMulR(val uint32, thisReceiver ot.Receiver) uint32 {
+	result := uint32(0)
 
 	for i := 0; i < 32; i++ {
 		a_bit := (val >> uint(i)) % 2
+		// fmt.Printf("thisReceiver=%+v\n", thisReceiver)
 		u_bytes := thisReceiver.Receive(ot.Selector(a_bit))
 		u := uint32(u_bytes[0])
 		result = (result << 1) | u
@@ -419,8 +420,8 @@ func piMulR(val uin32, thisReceiver ot.Receiver) uint32 {
 	return result
 }
 
-func piMulS(val uin32, thisSender ot.Sender) uint32 {
-	result := 0
+func piMulS(val uint32, thisSender ot.Sender) uint32 {
+	result := uint32(0)
 
 	for i := 0; i < 32; i++ {
 		b_bit := (val >> uint(i)) % 2
@@ -428,6 +429,7 @@ func piMulS(val uin32, thisSender ot.Sender) uint32 {
 		x_0 := []byte{byte(x_0_int)}
 		x_1_int := x_0_int ^ b_bit
 		x_1 := []byte{byte(x_1_int)}
+		// fmt.Printf("thisSender=%+v\n", thisSender)
 		thisSender.Send(x_0, x_1)
 		v := x_0_int
 
@@ -445,7 +447,7 @@ func triple32Secure(n int, thisPartyId int, senders []ot.Sender, receivers []ot.
 	d := make([]uint32, n)
 	e := make([]uint32, n)
 	for i := 0; i < n; i++ {
-		if i == n {
+		if i == thisPartyId {
 			continue
 		}
 		if thisPartyId > i {
@@ -538,10 +540,10 @@ func Example(n int) []*X {
 
 	for triple_i := 0; triple_i < num_triples; triple_i++ {
 		for i := 0; i < n; i++ {
-			go func() {
+			go func(i, triple_i int) {
 				triples32[i][triple_i] = triple32Secure(n, i, otSChannels[i], otRChannels[i])
 				done <- true
-			}()
+			}(i, triple_i)
 		}
 	}
 	for i := 0; i < n; i++ {

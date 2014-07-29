@@ -2,8 +2,10 @@ package base
 
 import (
 	//	"log"
-	"github.com/tjim/smpcc/runtime/ot"
+
 	"math/big"
+
+	"github.com/tjim/smpcc/runtime/ot"
 )
 
 type Genio interface {
@@ -53,6 +55,7 @@ func NewGenX(io *Chanio) *GenX {
 	//	log.Printf("rec params")
 	rcvParams := <-io.OtChans.ParamChan
 	//	log.Printf("done rec params")
+
 	npRecvr := ot.NewNPReceiver(ot.NP_MSG_LEN, rcvParams, io.OtChans.NpSendPk, io.OtChans.NpRecvPk, io.OtChans.NpSendEncs)
 	otSender := ot.NewExtendSender(io.OtChans.OtExtChan, io.OtChans.OtExtSelChan, npRecvr, ot.SEC_PARAM, ot.MSG_LEN, ot.NUM_PAIRS)
 
