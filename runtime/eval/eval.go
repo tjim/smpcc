@@ -294,26 +294,21 @@ func Printf(io EvalVM, mask []base.Key, f string, args ...[]base.Key) {
 	}
 }
 
-// NB Gen_int() reveals the active block
-func InputFrom0(io EvalVM, mask []base.Key) []base.Key {
+// NB Input32() reveals the active block
+func Input32(io EvalVM, mask []base.Key, party []base.Key, next_arg func() uint64) []base.Key {
 	if len(mask) != 1 {
-		panic("Gen_int")
+		panic("Input32")
 	}
 	if !Reveal(io, mask)[0] {
 		return Uint(io, 0, 32)
 	}
-	return ShareTo1(io, 32)
-}
-
-// NB Eval_int() reveals the active block
-func InputFrom1(io EvalVM, mask []base.Key, next_arg func() uint64) []base.Key {
-	if len(mask) != 1 {
-		panic("Eval_int")
+	if 0 == RevealUint32(io, party) {
+		// input from party 0 == gen
+		return ShareTo1(io, 32)
+	} else {
+		// input from party 1 == eval
+		return ShareTo0(io, next_arg(), 32)
 	}
-	if !Reveal(io, mask)[0] {
-		return Uint(io, 0, 32)
-	}
-	return ShareTo0(io, next_arg(), 32)
 }
 
 // Switch(io, s, dflt, c0, c1, ...) tests s.

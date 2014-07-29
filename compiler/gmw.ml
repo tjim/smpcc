@@ -238,8 +238,8 @@ let bpr_gmw_block b blocks_fv bl =
   || (List.fold_left
         (fun a (_,i) ->
           a ||
-          (match i with (* see bpr_gmw_instr, these are all only only cases using mask *)
-          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "gen_int" | "eval_int"))),_,_,_)
+          (match i with (* see bpr_gmw_instr, these are all cases using mask *)
+          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "input"))),_,_,_)
           | Load _
           | Store _ ->
               true

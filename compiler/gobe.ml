@@ -89,16 +89,8 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         failwith "Error: argument of puts must be a string constant")
   | Call(_,_,_,_,Var(Name(true, "putchar")),[typ,_,value],_,_) ->
                bprintf b "Printf(io, mask, \"%%c\", %a)\n" bpr_go_value (typ, value)
-  | Call(_,_,_,_,Var(Name(true, "gen_int")),_,_,_) ->
-      if is_gen then
-        bprintf b "InputFrom0(io, mask, next_arg)\n"
-      else
-        bprintf b "InputFrom0(io, mask)\n"
-  | Call(_,_,_,_,Var(Name(true, "eval_int")),_,_,_) ->
-      if is_gen then
-        bprintf b "InputFrom1(io, mask)\n"
-      else
-        bprintf b "InputFrom1(io, mask, next_arg)\n"
+  | Call(_,_,_,_,Var(Name(true, "input")),[typ,_,value],_,_) ->
+      bprintf b "Input32(io, mask, %a, next_arg)\n" bpr_go_value (typ, value)
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.start")),_,_,_) ->
       ()
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.end")),_,_,_) ->
@@ -232,8 +224,8 @@ let bpr_go_block b blocks_fv is_gen bl =
   || (List.fold_left
         (fun a (_,i) ->
           a ||
-          (match i with (* see bpr_go_instr, these are all only only cases using mask *)
-          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "gen_int" | "eval_int"))),_,_,_)
+          (match i with (* see bpr_go_instr, these are all cases using mask *)
+          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "input"))),_,_,_)
           | Load _
           | Store _ ->
               true
