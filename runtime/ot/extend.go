@@ -13,11 +13,9 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"log"
 
-	"github.com/tjim/smpcc/runtime/bit"
-	//	"log"
 	"bitbucket.org/ede/sha3"
+	"github.com/tjim/smpcc/runtime/bit"
 )
 
 type ExtendSender struct {
@@ -29,6 +27,8 @@ type ExtendSender struct {
 	otExtSelChan chan Selector
 	l            int
 	curPair      int
+	started      bool
+	sendCalls    int
 }
 
 type ExtendReceiver struct {
@@ -61,6 +61,8 @@ func NewExtendSender(c chan []byte, otExtSelChan chan Selector, R Receiver, k, l
 	sender.otExtChan = c
 	sender.m = m
 	sender.curPair = m
+	sender.started = false
+	sender.sendCalls = 0
 	return sender
 }
 
@@ -86,10 +88,11 @@ func NewExtendReceiver(c chan []byte, otExtSelChan chan Selector, S Sender, k, l
 }
 
 func (self *ExtendSender) preProcessSender(m int) {
-	fmt.Printf("pre-processing sender\n")
 	if m%8 != 0 {
 		panic("m must be a multiple of 8")
 	}
+	// fmt.Printf("pre-processing sender: start\n")
+	self.started = true
 	self.m = m
 	//	log.Printf("preProcessSender: m=%d", m)
 	self.curPair = 0
@@ -107,6 +110,7 @@ func (self *ExtendSender) preProcessSender(m int) {
 	}
 	Q := QT.Transpose()
 	self.z0 = make([][]byte, m)
+	// fmt.Printf("pre-processing sender: len(z0)=%d\n", len(self.z0))
 	self.z1 = make([][]byte, m)
 	temp := make([]byte, self.k/8)
 	for j := 0; j < m; j++ {
@@ -118,7 +122,7 @@ func (self *ExtendSender) preProcessSender(m int) {
 }
 
 func (self *ExtendReceiver) preProcessReceiver(m int) {
-	fmt.Printf("pre-processing receiver\n")
+	// fmt.Printf("pre-processing receiver\n")
 	self.curPair = 0
 	self.m = m
 	//	log.Printf("preProcessReceiver: m=%d", m)
@@ -160,6 +164,7 @@ func (self *ExtendSender) Send(m0, m1 Message) {
 	if len(m0)*8 != self.l || len(m1)*8 != self.l {
 		panic(fmt.Sprintf("Send: wrong message length. Should be %d, got %d and %d", self.l, len(m0), len(m1)))
 	}
+	// self.sendCalls++
 	if self.curPair == self.m {
 		self.preProcessSender(self.m)
 	}
@@ -167,7 +172,8 @@ func (self *ExtendSender) Send(m0, m1 Message) {
 	y1 := make([]byte, self.l/8)
 	// fmt.Printf("Send: self.l=%d, self.l%%8=%d, len(y0)=%d, len(y1)=%d\n", self.l, self.l/8, len(y0), len(y1))
 	smod := <-self.otExtSelChan
-	log.Printf("Send: self.curPair=%d, len(z0)=%d, smod=%d, m=%d\n", self.curPair, len(self.z0), smod, self.m)
+	// log.Printf("Send: self.curPair=%d, len(z0)=%d, smod=%d, m=%d, started=%v, sendCalls=%d\n", self.curPair, len(self.z0), smod, self.m,
+	// self.started, self.sendCalls)
 	if smod == 0 {
 		xorBytesExact(y0, m0, self.z0[self.curPair])
 		xorBytesExact(y1, m1, self.z1[self.curPair])
