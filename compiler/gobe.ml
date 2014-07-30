@@ -503,9 +503,11 @@ let print_function_circuit m f =
     bprintf b "import \"flag\"\n";
     bprintf b "\n";
     bprintf b "var id int\n";
+    bprintf b "var addr string\n";
     bprintf b "var args []string\n";
     bprintf b "func init_args() {\n";
     bprintf b "\tflag.IntVar(&id, \"id\", 0, \"identity (default 0)\")\n";
+    bprintf b "\tflag.StringVar(&addr, \"addr\", \"127.0.0.1:3042\", \"network address (default 127.0.0.1:3042)\")\n";
     bprintf b "\tflag.Parse()\n";
     bprintf b "\targs = flag.Args()\n";
     bprintf b "}\n";
@@ -544,7 +546,6 @@ let print_function_circuit m f =
     bprintf b "\n";
     bprintf b "func main() {\n";
     bprintf b "\tinit_args()\n";
-    bprintf b "\taddr := \"127.0.0.1:3042\"\n";
     bprintf b "\tif id == 0 {\n";
     bprintf b "\t\tfatchanio.GenClient(addr, gen_comm)\n";
     bprintf b "\t} else {\n";
