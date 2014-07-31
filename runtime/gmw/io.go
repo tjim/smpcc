@@ -111,7 +111,7 @@ func (x *X) Triple32() (a, b, c uint32) {
 		x.triples32 = make([]Triple, NUM_TRIPLES)
 		for triple_i := 0; triple_i < NUM_TRIPLES; triple_i++ {
 			go func(triple_i int) {
-				fmt.Printf("triple_i=%d, len(triples32)=%d\n", triple_i, len(x.triples32))
+				// fmt.Printf("triple_i=%d, len(triples32)=%d\n", triple_i, len(x.triples32))
 				x.triples32[triple_i] = triple32Secure(x.n, x.id, x.otSenders, x.otReceivers)
 				done <- true
 			}(triple_i)
@@ -291,7 +291,7 @@ func (x *X) Receive32(party int) uint32 {
 	if party == id {
 		return 0
 	}
-	fmt.Printf("Receive32: party=%d, len(rchannels)=%d\n", party, len(x.rchannels))
+	// fmt.Printf("Receive32: party=%d, len(rchannels)=%d\n", party, len(x.rchannels))
 	ch := x.rchannels[party]
 	result, ok := <-ch
 	if !ok {
@@ -431,7 +431,7 @@ func piMulR(val uint32, thisReceiver ot.Receiver) uint32 {
 		// fmt.Printf("thisReceiver=%+v\n", thisReceiver)
 		u_bytes := thisReceiver.Receive(ot.Selector(a_bit))
 		u := uint32(u_bytes[0])
-		result = (result << 1) | u
+		result |= (u << uint(i))
 	}
 
 	return result
@@ -450,7 +450,8 @@ func piMulS(val uint32, thisSender ot.Sender) uint32 {
 		thisSender.Send(x_0, x_1)
 		v := x_0_int
 
-		result = (result << 1) | v
+		result |= (v << uint(i))
+		// fmt.Printf("result=%d\n", result)
 	}
 
 	return result
@@ -458,17 +459,19 @@ func piMulS(val uint32, thisSender ot.Sender) uint32 {
 
 func triple32Secure(n int, thisPartyId int, senders []ot.Sender, receivers []ot.Receiver) Triple {
 	// Notation is from figure 9, DO10, and Algorithm 1 from ALSZ13
-	a := rand32()
-	b := rand32()
-	fmt.Printf("triple32Secure: n=%d, thisPartyId=%d, a=%d, b=%d\n", n, thisPartyId, a, b)
+	var a, b uint32
+	a = rand32()
+	b = rand32()
 
 	d := make([]uint32, n)
 	e := make([]uint32, n)
+	// fmt.Printf("triple32Secure: n=%d, thisPartyId=%d, a=%d, b=%d\nd=%v\ne=%v\n", n, thisPartyId, a, b, d, e)
+
 	for i := 0; i < n; i++ {
 		if i == thisPartyId {
 			continue
 		}
-		fmt.Printf("secure triple this=%d, other=%d\n", thisPartyId, i)
+		// fmt.Printf("secure triple this=%d, other=%d\n", thisPartyId, i)
 		if thisPartyId > i {
 			d[i] = piMulR(a, receivers[i])
 			e[i] = piMulS(b, senders[i])
@@ -479,9 +482,11 @@ func triple32Secure(n int, thisPartyId int, senders []ot.Sender, receivers []ot.
 	}
 
 	result := Triple{a, b, a & b}
+	// fmt.Printf("secure triple id=%v res=%+v\n", thisPartyId, result)
 	for i := 0; i < n; i++ {
 		result.c ^= d[i] ^ e[i]
 	}
+	// fmt.Printf("post secure triple id=%v res=%+v\n", thisPartyId, result)
 
 	return result
 }
@@ -526,13 +531,13 @@ func Example(n int) []*X {
 				continue
 			}
 			otChans := base.OTChans{
-				make(chan ot.PublicKey, 100),
-				make(chan big.Int, 100),
-				make(chan ot.HashedElGamalCiph, 100),
+				make(chan ot.PublicKey, 5),
+				make(chan big.Int, 5),
+				make(chan ot.HashedElGamalCiph, 5),
 
-				make(chan []byte, 100),
-				make(chan ot.Selector, 100),
-				make(chan ot.NPReceiverParams, 1),
+				make(chan []byte, 5),
+				make(chan ot.Selector, 5),
+				make(chan ot.NPReceiverParams, 5),
 			}
 
 			// Triples share size
@@ -548,25 +553,42 @@ func Example(n int) []*X {
 		}
 	}
 
-	done := make(chan bool, 10)
-	var t1, t2 Triple
-	go func() {
-		t1 = triple32Secure(2, 0, otSChannels[0], otRChannels[0])
-		t1.a = t1.a % 2
-		t1.b = t1.b % 2
-		t1.c = t1.c % 2
-		done <- true
-	}()
-	go func() {
-		t2 = triple32Secure(2, 1, otSChannels[1], otRChannels[1])
-		t2.a = t2.a % 2
-		t2.b = t2.b % 2
-		t2.c = t2.c % 2
-		done <- true
-	}()
-	<-done
-	<-done
-	fmt.Printf("t1=%+v\nt2=%+v\n", t1, t2)
+	// TRIPLE TEST DO NOT REMOVE
+
+	// done := make(chan bool, 10)
+	// var t1, t2 Triple
+	// go func() {
+	// 	t1 = triple32Secure(2, 0, otSChannels[0], otRChannels[0])
+	// 	t1.a = t1.a
+	// 	t1.b = t1.b
+	// 	t1.c = t1.c
+	// 	done <- true
+	// }()
+	// go func() {
+	// 	t2 = triple32Secure(2, 1, otSChannels[1], otRChannels[1])
+	// 	t2.a = t2.a
+	// 	t2.b = t2.b
+	// 	t2.c = t2.c
+	// 	done <- true
+	// }()
+	// <-done
+	// <-done
+	// for i := 0; i < 32; i++ {
+	// 	a1 := (t1.a >> uint(i)) % 2
+	// 	b1 := (t1.b >> uint(i)) % 2
+	// 	c1 := (t1.c >> uint(i)) % 2
+
+	// 	a2 := (t2.a >> uint(i)) % 2
+	// 	b2 := (t2.b >> uint(i)) % 2
+	// 	c2 := (t2.c >> uint(i)) % 2
+	// 	if ((a1 ^ a2) & (b1 ^ b2)) != (c1 ^ c2) {
+	// 		panic("triple check failed")
+	// 	}
+	// }
+	// // fmt.Printf("t1=%+v\nt2=%+v\n", t1, t2)
+	// fmt.Println("Triples check passed")
+
+	// END TRIPLE TEST
 
 	/* channels */
 	rchannels := make([] /*n*/ [] /*n*/ chan uint32, n)
