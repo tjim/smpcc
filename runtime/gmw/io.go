@@ -12,7 +12,7 @@ var log_communication bool = false
 var check_split = false
 
 const (
-	NUM_TRIPLES = 10
+	NUM_TRIPLES = 1
 )
 
 type Io interface {
@@ -108,8 +108,10 @@ func (x *X) Triple32() (a, b, c uint32) {
 	fmt.Printf("X.id=%d out of triples, making more\n", x.id)
 	done := make(chan bool, 10)
 	if len(x.triples32) == 0 {
+		x.triples32 = make([]Triple, NUM_TRIPLES)
 		for triple_i := 0; triple_i < NUM_TRIPLES; triple_i++ {
 			go func(triple_i int) {
+				fmt.Printf("triple_i=%d, len(triples32)=%d\n", triple_i, len(x.triples32))
 				x.triples32[triple_i] = triple32Secure(x.n, x.id, x.otSenders, x.otReceivers)
 				done <- true
 			}(triple_i)
@@ -289,6 +291,7 @@ func (x *X) Receive32(party int) uint32 {
 	if party == id {
 		return 0
 	}
+	fmt.Printf("Receive32: party=%d, len(rchannels)=%d\n", party, len(x.rchannels))
 	ch := x.rchannels[party]
 	result, ok := <-ch
 	if !ok {
@@ -457,6 +460,7 @@ func triple32Secure(n int, thisPartyId int, senders []ot.Sender, receivers []ot.
 	// Notation is from figure 9, DO10, and Algorithm 1 from ALSZ13
 	a := rand32()
 	b := rand32()
+	fmt.Printf("triple32Secure: n=%d, thisPartyId=%d, a=%d, b=%d\n", n, thisPartyId, a, b)
 
 	d := make([]uint32, n)
 	e := make([]uint32, n)
@@ -474,9 +478,9 @@ func triple32Secure(n int, thisPartyId int, senders []ot.Sender, receivers []ot.
 		}
 	}
 
-	result := Triple{a, b, 0}
+	result := Triple{a, b, a & b}
 	for i := 0; i < n; i++ {
-		result.c += d[i] + e[i]
+		result.c ^= d[i] ^ e[i]
 	}
 
 	return result
@@ -498,9 +502,9 @@ func triple32(n int) []Triple {
 
 // var num_triples int = 16 * 4096
 
-// var num_triples int = 1
+var num_triples int = 1
 
-var num_triples int = 10
+// var num_triples int = 10
 
 func UsedTriples32(x *X) int {
 	return num_triples - len(x.triples32)
@@ -544,27 +548,25 @@ func Example(n int) []*X {
 		}
 	}
 
-	/* triples */
-	triples32 := make([][]Triple, n)
-
-	for i := range triples32 {
-		triples32[i] = make([]Triple, num_triples)
-	}
-
-	// done := make(chan bool, 100)
-
-	// for triple_i := 0; triple_i < num_triples; triple_i++ {
-	// 	for i := 0; i < n; i++ {
-	// 		go func(i, triple_i int) {
-	// 			triples32[i][triple_i] = triple32Secure(n, i, otSChannels[i], otRChannels[i])
-	// 			done <- true
-	// 		}(i, triple_i)
-	// 	}
-	// 	for i := 0; i < n; i++ {
-	// 		<-done
-	// 	}
-	// }
-	// fmt.Println("Obtained all triples")
+	done := make(chan bool, 10)
+	var t1, t2 Triple
+	go func() {
+		t1 = triple32Secure(2, 0, otSChannels[0], otRChannels[0])
+		t1.a = t1.a % 2
+		t1.b = t1.b % 2
+		t1.c = t1.c % 2
+		done <- true
+	}()
+	go func() {
+		t2 = triple32Secure(2, 1, otSChannels[1], otRChannels[1])
+		t2.a = t2.a % 2
+		t2.b = t2.b % 2
+		t2.c = t2.c % 2
+		done <- true
+	}()
+	<-done
+	<-done
+	fmt.Printf("t1=%+v\nt2=%+v\n", t1, t2)
 
 	/* channels */
 	rchannels := make([] /*n*/ [] /*n*/ chan uint32, n)
