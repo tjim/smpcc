@@ -458,7 +458,7 @@ let print_function_circuit m f =
     bprintf b "func init_args() {\n";
     bprintf b "	args = os.Args[1:]\n";
     bprintf b "	if len(args) > 0 && args[0] == \"-pprof\" {\n";
-    bprintf b "		args = os.Args[1:]\n";
+    bprintf b "		args = args[1:]\n";
     bprintf b "		file := \"cpu.pprof\"\n";
     bprintf b "		f, err := os.Create(file)\n";
     bprintf b "		if err != nil {\n";
