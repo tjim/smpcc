@@ -12,7 +12,7 @@ var log_communication bool = false
 var check_split = false
 
 const (
-	NUM_TRIPLES = 1
+	NUM_TRIPLES = 10
 )
 
 type Io interface {
@@ -507,7 +507,7 @@ func triple32(n int) []Triple {
 
 // var num_triples int = 16 * 4096
 
-var num_triples int = 1
+var num_triples int = 10
 
 // var num_triples int = 10
 
@@ -556,23 +556,32 @@ func Example(n int) []*X {
 	// TRIPLE TEST DO NOT REMOVE
 
 	// done := make(chan bool, 10)
-	// var t1, t2 Triple
+	// var t1, t2, t3 Triple
 	// go func() {
-	// 	t1 = triple32Secure(2, 0, otSChannels[0], otRChannels[0])
+	// 	t1 = triple32Secure(3, 0, otSChannels[0], otRChannels[0])
 	// 	t1.a = t1.a
 	// 	t1.b = t1.b
 	// 	t1.c = t1.c
 	// 	done <- true
 	// }()
 	// go func() {
-	// 	t2 = triple32Secure(2, 1, otSChannels[1], otRChannels[1])
+	// 	t2 = triple32Secure(3, 1, otSChannels[1], otRChannels[1])
 	// 	t2.a = t2.a
 	// 	t2.b = t2.b
 	// 	t2.c = t2.c
 	// 	done <- true
 	// }()
+	// go func() {
+	// 	t3 = triple32Secure(3, 2, otSChannels[2], otRChannels[2])
+	// 	t3.a = t3.a
+	// 	t3.b = t3.b
+	// 	t3.c = t3.c
+	// 	done <- true
+	// }()
 	// <-done
 	// <-done
+	// <-done
+
 	// for i := 0; i < 32; i++ {
 	// 	a1 := (t1.a >> uint(i)) % 2
 	// 	b1 := (t1.b >> uint(i)) % 2
@@ -581,7 +590,12 @@ func Example(n int) []*X {
 	// 	a2 := (t2.a >> uint(i)) % 2
 	// 	b2 := (t2.b >> uint(i)) % 2
 	// 	c2 := (t2.c >> uint(i)) % 2
-	// 	if ((a1 ^ a2) & (b1 ^ b2)) != (c1 ^ c2) {
+
+	// 	a3 := (t3.a >> uint(i)) % 2
+	// 	b3 := (t3.b >> uint(i)) % 2
+	// 	c3 := (t3.c >> uint(i)) % 2
+
+	// 	if ((a1 ^ a2 ^ a3) & (b1 ^ b2 ^ b3)) != (c1 ^ c2 ^ c3) {
 	// 		panic("triple check failed")
 	// 	}
 	// }
