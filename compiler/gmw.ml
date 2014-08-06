@@ -505,6 +505,11 @@ let print_function_circuit m f =
   bprintf b "var %s_done = make(chan bool, 1)\n" (Gobe.govar f.fname);
   bprintf b "\n";
   bprintf b "func main() {\n";
+  bprintf b "\tstart_time := time.Now()\n";
+  bprintf b "\tif log_stats {\n";
+  bprintf b "\t\tfmt.Printf(\"Starting triple generation\\n\")\n";
+  bprintf b "\t}\n";
+  bprintf b "\tinit_args()\n";
   bprintf b "\tif do_pprof {\n";
   bprintf b "\t\tfile := \"cpu.pprof\"\n";
   bprintf b "\t\tf, err := os.Create(file)\n";
@@ -514,11 +519,6 @@ let print_function_circuit m f =
   bprintf b "\t\tpprof.StartCPUProfile(f)\n";
   bprintf b "\t\tdefer pprof.StopCPUProfile()\n";
   bprintf b "\t}\n";
-  bprintf b "\tstart_time := time.Now()\n";
-  bprintf b "\tif log_stats {\n";
-  bprintf b "\t\tfmt.Printf(\"Starting triple generation\\n\")\n";
-  bprintf b "\t}\n";
-  bprintf b "\tinit_args()\n";
   let num_parties = 3 in (* hard coded for now *)
   bprintf b "\tios := make([][]gmw.Io, %d)\n" num_parties;
   bprintf b "\tfor i := range ios {\n";
