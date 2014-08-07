@@ -41,7 +41,6 @@ type NPSender struct {
 
 type NPSenderParams struct {
 	pri    *PrivateKey
-	MsgLen int
 }
 
 type NPReceiver struct {
@@ -53,22 +52,19 @@ type NPReceiver struct {
 
 type NPReceiverParams struct {
 	PkSender PublicKey
-	MsgLen   int
 }
 
-func GenNPParams(MsgLen int) (snd NPSenderParams, rcv NPReceiverParams) {
+func GenNPParams() (snd NPSenderParams, rcv NPReceiverParams) {
 	pri := new(PrivateKey)
 	pri.PublicKey = publicParams
 	pri.X = generateNumNonce(publicParams.P)
 	pri.Y = new(big.Int).Exp(pri.G, pri.X, pri.P)
 	snd.pri = pri
-	snd.MsgLen = MsgLen
 	rcv.PkSender = pri.PublicKey
-	rcv.MsgLen = MsgLen
 	return
 }
 
-func NewNPSender(MsgLen int,
+func NewNPSender(
 	snd NPSenderParams,
 	npSendPk chan PublicKey,
 	npRecvPk chan big.Int,
@@ -83,7 +79,7 @@ func NewNPSender(MsgLen int,
 	return sender
 }
 
-func NewNPReceiver(MsgLen int, rcv NPReceiverParams,
+func NewNPReceiver(rcv NPReceiverParams,
 	npSendPk chan PublicKey,
 	npRecvPk chan big.Int,
 	npSendEncs chan HashedElGamalCiph) *NPReceiver {
@@ -97,14 +93,14 @@ func NewNPReceiver(MsgLen int, rcv NPReceiverParams,
 	return receiver
 }
 
-func NewNP(MsgLen int) (*NPSender, *NPReceiver) {
-	snd, rcv := GenNPParams(MsgLen)
+func NewNP() (*NPSender, *NPReceiver) {
+	snd, rcv := GenNPParams()
 	npSendPk := make(chan PublicKey)
 	npRecvPk := make(chan big.Int)
 	npSendEncs := make(chan HashedElGamalCiph)
 
-	return NewNPSender(MsgLen, snd, npSendPk, npRecvPk, npSendEncs),
-		NewNPReceiver(MsgLen, rcv, npSendPk, npRecvPk, npSendEncs)
+	return NewNPSender(snd, npSendPk, npRecvPk, npSendEncs),
+		NewNPReceiver(rcv, npSendPk, npRecvPk, npSendEncs)
 }
 
 func (self *NPSender) Send(m0, m1 Message) {
@@ -132,7 +128,7 @@ func (self *NPSender) Send(m0, m1 Message) {
 }
 
 func (self *NPReceiver) Receive(s Selector) Message {
-	//	log.Printf("Starting run of OTNPSender.Receive. self.MsgLen=%d\n", self.MsgLen)
+	//	log.Printf("Starting run of OTNPSender.Receive.\n")
 	pks := make([]*big.Int, 2)
 	k := generateNumNonce(publicParams.P)
 	pks[s] = gExpModP(k)
