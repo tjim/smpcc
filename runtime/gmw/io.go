@@ -105,9 +105,10 @@ func (x *X) Triple8() (a, b, c uint8) {
 }
 
 func (x *X) Triple32() (a, b, c uint32) {
-	fmt.Printf("X.id=%d out of triples, making more\n", x.id)
+
 	done := make(chan bool, 10)
 	if len(x.triples32) == 0 {
+		fmt.Printf("X.id=%d out of triples, making more\n", x.id)
 		x.triples32 = make([]Triple, NUM_TRIPLES)
 		for triple_i := 0; triple_i < NUM_TRIPLES; triple_i++ {
 			go func(triple_i int) {
