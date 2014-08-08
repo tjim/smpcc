@@ -114,9 +114,9 @@ func (self *ExtendSender) preProcessSender(m int) {
 	self.z1 = make([][]byte, m)
 	temp := make([]byte, self.k/8)
 	for j := 0; j < m; j++ {
-		self.z0[j] = RO(Q.GetRow(j), self.l)
+		self.z0[j] = Q.GetRow(j)
 		xorBytesExact(temp, Q.GetRow(j), s)
-		self.z1[j] = RO(temp, self.l)
+		self.z1[j] = temp
 	}
 
 }
@@ -161,25 +161,26 @@ func RO(input []byte, outBits int) []byte {
 }
 
 func (self *ExtendSender) Send(m0, m1 Message) {
-	if len(m0)*8 != self.l || len(m1)*8 != self.l {
-		panic(fmt.Sprintf("Send: wrong message length. Should be %d, got %d and %d", self.l, len(m0), len(m1)))
-	}
 	// self.sendCalls++
 	if self.curPair == self.m {
 		self.preProcessSender(self.m)
 	}
-	y0 := make([]byte, self.l/8)
-	y1 := make([]byte, self.l/8)
+	if len(m0) != len(m1) {
+		panic("(*ot.ExtendSender).Send: messages have different lengths")
+	}
+	msglen := len(m0)
+	y0 := make([]byte, msglen)
+	y1 := make([]byte, msglen)
 	// fmt.Printf("Send: self.l=%d, self.l%%8=%d, len(y0)=%d, len(y1)=%d\n", self.l, self.l/8, len(y0), len(y1))
 	smod := <-self.otExtSelChan
 	// log.Printf("Send: self.curPair=%d, len(z0)=%d, smod=%d, m=%d, started=%v, sendCalls=%d\n", self.curPair, len(self.z0), smod, self.m,
 	// self.started, self.sendCalls)
 	if smod == 0 {
-		xorBytesExact(y0, m0, self.z0[self.curPair])
-		xorBytesExact(y1, m1, self.z1[self.curPair])
+		xorBytesExact(y0, m0, RO(self.z0[self.curPair], 8*msglen))
+		xorBytesExact(y1, m1, RO(self.z1[self.curPair], 8*msglen))
 	} else if smod == 1 {
-		xorBytesExact(y0, m1, self.z0[self.curPair])
-		xorBytesExact(y1, m0, self.z1[self.curPair])
+		xorBytesExact(y0, m1, RO(self.z0[self.curPair], 8*msglen))
+		xorBytesExact(y1, m0, RO(self.z1[self.curPair], 8*msglen))
 	} else {
 		panic("Sender: unexpected smod value")
 	}
@@ -201,12 +202,16 @@ func (self *ExtendReceiver) Receive(s Selector) Message {
 	self.otExtSelChan <- smod
 	y0 := <-self.otExtChan
 	y1 := <-self.otExtChan
-	w := make([]byte, self.l/8)
+	if len(y0) != len(y1) {
+		panic("(*ot.ExtendReceiver).Receive: messages have different length")
+	}
+	msglen := len(y0)
+	w := make([]byte, msglen)
 	// fmt.Printf("Receive: y0=%v y1=%v\n", y0, y1)
 	if bit.GetBit(self.r, self.curPair) == 0 {
-		xorBytesExact(w, y0, RO(self.T.GetRow(self.curPair), self.l))
+		xorBytesExact(w, y0, RO(self.T.GetRow(self.curPair), 8*msglen))
 	} else if bit.GetBit(self.r, self.curPair) == 1 {
-		xorBytesExact(w, y1, RO(self.T.GetRow(self.curPair), self.l))
+		xorBytesExact(w, y1, RO(self.T.GetRow(self.curPair), 8*msglen))
 	}
 	self.curPair++
 	return w
