@@ -56,7 +56,7 @@ func NewGenX(io *Chanio) *GenX {
 	rcvParams := <-io.OtChans.ParamChan
 	//	log.Printf("done rec params")
 
-	npRecvr := ot.NewNPReceiver(ot.NP_MSG_LEN, rcvParams, io.OtChans.NpSendPk, io.OtChans.NpRecvPk, io.OtChans.NpSendEncs)
+	npRecvr := ot.NewNPReceiver(rcvParams, io.OtChans.NpSendPk, io.OtChans.NpRecvPk, io.OtChans.NpSendEncs)
 	otSender := ot.NewExtendSender(io.OtChans.OtExtChan, io.OtChans.OtExtSelChan, npRecvr, ot.SEC_PARAM, ot.MSG_LEN, ot.NUM_PAIRS)
 
 	result := &GenX{
@@ -67,12 +67,12 @@ func NewGenX(io *Chanio) *GenX {
 }
 
 func NewEvalX(io *Chanio) *EvalX {
-	sndParams, rcvParams := ot.GenNPParams(ot.NP_MSG_LEN)
+	sndParams, rcvParams := ot.GenNPParams()
 	//	log.Printf("send params")
 	io.OtChans.ParamChan <- rcvParams
 	//	log.Printf("done send params")
 
-	npSndr := ot.NewNPSender(ot.NP_MSG_LEN, sndParams, io.OtChans.NpSendPk, io.OtChans.NpRecvPk, io.OtChans.NpSendEncs)
+	npSndr := ot.NewNPSender(sndParams, io.OtChans.NpSendPk, io.OtChans.NpRecvPk, io.OtChans.NpSendEncs)
 	otRecvr := ot.NewExtendReceiver(io.OtChans.OtExtChan, io.OtChans.OtExtSelChan, npSndr, ot.SEC_PARAM, ot.MSG_LEN, ot.NUM_PAIRS)
 
 	result := &EvalX{

@@ -544,11 +544,11 @@ func Example(n int) []*X {
 			// Triples share size
 			tripleShareSize := 8
 
-			sndParams, rcvParams := ot.GenNPParams(ot.NP_MSG_LEN)
-			npRecvr := ot.NewNPReceiver(ot.NP_MSG_LEN, rcvParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
+			sndParams, rcvParams := ot.GenNPParams()
+			npRecvr := ot.NewNPReceiver(rcvParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
 			otSChannels[i][j] = ot.NewExtendSender(otChans.OtExtChan, otChans.OtExtSelChan, npRecvr, ot.SEC_PARAM,
 				tripleShareSize, ot.NUM_PAIRS)
-			npSndr := ot.NewNPSender(ot.NP_MSG_LEN, sndParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
+			npSndr := ot.NewNPSender(sndParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
 			otRChannels[j][i] = ot.NewExtendReceiver(otChans.OtExtChan, otChans.OtExtSelChan, npSndr, ot.SEC_PARAM,
 				tripleShareSize, ot.NUM_PAIRS)
 		}

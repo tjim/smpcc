@@ -41,7 +41,6 @@ type NPSender struct {
 
 type NPSenderParams struct {
 	pri    *PrivateKey
-	MsgLen int
 }
 
 type NPReceiver struct {
@@ -53,22 +52,19 @@ type NPReceiver struct {
 
 type NPReceiverParams struct {
 	PkSender PublicKey
-	MsgLen   int
 }
 
-func GenNPParams(MsgLen int) (snd NPSenderParams, rcv NPReceiverParams) {
+func GenNPParams() (snd NPSenderParams, rcv NPReceiverParams) {
 	pri := new(PrivateKey)
 	pri.PublicKey = publicParams
 	pri.X = generateNumNonce(publicParams.P)
 	pri.Y = new(big.Int).Exp(pri.G, pri.X, pri.P)
 	snd.pri = pri
-	snd.MsgLen = MsgLen
 	rcv.PkSender = pri.PublicKey
-	rcv.MsgLen = MsgLen
 	return
 }
 
-func NewNPSender(MsgLen int,
+func NewNPSender(
 	snd NPSenderParams,
 	npSendPk chan PublicKey,
 	npRecvPk chan big.Int,
@@ -83,7 +79,7 @@ func NewNPSender(MsgLen int,
 	return sender
 }
 
-func NewNPReceiver(MsgLen int, rcv NPReceiverParams,
+func NewNPReceiver(rcv NPReceiverParams,
 	npSendPk chan PublicKey,
 	npRecvPk chan big.Int,
 	npSendEncs chan HashedElGamalCiph) *NPReceiver {
@@ -97,18 +93,22 @@ func NewNPReceiver(MsgLen int, rcv NPReceiverParams,
 	return receiver
 }
 
-func NewNP(MsgLen int) (*NPSender, *NPReceiver) {
-	snd, rcv := GenNPParams(MsgLen)
+func NewNP() (*NPSender, *NPReceiver) {
+	snd, rcv := GenNPParams()
 	npSendPk := make(chan PublicKey)
 	npRecvPk := make(chan big.Int)
 	npSendEncs := make(chan HashedElGamalCiph)
 
-	return NewNPSender(MsgLen, snd, npSendPk, npRecvPk, npSendEncs),
-		NewNPReceiver(MsgLen, rcv, npSendPk, npRecvPk, npSendEncs)
+	return NewNPSender(snd, npSendPk, npRecvPk, npSendEncs),
+		NewNPReceiver(rcv, npSendPk, npRecvPk, npSendEncs)
 }
 
 func (self *NPSender) Send(m0, m1 Message) {
 	//	log.Println("Starting run of OTNPSender.Send")
+	if len(m0) != len(m1) {
+		panic("(*ot.NPSender).Send: messages have different lengths")
+	}
+	msglen := len(m0)
 	pks := make([]big.Int, 2)
 	pks[0] = <-self.npRecvPk
 	pks[1].ModInverse(&pks[0], publicParams.P)
@@ -116,10 +116,10 @@ func (self *NPSender) Send(m0, m1 Message) {
 	r0 := generateNumNonce(publicParams.P)
 	r1 := generateNumNonce(publicParams.P)
 
-	maskedVal0 := make([]byte, len(m0))
-	xorBytes(maskedVal0, RO(expModP(&pks[0], r0).Bytes(), 8*len(m0)), m0)
-	maskedVal1 := make([]byte, len(m0))
-	xorBytes(maskedVal1, RO(expModP(&pks[1], r1).Bytes(), 8*len(m0)), m1)
+	maskedVal0 := make([]byte, msglen)
+	xorBytesExact(maskedVal0, RO(expModP(&pks[0], r0).Bytes(), 8*msglen), m0)
+	maskedVal1 := make([]byte, msglen)
+	xorBytesExact(maskedVal1, RO(expModP(&pks[1], r1).Bytes(), 8*msglen), m1)
 	e0 := HashedElGamalCiph{C0: *gExpModP(r0), C1: maskedVal0}
 	e1 := HashedElGamalCiph{C0: *gExpModP(r1), C1: maskedVal1}
 	self.npSendEncs <- e0
@@ -128,7 +128,7 @@ func (self *NPSender) Send(m0, m1 Message) {
 }
 
 func (self *NPReceiver) Receive(s Selector) Message {
-	//	log.Printf("Starting run of OTNPSender.Receive. self.MsgLen=%d\n", self.MsgLen)
+	//	log.Printf("Starting run of OTNPSender.Receive.\n")
 	pks := make([]*big.Int, 2)
 	k := generateNumNonce(publicParams.P)
 	pks[s] = gExpModP(k)
@@ -136,8 +136,12 @@ func (self *NPReceiver) Receive(s Selector) Message {
 	pks[1-s].Mul(pks[1-s], self.PkSender.Y).Mod(pks[1-s], publicParams.P)
 	self.npRecvPk <- *pks[0]
 	ciphs := []HashedElGamalCiph{<-self.npSendEncs, <-self.npSendEncs}
-	res := make([]byte, self.MsgLen)
-	xorBytes(res, RO(expModP(&ciphs[s].C0, k).Bytes(), 8*self.MsgLen), ciphs[s].C1)
+	if len(ciphs[0].C1) != len(ciphs[1].C1) {
+		panic("(*ot.NPReceiver).Receive: messages have different lengths")
+	}
+	msglen := len(ciphs[0].C1)
+	res := make([]byte, msglen)
+	xorBytesExact(res, RO(expModP(&ciphs[s].C0, k).Bytes(), 8*msglen), ciphs[s].C1)
 	//	log.Printf("Completed run of OTNPSender.Receive. len(res)=%d\n", len(res))
 	return res
 }
