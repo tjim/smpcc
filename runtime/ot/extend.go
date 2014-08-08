@@ -91,7 +91,7 @@ func (self *ExtendSender) preProcessSender(m int) {
 	if m%8 != 0 {
 		panic("m must be a multiple of 8")
 	}
-	// fmt.Printf("pre-processing sender: start\n")
+	// fmt.Printf("pre-processing sender\n")
 	self.started = true
 	self.m = m
 	//	log.Printf("preProcessSender: m=%d", m)
@@ -164,6 +164,7 @@ func (self *ExtendSender) Send(m0, m1 Message) {
 	if len(m0)*8 != self.l || len(m1)*8 != self.l {
 		panic(fmt.Sprintf("Send: wrong message length. Should be %d, got %d and %d", self.l, len(m0), len(m1)))
 	}
+	// fmt.Println("Sending")
 	// self.sendCalls++
 	if self.curPair == self.m {
 		self.preProcessSender(self.m)
@@ -196,6 +197,7 @@ func (self *ExtendReceiver) Receive(s Selector) Message {
 	if self.curPair == self.m {
 		self.preProcessReceiver(self.m)
 	}
+	// fmt.Println("Receiving")
 	smod := Selector(byte(s) ^ bit.GetBit(self.r, self.curPair))
 	//	log.Printf("Receive: self.curPair=%d, len(self.r)=%d\n", self.curPair, len(self.r))
 	self.otExtSelChan <- smod
