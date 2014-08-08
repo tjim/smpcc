@@ -116,7 +116,8 @@ func (self *ExtendSender) preProcessSender(m int) {
 	for j := 0; j < m; j++ {
 		self.z0[j] = Q.GetRow(j)
 		xorBytesExact(temp, Q.GetRow(j), s)
-		self.z1[j] = temp
+		self.z1[j] = make([]byte, len(temp))
+		copy(self.z1[j], temp)
 	}
 
 }
@@ -175,10 +176,13 @@ func (self *ExtendSender) Send(m0, m1 Message) {
 	smod := <-self.otExtSelChan
 	// log.Printf("Send: self.curPair=%d, len(z0)=%d, smod=%d, m=%d, started=%v, sendCalls=%d\n", self.curPair, len(self.z0), smod, self.m,
 	// self.started, self.sendCalls)
+	// fmt.Printf("Send: z0=%v\nSend: z1=%v\n", self.z0[self.curPair], self.z1[self.curPair])
 	if smod == 0 {
+		// fmt.Println("smod = 0")
 		xorBytesExact(y0, m0, RO(self.z0[self.curPair], 8*msglen))
 		xorBytesExact(y1, m1, RO(self.z1[self.curPair], 8*msglen))
 	} else if smod == 1 {
+		// fmt.Println("smod = 1")
 		xorBytesExact(y0, m1, RO(self.z0[self.curPair], 8*msglen))
 		xorBytesExact(y1, m0, RO(self.z1[self.curPair], 8*msglen))
 	} else {
@@ -198,6 +202,7 @@ func (self *ExtendReceiver) Receive(s Selector) Message {
 		self.preProcessReceiver(self.m)
 	}
 	smod := Selector(byte(s) ^ bit.GetBit(self.r, self.curPair))
+	// fmt.Printf("receive smod = %d\n", smod)
 	//	log.Printf("Receive: self.curPair=%d, len(self.r)=%d\n", self.curPair, len(self.r))
 	self.otExtSelChan <- smod
 	y0 := <-self.otExtChan
@@ -207,7 +212,7 @@ func (self *ExtendReceiver) Receive(s Selector) Message {
 	}
 	msglen := len(y0)
 	w := make([]byte, msglen)
-	// fmt.Printf("Receive: y0=%v y1=%v\n", y0, y1)
+	// fmt.Printf("Receive: Trow=%v\n", self.T.GetRow(self.curPair))
 	if bit.GetBit(self.r, self.curPair) == 0 {
 		xorBytesExact(w, y0, RO(self.T.GetRow(self.curPair), 8*msglen))
 	} else if bit.GetBit(self.r, self.curPair) == 1 {
