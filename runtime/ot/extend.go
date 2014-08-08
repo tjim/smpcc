@@ -13,6 +13,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"time"
 
 	"bitbucket.org/ede/sha3"
 	"github.com/tjim/smpcc/runtime/bit"
@@ -88,6 +89,7 @@ func NewExtendReceiver(c chan []byte, otExtSelChan chan Selector, S Sender, k, l
 }
 
 func (self *ExtendSender) preProcessSender(m int) {
+	defer timeTrack(time.Now(), "preProcessSender")
 	if m%8 != 0 {
 		panic("m must be a multiple of 8")
 	}
@@ -122,6 +124,7 @@ func (self *ExtendSender) preProcessSender(m int) {
 }
 
 func (self *ExtendReceiver) preProcessReceiver(m int) {
+	defer timeTrack(time.Now(), "preProcessReceiver")
 	// fmt.Printf("pre-processing receiver\n")
 	self.curPair = 0
 	self.m = m

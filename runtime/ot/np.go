@@ -13,7 +13,9 @@ package ot
 import (
 	//	"log"
 	"crypto/aes"
+	"log"
 	"math/big"
+	"time"
 )
 
 const (
@@ -40,7 +42,7 @@ type NPSender struct {
 }
 
 type NPSenderParams struct {
-	pri    *PrivateKey
+	pri *PrivateKey
 }
 
 type NPReceiver struct {
@@ -52,6 +54,11 @@ type NPReceiver struct {
 
 type NPReceiverParams struct {
 	PkSender PublicKey
+}
+
+func timeTrack(start time.Time, name string) {
+	elapsed := time.Since(start)
+	log.Printf("%s took %s", name, elapsed)
 }
 
 func GenNPParams() (snd NPSenderParams, rcv NPReceiverParams) {
