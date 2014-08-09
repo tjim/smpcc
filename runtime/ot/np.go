@@ -37,7 +37,7 @@ type NPSender struct {
 }
 
 type NPSenderParams struct {
-	pri    *PrivateKey
+	pri *PrivateKey
 }
 
 type NPReceiver struct {
@@ -114,9 +114,9 @@ func (self *NPSender) Send(m0, m1 Message) {
 	r1 := generateNumNonce(publicParams.P)
 
 	maskedVal0 := make([]byte, msglen)
-	xorBytesExact(maskedVal0, RO(expModP(&pks[0], r0).Bytes(), 8*msglen), m0)
+	xorBytes(maskedVal0, RO(expModP(&pks[0], r0).Bytes(), 8*msglen), m0)
 	maskedVal1 := make([]byte, msglen)
-	xorBytesExact(maskedVal1, RO(expModP(&pks[1], r1).Bytes(), 8*msglen), m1)
+	xorBytes(maskedVal1, RO(expModP(&pks[1], r1).Bytes(), 8*msglen), m1)
 	e0 := HashedElGamalCiph{C0: *gExpModP(r0), C1: maskedVal0}
 	e1 := HashedElGamalCiph{C0: *gExpModP(r1), C1: maskedVal1}
 	self.npSendEncs <- e0
@@ -138,21 +138,17 @@ func (self *NPReceiver) Receive(s Selector) Message {
 	}
 	msglen := len(ciphs[0].C1)
 	res := make([]byte, msglen)
-	xorBytesExact(res, RO(expModP(&ciphs[s].C0, k).Bytes(), 8*msglen), ciphs[s].C1)
+	xorBytes(res, RO(expModP(&ciphs[s].C0, k).Bytes(), 8*msglen), ciphs[s].C1)
 	//	log.Printf("Completed run of OTNPSender.Receive. len(res)=%d\n", len(res))
 	return res
 }
 
 func xorBytes(a, b, c []byte) {
+	if len(a) != len(b) || len(b) != len(c) {
+		panic("xorBytes: length mismatch")
+	}
 	for i := range a {
-		switch {
-		case i < len(b) && i < len(c):
-			a[i] = b[i] ^ c[i]
-		case i < len(b):
-			a[i] = b[i]
-		case i < len(c):
-			a[i] = c[i]
-		}
+		a[i] = b[i] ^ c[i]
 	}
 }
 
