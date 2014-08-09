@@ -25,7 +25,6 @@ type ExtendSender struct {
 	k            int
 	otExtChan    chan []byte
 	otExtSelChan chan Selector
-	l            int
 	curPair      int
 	started      bool
 	sendCalls    int
@@ -38,17 +37,13 @@ type ExtendReceiver struct {
 	k            int
 	otExtChan    chan []byte
 	otExtSelChan chan Selector
-	l            int
 	curPair      int
 	T            *bit.Matrix8
 }
 
-func NewExtendSender(c chan []byte, otExtSelChan chan Selector, R Receiver, k, l, m int) Sender {
+func NewExtendSender(c chan []byte, otExtSelChan chan Selector, R Receiver, k, m int) Sender {
 	if k%8 != 0 {
 		panic("k must be a multiple of 8")
-	}
-	if l%8 != 0 {
-		panic("l must be a multiple of 8")
 	}
 	if m%8 != 0 {
 		panic("m must be a multiple of 8")
@@ -56,7 +51,6 @@ func NewExtendSender(c chan []byte, otExtSelChan chan Selector, R Receiver, k, l
 	sender := new(ExtendSender)
 	sender.otExtSelChan = otExtSelChan
 	sender.k = k
-	sender.l = l
 	sender.R = R
 	sender.otExtChan = c
 	sender.m = m
@@ -66,12 +60,9 @@ func NewExtendSender(c chan []byte, otExtSelChan chan Selector, R Receiver, k, l
 	return sender
 }
 
-func NewExtendReceiver(c chan []byte, otExtSelChan chan Selector, S Sender, k, l, m int) Receiver {
+func NewExtendReceiver(c chan []byte, otExtSelChan chan Selector, S Sender, k, m int) Receiver {
 	if k%8 != 0 {
 		panic("k must be a multiple of 8")
-	}
-	if l%8 != 0 {
-		panic("l must be a multiple of 8")
 	}
 	if m%8 != 0 {
 		panic("m must be a multiple of 8")
@@ -79,7 +70,6 @@ func NewExtendReceiver(c chan []byte, otExtSelChan chan Selector, S Sender, k, l
 	receiver := new(ExtendReceiver)
 	receiver.otExtSelChan = otExtSelChan
 	receiver.k = k
-	receiver.l = l
 	receiver.S = S
 	receiver.m = m
 	receiver.curPair = m
@@ -173,7 +163,7 @@ func (self *ExtendSender) Send(m0, m1 Message) {
 	msglen := len(m0)
 	y0 := make([]byte, msglen)
 	y1 := make([]byte, msglen)
-	// fmt.Printf("Send: self.l=%d, self.l%%8=%d, len(y0)=%d, len(y1)=%d\n", self.l, self.l/8, len(y0), len(y1))
+	// fmt.Printf("Send: len(y0)=%d, len(y1)=%d\n", len(y0), len(y1))
 	smod := <-self.otExtSelChan
 	// log.Printf("Send: self.curPair=%d, len(z0)=%d, smod=%d, m=%d, started=%v, sendCalls=%d\n", self.curPair, len(self.z0), smod, self.m,
 	// self.started, self.sendCalls)

@@ -541,16 +541,11 @@ func Example(n int) []*X {
 				make(chan ot.NPReceiverParams, 5),
 			}
 
-			// Triples share size
-			tripleShareSize := 8
-
 			sndParams, rcvParams := ot.GenNPParams()
 			npRecvr := ot.NewNPReceiver(rcvParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
-			otSChannels[i][j] = ot.NewExtendSender(otChans.OtExtChan, otChans.OtExtSelChan, npRecvr, ot.SEC_PARAM,
-				tripleShareSize, ot.NUM_PAIRS)
+			otSChannels[i][j] = ot.NewExtendSender(otChans.OtExtChan, otChans.OtExtSelChan, npRecvr, ot.SEC_PARAM, ot.NUM_PAIRS)
 			npSndr := ot.NewNPSender(sndParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
-			otRChannels[j][i] = ot.NewExtendReceiver(otChans.OtExtChan, otChans.OtExtSelChan, npSndr, ot.SEC_PARAM,
-				tripleShareSize, ot.NUM_PAIRS)
+			otRChannels[j][i] = ot.NewExtendReceiver(otChans.OtExtChan, otChans.OtExtSelChan, npSndr, ot.SEC_PARAM, ot.NUM_PAIRS)
 		}
 	}
 
