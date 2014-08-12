@@ -20,10 +20,7 @@ import (
 
 const (
 	KEY_SIZE     = aes.BlockSize
-	HASH_SIZE    = 32
-	MSG_LEN      = KEY_SIZE * 8
 	NUM_PAIRS    = 1024 * 64
-	NP_MSG_LEN   = NUM_PAIRS / 8
 	SEC_PARAM    = 80
 	primeHex     = "B10B8F96A080E01DDE92DE5EAE5D54EC52C99FBCFB06A3C69A6A9DCA52D23B616073E28675A23D189838EF1E2EE652C013ECB4AEA906112324975C3CD49B83BFACCBDD7D90C4BD7098488E9C219A73724EFFD6FAE5644738FAA31A4FF55BCCC0A151AF5F0DC8B4BD45BF37DF365C1A65E68CFDA76D4DA708DF1FB2BC2E4A4371"
 	generatorHex = "A4D1CBD5C3FD34126765A442EFB99905F8104DD258AC507FD6406CFF14266D31266FEA1E5C41564B777E690F5504F213160217B4B01B886A5E91547F9E2749F4D7FBD7D3B9A92EE1909D0D2263F80A76A6A24C087A091F531DBF0A0169B6A28AD662A4D18E73AFA32D779D5918D08BC8858F4DCEF97C2A24855E6EEB22B3B2E5"
@@ -124,9 +121,9 @@ func (self *NPSender) Send(m0, m1 Message) {
 	r1 := generateNumNonce(publicParams.P)
 
 	maskedVal0 := make([]byte, msglen)
-	xorBytesExact(maskedVal0, RO(expModP(&pks[0], r0).Bytes(), 8*msglen), m0)
+	xorBytes(maskedVal0, RO(expModP(&pks[0], r0).Bytes(), 8*msglen), m0)
 	maskedVal1 := make([]byte, msglen)
-	xorBytesExact(maskedVal1, RO(expModP(&pks[1], r1).Bytes(), 8*msglen), m1)
+	xorBytes(maskedVal1, RO(expModP(&pks[1], r1).Bytes(), 8*msglen), m1)
 	e0 := HashedElGamalCiph{C0: *gExpModP(r0), C1: maskedVal0}
 	e1 := HashedElGamalCiph{C0: *gExpModP(r1), C1: maskedVal1}
 	self.npSendEncs <- e0
@@ -148,21 +145,17 @@ func (self *NPReceiver) Receive(s Selector) Message {
 	}
 	msglen := len(ciphs[0].C1)
 	res := make([]byte, msglen)
-	xorBytesExact(res, RO(expModP(&ciphs[s].C0, k).Bytes(), 8*msglen), ciphs[s].C1)
+	xorBytes(res, RO(expModP(&ciphs[s].C0, k).Bytes(), 8*msglen), ciphs[s].C1)
 	//	log.Printf("Completed run of OTNPSender.Receive. len(res)=%d\n", len(res))
 	return res
 }
 
 func xorBytes(a, b, c []byte) {
+	if len(a) != len(b) || len(b) != len(c) {
+		panic("xorBytes: length mismatch")
+	}
 	for i := range a {
-		switch {
-		case i < len(b) && i < len(c):
-			a[i] = b[i] ^ c[i]
-		case i < len(b):
-			a[i] = b[i]
-		case i < len(c):
-			a[i] = c[i]
-		}
+		a[i] = b[i] ^ c[i]
 	}
 }
 
