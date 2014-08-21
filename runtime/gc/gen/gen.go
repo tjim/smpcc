@@ -1,9 +1,7 @@
 package gen
 
-import (
-	"fmt"
-	"github.com/tjim/smpcc/runtime/base"
-)
+import "fmt"
+import base "github.com/tjim/smpcc/runtime/gc"
 
 type GenVM interface {
 	And(a, b []base.Wire) []base.Wire

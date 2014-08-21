@@ -1,6 +1,6 @@
 package eval
 
-import "github.com/tjim/smpcc/runtime/base"
+import base "github.com/tjim/smpcc/runtime/gc"
 import "fmt"
 
 type EvalVM interface {

@@ -180,7 +180,7 @@ let io_type is_gen =
   if is_gen then "GenVM" else "EvalVM"
 
 let bit_type is_gen =
-  if is_gen then "base.Wire" else "base.Key"
+  if is_gen then "gc.Wire" else "gc.Key"
 
 let gen_or_eval is_gen =
   if is_gen then "gen" else "eval"
@@ -423,8 +423,8 @@ let print_function_circuit m f =
   (* gen side *)
   bprintf b "package main\n";
   bprintf b "\n";
-  bprintf b "import . \"%s%s\"\n" package_prefix (gen_or_eval true);
-  bprintf b "import \"%sbase\"\n" package_prefix;
+  bprintf b "import . \"%sgc/%s\"\n" package_prefix (gen_or_eval true);
+  bprintf b "import \"%sgc\"\n" package_prefix;
   bprintf b "import \"fmt\"\n";
   bprintf b "\n";
   bpr_globals b m;
@@ -437,8 +437,8 @@ let print_function_circuit m f =
   (* eval side *)
   bprintf b "package main\n";
   bprintf b "\n";
-  bprintf b "import . \"%s%s\"\n" package_prefix (gen_or_eval false);
-  bprintf b "import \"%sbase\"\n" package_prefix;
+  bprintf b "import . \"%sgc/%s\"\n" package_prefix (gen_or_eval false);
+  bprintf b "import \"%sgc\"\n" package_prefix;
   bprintf b "import \"fmt\"\n";
   bprintf b "\n";
   bpr_main b f false;
@@ -449,7 +449,7 @@ let print_function_circuit m f =
   if options.sim then begin
     bprintf b "package main\n";
     bprintf b "\n";
-    bprintf b "import \"%s%s/eval\"\n" package_prefix (match options.circuitlib with None -> "yao" | Some x -> x);
+    bprintf b "import \"%sgc/%s/eval\"\n" package_prefix (match options.circuitlib with None -> "yao" | Some x -> x);
     bprintf b "import \"fmt\"\n";
     bprintf b "import \"os\"\n";
     bprintf b "import \"runtime/pprof\"\n";
@@ -493,12 +493,12 @@ let print_function_circuit m f =
   end else begin
     bprintf b "package main\n";
     bprintf b "\n";
-    bprintf b "import \"github.com/tjim/smpcc/runtime/base\"\n";
+    bprintf b "import \"github.com/tjim/smpcc/runtime/gc\"\n";
     bprintf b "import \"github.com/tjim/smpcc/runtime/fatchanio\"\n";
-    bprintf b "import \"github.com/tjim/smpcc/runtime/yao/eval\"\n";
-    bprintf b "import \"github.com/tjim/smpcc/runtime/yao/gen\"\n";
-    bprintf b "import baseeval \"github.com/tjim/smpcc/runtime/eval\"\n";
-    bprintf b "import basegen \"github.com/tjim/smpcc/runtime/gen\"\n";
+    bprintf b "import \"github.com/tjim/smpcc/runtime/gc/yao/eval\"\n";
+    bprintf b "import \"github.com/tjim/smpcc/runtime/gc/yao/gen\"\n";
+    bprintf b "import baseeval \"github.com/tjim/smpcc/runtime/gc/eval\"\n";
+    bprintf b "import basegen \"github.com/tjim/smpcc/runtime/gc/gen\"\n";
     bprintf b "import \"fmt\"\n";
     bprintf b "import \"flag\"\n";
     bprintf b "\n";
@@ -523,17 +523,17 @@ let print_function_circuit m f =
     bprintf b "\n";
     bprintf b "var _main_done = make(chan bool, 1)\n";
     bprintf b "\n";
-    bprintf b "func eval_comm(nu chan base.Chanio) {\n";
+    bprintf b "func eval_comm(nu chan gc.Chanio) {\n";
     bprintf b "\tios := make([]baseeval.EvalVM, %d)\n" (List.length f.fblocks + 1);
     bprintf b "\tfor i := range ios {\n";
     bprintf b "\t\tio := <-nu\n";
-    bprintf b "\t\tios[i] = eval.NewState(base.NewEvalX(&io))\n";
+    bprintf b "\t\tios[i] = eval.NewState(gc.NewEvalX(&io))\n";
     bprintf b "\t}\n";
     bprintf b "\tgo eval_main(ios)\n";
     bprintf b "\t<- _main_done\n";
     bprintf b "}\n";
     bprintf b "\n";
-    bprintf b "func gen_comm(nu chan base.Chanio) {\n";
+    bprintf b "func gen_comm(nu chan gc.Chanio) {\n";
     bprintf b "\tdefer close(nu)\n";
     bprintf b "\tios := make([]basegen.GenVM, %d)\n" (List.length f.fblocks + 1);
     bprintf b "\tfor i := range ios {\n";

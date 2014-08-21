@@ -1,4 +1,4 @@
-package base
+package gc
 
 import (
 	//	"log"
@@ -23,22 +23,11 @@ type Evalio interface {
 }
 
 // **********************************************
-type OTChans struct {
-	NpSendPk   chan ot.PublicKey         `fatchan:"reply"`
-	NpRecvPk   chan big.Int              `fatchan:"request"`
-	NpSendEncs chan ot.HashedElGamalCiph `fatchan:"reply"`
-
-	OtExtChan    chan []byte      `fatchan:"request"`
-	OtExtSelChan chan ot.Selector `fatchan:"reply"`
-
-	ParamChan chan ot.NPReceiverParams `fatchan:"reply"`
-}
-
 type Chanio struct {
 	Tchan   chan GarbledTable `fatchan:"request"`
 	Kchan   chan Key          `fatchan:"request"`
 	Kchan2  chan Key          `fatchan:"reply"`
-	OtChans OTChans
+	OtChans ot.OTChans
 }
 
 type GenX struct {
@@ -122,7 +111,7 @@ func NewChanio() (io *Chanio) {
 		make(chan GarbledTable, 50),
 		make(chan Key, 50),
 		make(chan Key, 50),
-		OTChans{
+		ot.OTChans{
 			make(chan ot.PublicKey, 100),
 			make(chan big.Int, 100),
 			make(chan ot.HashedElGamalCiph, 100),

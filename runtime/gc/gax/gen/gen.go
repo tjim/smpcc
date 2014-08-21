@@ -2,16 +2,12 @@ package gen
 
 import (
 	"bytes"
-	"crypto/aes"
 	"fmt"
 	"math/rand"
 
 	"github.com/tjim/smpcc/runtime/base"
+	"github.com/tjim/smpcc/runtime/gc"
 	"github.com/tjim/smpcc/runtime/ot"
-)
-
-const (
-	KEY_SIZE = aes.BlockSize
 )
 
 // type ConcurrentId [KEY_SIZE / 2]byte
@@ -19,7 +15,7 @@ type ConcurrentId int64
 
 /* GaxState implements the GenVM interface */
 type GaxState struct {
-	io           base.Genio
+	io           gc.Genio
 	concurrentId ConcurrentId
 	gateId       uint16
 }
@@ -28,11 +24,11 @@ var (
 	AESCount uint = 0
 )
 
-func NewGaxState(io base.Genio, id ConcurrentId) GaxState {
+func NewGaxState(io gc.Genio, id ConcurrentId) GaxState {
 	return GaxState{io, id, 0}
 }
 
-func slot(keys []base.Key) int {
+func slot(keys []gc.Key) int {
 	result := 0
 	for i := 0; i < len(keys); i++ {
 		key := keys[i]
@@ -42,27 +38,27 @@ func slot(keys []base.Key) int {
 	return result
 }
 
-func encrypt(keys []base.Key, plaintext, tweak []byte) []byte {
+func encrypt(keys []gc.Key, plaintext, tweak []byte) []byte {
 	// log.Printf("Computing encrypt with inputs %v, %v, %v\n", keys, plaintext, tweak)
 	AESCount++
-	result := base.GaXDKC_E(keys[0], keys[1], tweak, plaintext)
+	result := gc.GaXDKC_E(keys[0], keys[1], tweak, plaintext)
 	return result
 }
 
-func encrypt_nonoptimized(keys []base.Key, result []byte) []byte {
+func encrypt_nonoptimized(keys []gc.Key, result []byte) []byte {
 	for i := 0; i < len(keys); i++ {
-		result = base.Encrypt(keys[i], result)
+		result = gc.Encrypt(keys[i], result)
 		AESCount++
 	}
 	return result
 }
 
-func encrypt_slot_nonoptimized(t base.GarbledTable, plaintext []byte, keys []base.Key) {
+func encrypt_slot_nonoptimized(t gc.GarbledTable, plaintext []byte, keys []gc.Key) {
 	// fmt.Println("Non-optimized encrypt slot")
 	t[slot(keys)] = encrypt_nonoptimized(keys, plaintext)
 }
 
-func (gax GaxState) encrypt_slot(t base.GarbledTable, plaintext []byte, keys ...base.Key) {
+func (gax GaxState) encrypt_slot(t gc.GarbledTable, plaintext []byte, keys ...gc.Key) {
 	if len(keys) != 2 {
 		// log.Println("Non optimized encrypt_slot")
 		encrypt_slot_nonoptimized(t, plaintext, keys)
@@ -79,20 +75,20 @@ func (gax GaxState) encrypt_slot(t base.GarbledTable, plaintext []byte, keys ...
 	t[slot(keys)] = encrypt(keys, plaintext, tweak)
 }
 
-var key0 base.Key    // The XOR random constant
-var const0 base.Wire // A wire for a constant 0 bit with unbounded fanout
-var const1 base.Wire // A wire for a constant 1 bit with unbounded fanout
+var key0 gc.Key    // The XOR random constant
+var const0 gc.Wire // A wire for a constant 0 bit with unbounded fanout
+var const1 gc.Wire // A wire for a constant 1 bit with unbounded fanout
 
 func init_key0() {
 	if key0 != nil {
 		return
 	}
-	key0 = make([]byte, KEY_SIZE)
-	base.GenKey(key0) // least significant bit is random...
+	key0 = make([]byte, base.KEY_SIZE)
+	gc.GenKey(key0) // least significant bit is random...
 	key0[0] |= 1      // ...force it to 1
 }
 
-func init_constants(io base.Genio) {
+func init_constants(io gc.Genio) {
 	if const0 == nil {
 		const0 = genWire()
 		const1 = genWire()
@@ -108,20 +104,20 @@ func reset() {
 }
 
 // Generates two keys of size KEY_SIZE and returns the pair
-func genWire() base.Wire {
+func genWire() gc.Wire {
 	init_key0()
-	k0 := make([]byte, KEY_SIZE)
-	base.GenKey(k0)
-	k1 := base.XorKey(k0, key0)
-	return []base.Key{k0, k1}
+	k0 := make([]byte, base.KEY_SIZE)
+	gc.GenKey(k0)
+	k1 := gc.XorKey(k0, key0)
+	return []gc.Key{k0, k1}
 }
 
 // Generates an array of wires. A wire is a pair of keys.
-func genWires(size int) []base.Wire {
+func genWires(size int) []gc.Wire {
 	if size <= 0 {
 		panic("genWires with request <= 0")
 	}
-	res := make([]base.Wire, size)
+	res := make([]gc.Wire, size)
 	for i := 0; i < size; i++ {
 		res[i] = genWire()
 	}
@@ -130,15 +126,15 @@ func genWires(size int) []base.Wire {
 
 /* http://www.llvm.org/docs/LangRef.html */
 
-func (y GaxState) And(a, b []base.Wire) []base.Wire {
+func (y GaxState) And(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Wire mismatch in gen.And()")
 	}
-	result := make([]base.Wire, len(a))
+	result := make([]gc.Wire, len(a))
 	for i := 0; i < len(a); i++ {
 		w := genWire()
 		result[i] = w
-		t := make([]base.Ciphertext, 4)
+		t := make([]gc.Ciphertext, 4)
 		y.encrypt_slot(t, w[0], a[i][0], b[i][0])
 		y.encrypt_slot(t, w[0], a[i][0], b[i][1])
 		y.encrypt_slot(t, w[0], a[i][1], b[i][0])
@@ -148,15 +144,15 @@ func (y GaxState) And(a, b []base.Wire) []base.Wire {
 	return result
 }
 
-func (y GaxState) Or(a, b []base.Wire) []base.Wire {
+func (y GaxState) Or(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Wire mismatch in gen.Or()")
 	}
-	result := make([]base.Wire, len(a))
+	result := make([]gc.Wire, len(a))
 	for i := 0; i < len(a); i++ {
 		w := genWire()
 		result[i] = w
-		t := make([]base.Ciphertext, 4)
+		t := make([]gc.Ciphertext, 4)
 		y.encrypt_slot(t, w[0], a[i][0], b[i][0])
 		y.encrypt_slot(t, w[1], a[i][0], b[i][1])
 		y.encrypt_slot(t, w[1], a[i][1], b[i][0])
@@ -166,31 +162,31 @@ func (y GaxState) Or(a, b []base.Wire) []base.Wire {
 	return result
 }
 
-func (y GaxState) Xor(a, b []base.Wire) []base.Wire {
+func (y GaxState) Xor(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Xor(): mismatch")
 	}
-	result := make([]base.Wire, len(a))
+	result := make([]gc.Wire, len(a))
 	for i := 0; i < len(a); i++ {
-		k0 := base.XorKey(a[i][0], b[i][0])
-		k1 := base.XorKey(a[i][0], b[i][1])
-		result[i] = []base.Key{k0, k1}
+		k0 := gc.XorKey(a[i][0], b[i][0])
+		k1 := gc.XorKey(a[i][0], b[i][1])
+		result[i] = []gc.Key{k0, k1}
 	}
 	return result
 }
 
-func (y GaxState) True() []base.Wire {
+func (y GaxState) True() []gc.Wire {
 	init_constants(y.io)
-	return []base.Wire{const1}
+	return []gc.Wire{const1}
 }
 
-func (y GaxState) False() []base.Wire {
+func (y GaxState) False() []gc.Wire {
 	init_constants(y.io)
-	return []base.Wire{const0}
+	return []gc.Wire{const0}
 }
 
 /* Reveal to party 0 = gen */
-func (y GaxState) RevealTo0(a []base.Wire) []bool {
+func (y GaxState) RevealTo0(a []gc.Wire) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		bit := resolveKey(a[i], y.io.RecvK2())
@@ -204,9 +200,9 @@ func (y GaxState) RevealTo0(a []base.Wire) []bool {
 }
 
 /* Reveal to party 1 = eval */
-func (y GaxState) RevealTo1(a []base.Wire) {
+func (y GaxState) RevealTo1(a []gc.Wire) {
 	for i := 0; i < len(a); i++ {
-		t := make([]base.Ciphertext, 2)
+		t := make([]gc.Ciphertext, 2)
 		w := genWire()
 		w[0][0] = 0
 		w[1][0] = 1
@@ -216,8 +212,8 @@ func (y GaxState) RevealTo1(a []base.Wire) {
 	}
 }
 
-func (y GaxState) ShareTo0(bits int) []base.Wire {
-	a := make([]base.Wire, bits)
+func (y GaxState) ShareTo0(bits int) []gc.Wire {
+	a := make([]gc.Wire, bits)
 	for i := 0; i < len(a); i++ {
 		w := genWire()
 		a[i] = w
@@ -226,11 +222,11 @@ func (y GaxState) ShareTo0(bits int) []base.Wire {
 	return a
 }
 
-func (y GaxState) ShareTo1(a uint64, bits int) []base.Wire {
+func (y GaxState) ShareTo1(a uint64, bits int) []gc.Wire {
 	if bits > 64 {
 		panic("BT: bits > 64")
 	}
-	result := make([]base.Wire, bits)
+	result := make([]gc.Wire, bits)
 	for i := 0; i < bits; i++ {
 		w := genWire()
 		result[i] = w
@@ -244,11 +240,11 @@ func (y GaxState) ShareTo1(a uint64, bits int) []base.Wire {
 }
 
 // Random generates random bits.
-func (y GaxState) Random(bits int) []base.Wire {
+func (y GaxState) Random(bits int) []gc.Wire {
 	if bits < 1 {
 		panic("Random: bits < 1")
 	}
-	result := make([]base.Wire, bits)
+	result := make([]gc.Wire, bits)
 	for i, _ := range result {
 		w := genWire()
 		result[i] = w
@@ -262,7 +258,7 @@ func (y GaxState) Random(bits int) []base.Wire {
 	return result
 }
 
-func resolveKey(w base.Wire, k base.Key) int {
+func resolveKey(w gc.Wire, k gc.Key) int {
 	if bytes.Equal(k, w[0]) {
 		return 0
 	} else if bytes.Equal(k, w[1]) {

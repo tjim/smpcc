@@ -1,4 +1,4 @@
-package base
+package gc
 
 import (
 	"crypto/aes"

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/tjim/smpcc/runtime/base"
+	"github.com/tjim/smpcc/runtime/gc"
 	"github.com/tjim/smpcc/runtime/ot"
 )
 
@@ -19,21 +19,21 @@ type ConcurrentId int64
 
 /* YaoRState implements the GenVM interface */
 type YaoRState struct {
-	io           base.Genio
+	io           gc.Genio
 	concurrentId ConcurrentId
 	gateId       uint16
 }
 
 var (
 	AESCount  uint     = 0
-	ALL_ZEROS base.Key = make([]byte, KEY_SIZE)
+	ALL_ZEROS gc.Key = make([]byte, KEY_SIZE)
 )
 
-func NewYaoRState(io base.Genio, id ConcurrentId) YaoRState {
+func NewYaoRState(io gc.Genio, id ConcurrentId) YaoRState {
 	return YaoRState{io, id, 0}
 }
 
-func slot(keys []base.Key) int {
+func slot(keys []gc.Key) int {
 	result := 0
 	for i := 0; i < len(keys); i++ {
 		key := keys[i]
@@ -43,27 +43,27 @@ func slot(keys []base.Key) int {
 	return result
 }
 
-func encrypt(keys []base.Key, result []byte) []byte {
+func encrypt(keys []gc.Key, result []byte) []byte {
 	for i := 0; i < len(keys); i++ {
-		result = base.Encrypt(keys[i], result)
+		result = gc.Encrypt(keys[i], result)
 	}
 	return result
 }
 
-func encrypt_nonoptimized(keys []base.Key, result []byte) []byte {
+func encrypt_nonoptimized(keys []gc.Key, result []byte) []byte {
 	for i := 0; i < len(keys); i++ {
-		result = base.Encrypt(keys[i], result)
+		result = gc.Encrypt(keys[i], result)
 		AESCount++
 	}
 	return result
 }
 
-func encrypt_slot_nonoptimized(t base.GarbledTable, plaintext []byte, keys []base.Key) {
+func encrypt_slot_nonoptimized(t gc.GarbledTable, plaintext []byte, keys []gc.Key) {
 	// fmt.Println("Non-optimized encrypt slot")
 	t[slot(keys)] = encrypt_nonoptimized(keys, plaintext)
 }
 
-func (gax YaoRState) encrypt_slot(t base.GarbledTable, plaintext []byte, keys ...base.Key) {
+func (gax YaoRState) encrypt_slot(t gc.GarbledTable, plaintext []byte, keys ...gc.Key) {
 	if len(keys) != 2 {
 		// log.Println("Non optimized encrypt_slot")
 		encrypt_slot_nonoptimized(t, plaintext, keys)
@@ -74,20 +74,20 @@ func (gax YaoRState) encrypt_slot(t base.GarbledTable, plaintext []byte, keys ..
 	t[slot(keys)] = encrypt(keys, plaintext)
 }
 
-var key0 base.Key    // The XOR random constant
-var const0 base.Wire // A wire for a constant 0 bit with unbounded fanout
-var const1 base.Wire // A wire for a constant 1 bit with unbounded fanout
+var key0 gc.Key    // The XOR random constant
+var const0 gc.Wire // A wire for a constant 0 bit with unbounded fanout
+var const1 gc.Wire // A wire for a constant 1 bit with unbounded fanout
 
 func init_key0() {
 	if key0 != nil {
 		return
 	}
 	key0 = make([]byte, KEY_SIZE)
-	base.GenKey(key0) // least significant bit is random...
+	gc.GenKey(key0) // least significant bit is random...
 	key0[0] |= 1      // ...force it to 1
 }
 
-func init_constants(io base.Genio) {
+func init_constants(io gc.Genio) {
 	if const0 == nil {
 		const0 = genWire()
 		const1 = genWire()
@@ -103,35 +103,35 @@ func reset() {
 }
 
 // Generates two keys of size KEY_SIZE and returns the pair
-func genWire() base.Wire {
+func genWire() gc.Wire {
 	init_key0()
 	k0 := make([]byte, KEY_SIZE)
-	base.GenKey(k0)
-	k1 := base.XorKey(k0, key0)
-	return []base.Key{k0, k1}
+	gc.GenKey(k0)
+	k1 := gc.XorKey(k0, key0)
+	return []gc.Key{k0, k1}
 }
 
-func (g *YaoRState) genWireRR(inKey0, inKey1 base.Key, gateVal byte) base.Wire {
+func (g *YaoRState) genWireRR(inKey0, inKey1 gc.Key, gateVal byte) gc.Wire {
 	init_key0()
-	var k0, k1 base.Key
+	var k0, k1 gc.Key
 	if gateVal == 0 {
-		k0 = encrypt([]base.Key{inKey0, inKey1}, ALL_ZEROS)
-		k1 = base.XorKey(k0, key0)
+		k0 = encrypt([]gc.Key{inKey0, inKey1}, ALL_ZEROS)
+		k1 = gc.XorKey(k0, key0)
 	} else if gateVal == 1 {
-		k1 = encrypt([]base.Key{inKey0, inKey1}, ALL_ZEROS)
-		k0 = base.XorKey(k1, key0)
+		k1 = encrypt([]gc.Key{inKey0, inKey1}, ALL_ZEROS)
+		k0 = gc.XorKey(k1, key0)
 	} else {
 		panic("Invalid gateVal")
 	}
-	return []base.Key{k0, k1}
+	return []gc.Key{k0, k1}
 }
 
 // Generates an array of wires. A wire is a pair of keys.
-func genWires(size int) []base.Wire {
+func genWires(size int) []gc.Wire {
 	if size <= 0 {
 		panic("genWires with request <= 0")
 	}
-	res := make([]base.Wire, size)
+	res := make([]gc.Wire, size)
 	for i := 0; i < size; i++ {
 		res[i] = genWire()
 	}
@@ -142,16 +142,16 @@ func genWires(size int) []base.Wire {
 
 // Gates built directly using encrypt_slot
 
-func (y YaoRState) And(a, b []base.Wire) []base.Wire {
+func (y YaoRState) And(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Wire mismatch in gen.And()")
 	}
-	result := make([]base.Wire, len(a))
+	result := make([]gc.Wire, len(a))
 
-	var w base.Wire
+	var w gc.Wire
 
 	for i := 0; i < len(a); i++ {
-		t := make([]base.Ciphertext, 3)
+		t := make([]gc.Ciphertext, 3)
 
 		ii := a[i][0][0] % 2
 		jj := b[i][0][0] % 2
@@ -164,7 +164,7 @@ func (y YaoRState) And(a, b []base.Wire) []base.Wire {
 			ii := aa ^ (a[i][0][0] % 2)
 			jj := bb ^ (b[i][0][0] % 2)
 
-			t[counter-1] = encrypt([]base.Key{a[i][ii], b[i][jj]}, w[ii&jj])
+			t[counter-1] = encrypt([]gc.Key{a[i][ii], b[i][jj]}, w[ii&jj])
 		}
 
 		y.io.SendT(t)
@@ -172,16 +172,16 @@ func (y YaoRState) And(a, b []base.Wire) []base.Wire {
 	return result
 }
 
-func (y YaoRState) Or(a, b []base.Wire) []base.Wire {
+func (y YaoRState) Or(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Wire mismatch in gen.And()")
 	}
-	result := make([]base.Wire, len(a))
+	result := make([]gc.Wire, len(a))
 
-	var w base.Wire
+	var w gc.Wire
 
 	for i := 0; i < len(a); i++ {
-		t := make([]base.Ciphertext, 3)
+		t := make([]gc.Ciphertext, 3)
 		// fmt.Printf("==== %d, %d \n", len(a), len(a[i]))
 		ii := a[i][0][0] % 2
 		jj := b[i][0][0] % 2
@@ -194,7 +194,7 @@ func (y YaoRState) Or(a, b []base.Wire) []base.Wire {
 			ii := aa ^ (a[i][0][0] % 2)
 			jj := bb ^ (b[i][0][0] % 2)
 
-			t[counter-1] = encrypt([]base.Key{a[i][ii], b[i][jj]}, w[ii|jj])
+			t[counter-1] = encrypt([]gc.Key{a[i][ii], b[i][jj]}, w[ii|jj])
 		}
 
 		y.io.SendT(t)
@@ -202,33 +202,33 @@ func (y YaoRState) Or(a, b []base.Wire) []base.Wire {
 	return result
 }
 
-func (y YaoRState) Xor(a, b []base.Wire) []base.Wire {
+func (y YaoRState) Xor(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Xor(): mismatch")
 	}
-	result := make([]base.Wire, len(a))
+	result := make([]gc.Wire, len(a))
 	for i := 0; i < len(a); i++ {
-		k0 := base.XorKey(a[i][0], b[i][0])
-		k1 := base.XorKey(a[i][0], b[i][1])
-		result[i] = []base.Key{k0, k1}
+		k0 := gc.XorKey(a[i][0], b[i][0])
+		k1 := gc.XorKey(a[i][0], b[i][1])
+		result[i] = []gc.Key{k0, k1}
 	}
 	return result
 }
 
-func (y YaoRState) True() []base.Wire {
+func (y YaoRState) True() []gc.Wire {
 	init_constants(y.io)
-	return []base.Wire{const1}
+	return []gc.Wire{const1}
 }
 
-func (y YaoRState) False() []base.Wire {
+func (y YaoRState) False() []gc.Wire {
 	init_constants(y.io)
-	return []base.Wire{const0}
+	return []gc.Wire{const0}
 }
 
 // Other gates and helper functions
 
 /* Reveal to party 0 = gen */
-func (y YaoRState) RevealTo0(a []base.Wire) []bool {
+func (y YaoRState) RevealTo0(a []gc.Wire) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		bit := resolveKey(a[i], y.io.RecvK2())
@@ -242,9 +242,9 @@ func (y YaoRState) RevealTo0(a []base.Wire) []bool {
 }
 
 /* Reveal to party 1 = eval */
-func (y YaoRState) RevealTo1(a []base.Wire) {
+func (y YaoRState) RevealTo1(a []gc.Wire) {
 	for i := 0; i < len(a); i++ {
-		t := make([]base.Ciphertext, 2)
+		t := make([]gc.Ciphertext, 2)
 		w := genWire()
 		w[0][0] = 0
 		w[1][0] = 1
@@ -254,8 +254,8 @@ func (y YaoRState) RevealTo1(a []base.Wire) {
 	}
 }
 
-func (y YaoRState) ShareTo0(bits int) []base.Wire {
-	a := make([]base.Wire, bits)
+func (y YaoRState) ShareTo0(bits int) []gc.Wire {
+	a := make([]gc.Wire, bits)
 	for i := 0; i < len(a); i++ {
 		w := genWire()
 		a[i] = w
@@ -264,11 +264,11 @@ func (y YaoRState) ShareTo0(bits int) []base.Wire {
 	return a
 }
 
-func (y YaoRState) ShareTo1(a uint64, bits int) []base.Wire {
+func (y YaoRState) ShareTo1(a uint64, bits int) []gc.Wire {
 	if bits > 64 {
 		panic("BT: bits > 64")
 	}
-	result := make([]base.Wire, bits)
+	result := make([]gc.Wire, bits)
 	for i := 0; i < bits; i++ {
 		w := genWire()
 		result[i] = w
@@ -282,11 +282,11 @@ func (y YaoRState) ShareTo1(a uint64, bits int) []base.Wire {
 }
 
 // Random generates random bits.
-func (y YaoRState) Random(bits int) []base.Wire {
+func (y YaoRState) Random(bits int) []gc.Wire {
 	if bits < 1 {
 		panic("Random: bits < 1")
 	}
-	result := make([]base.Wire, bits)
+	result := make([]gc.Wire, bits)
 	for i, _ := range result {
 		w := genWire()
 		result[i] = w
@@ -300,7 +300,7 @@ func (y YaoRState) Random(bits int) []base.Wire {
 	return result
 }
 
-func resolveKey(w base.Wire, k base.Key) int {
+func resolveKey(w gc.Wire, k gc.Key) int {
 	if bytes.Equal(k, w[0]) {
 		return 0
 	} else if bytes.Equal(k, w[1]) {

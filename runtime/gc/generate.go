@@ -4,9 +4,10 @@
 
 */
 
-package base
+package gc
 
 import (
+	"github.com/tjim/smpcc/runtime/base"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -39,9 +40,9 @@ func GenKey(keyBuf []byte) {
 }
 
 func Encrypt(key Key, input []byte) Ciphertext {
-	return AESEval(key, input)
+	return base.AESEval(key, input)
 }
 
 func Decrypt(key Key, input Ciphertext) []byte {
-	return AESInvert(key, input)
+	return base.AESInvert(key, input)
 }

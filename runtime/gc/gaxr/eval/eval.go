@@ -1,44 +1,39 @@
 package eval
 
 import (
-	"crypto/aes"
-
 	"github.com/tjim/smpcc/runtime/base"
+	"github.com/tjim/smpcc/runtime/gc"
 )
 
-import "github.com/tjim/smpcc/runtime/gaxr/gen"
+import "github.com/tjim/smpcc/runtime/gc/gaxr/gen"
 import "github.com/tjim/smpcc/runtime/ot"
-import basegen "github.com/tjim/smpcc/runtime/gen"
-import baseeval "github.com/tjim/smpcc/runtime/eval"
+import basegen "github.com/tjim/smpcc/runtime/gc/gen"
+import baseeval "github.com/tjim/smpcc/runtime/gc/eval"
 import "math/rand"
 
 type ConcurrentId int64
 
 /* GaxState implements the EvalVM interface */
 type GaxState struct {
-	io           base.Evalio
+	io           gc.Evalio
 	concurrentId ConcurrentId
 	gateId       uint16
 }
 
-const (
-	KEY_SIZE = aes.BlockSize
-)
-
 var (
 	AESCount  uint     = 0
-	ALL_ZEROS base.Key = make([]byte, KEY_SIZE)
+	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
 
 func IO(id int64) (gen.GaxState, GaxState) {
-	io := base.NewChanio()
-	gchan := make(chan base.GenX, 1)
-	echan := make(chan base.EvalX, 1)
+	io := gc.NewChanio()
+	gchan := make(chan gc.GenX, 1)
+	echan := make(chan gc.EvalX, 1)
 	go func() {
-		echan <- *base.NewEvalX(io)
+		echan <- *gc.NewEvalX(io)
 	}()
 	go func() {
-		gchan <- *base.NewGenX(io)
+		gchan <- *gc.NewGenX(io)
 	}()
 	gio := <-gchan
 	eio := <-echan
@@ -56,10 +51,10 @@ func IOs(n int) ([]basegen.GenVM, []baseeval.EvalVM) {
 	return result1, result2
 }
 
-var const0 base.Key
-var const1 base.Key
+var const0 gc.Key
+var const1 gc.Key
 
-func init_constants(io base.Evalio) {
+func init_constants(io gc.Evalio) {
 	if const0 == nil {
 		const0 = io.RecvK()
 		const1 = io.RecvK()
@@ -71,7 +66,7 @@ func reset() {
 	const1 = nil
 }
 
-func slot(keys []base.Key) int {
+func slot(keys []gc.Key) int {
 	result := 0
 	for i := 0; i < len(keys); i++ {
 		key := keys[i]
@@ -81,27 +76,27 @@ func slot(keys []base.Key) int {
 	return result
 }
 
-func decrypt_nonoptimized(keys []base.Key, ciphertext []byte) []byte {
+func decrypt_nonoptimized(keys []gc.Key, ciphertext []byte) []byte {
 	result := ciphertext
 	for i := len(keys); i > 0; i-- {
-		result = base.Decrypt(keys[i-1], result)
+		result = gc.Decrypt(keys[i-1], result)
 		AESCount++
 	}
 	// log.Printf("Decrypt_nonoptimized, result = %v\n", result)
 	return result
 }
 
-func Decrypt_nonoptimized(t base.GarbledTable, keys []base.Key) []byte {
+func Decrypt_nonoptimized(t gc.GarbledTable, keys []gc.Key) []byte {
 	return decrypt_nonoptimized(keys, t[slot(keys)])
 }
 
-func decrypt(keys []base.Key, ciphertext, tweak []byte) (result base.Key) {
+func decrypt(keys []gc.Key, ciphertext, tweak []byte) (result gc.Key) {
 	// log.Printf("Computing decrypt with inputs %v, %v, %v\n", keys, ciphertext, tweak)
 	AESCount++
-	return base.GaXDKC_D(keys[0], keys[1], tweak, ciphertext)
+	return gc.GaXDKC_D(keys[0], keys[1], tweak, ciphertext)
 }
 
-func (gax GaxState) Decrypt(t base.GarbledTable, keys ...base.Key) []byte {
+func (gax GaxState) Decrypt(t gc.GarbledTable, keys ...gc.Key) []byte {
 	if len(keys) != 2 {
 		// log.Println("Non-optimized decrypt slot")
 		return Decrypt_nonoptimized(t, keys)
@@ -118,7 +113,7 @@ func (gax GaxState) Decrypt(t base.GarbledTable, keys ...base.Key) []byte {
 	return decrypt(keys, t[slot(keys)], tweak)
 }
 
-func (gax *GaxState) computeTweak() base.Key {
+func (gax *GaxState) computeTweak() gc.Key {
 	tweak := make([]byte, base.KEY_SIZE)
 	tweak[0] = byte(gax.gateId)
 	tweak[1] = byte(gax.gateId >> 8)
@@ -129,63 +124,63 @@ func (gax *GaxState) computeTweak() base.Key {
 	return tweak
 }
 
-func (y GaxState) bitwise_binary_operator(io base.Evalio, a, b []base.Key) []base.Key {
+func (y GaxState) bitwise_binary_operator(io gc.Evalio, a, b []gc.Key) []gc.Key {
 	if len(a) != len(b) {
 		panic("Wire mismatch in eval.bitwise_binary_operator()")
 	}
-	result := make([]base.Key, len(a))
+	result := make([]gc.Key, len(a))
 	for i := 0; i < len(a); i++ {
 		t := io.RecvT()
 		aa := a[i][0] % 2
 		bb := b[i][0] % 2
 		if aa == 0 && bb == 0 {
-			result[i] = base.GaXDKC_E(a[i], b[i], y.computeTweak(), ALL_ZEROS)
+			result[i] = gc.GaXDKC_E(a[i], b[i], y.computeTweak(), ALL_ZEROS)
 		} else {
 			tweak := y.computeTweak()
-			result[i] = decrypt([]base.Key{a[i], b[i]}, t[bb*2+aa-1], tweak)
+			result[i] = decrypt([]gc.Key{a[i], b[i]}, t[bb*2+aa-1], tweak)
 		}
 	}
 	return result
 }
 
-func (y GaxState) And(a, b []base.Key) []base.Key {
+func (y GaxState) And(a, b []gc.Key) []gc.Key {
 	return y.bitwise_binary_operator(y.io, a, b)
 }
 
-func (y GaxState) Or(a, b []base.Key) []base.Key {
+func (y GaxState) Or(a, b []gc.Key) []gc.Key {
 	return y.bitwise_binary_operator(y.io, a, b)
 }
 
-func (y GaxState) Xor(a, b []base.Key) []base.Key {
+func (y GaxState) Xor(a, b []gc.Key) []gc.Key {
 	if len(a) != len(b) {
 		panic("Xor(): mismatch")
 	}
-	result := make([]base.Key, len(a))
+	result := make([]gc.Key, len(a))
 	for i := 0; i < len(a); i++ {
-		result[i] = base.XorKey(a[i], b[i])
+		result[i] = gc.XorKey(a[i], b[i])
 	}
 	return result
 }
 
-func (y GaxState) True() []base.Key {
+func (y GaxState) True() []gc.Key {
 	init_constants(y.io)
-	return []base.Key{const1}
+	return []gc.Key{const1}
 }
 
-func (y GaxState) False() []base.Key {
+func (y GaxState) False() []gc.Key {
 	init_constants(y.io)
-	return []base.Key{const0}
+	return []gc.Key{const0}
 }
 
 /* Reveal to party 0 = gen */
-func (y GaxState) RevealTo0(a []base.Key) {
+func (y GaxState) RevealTo0(a []gc.Key) {
 	for i := 0; i < len(a); i++ {
 		y.io.SendK2(a[i])
 	}
 }
 
 /* Reveal to party 1 = eval */
-func (y GaxState) RevealTo1(a []base.Key) []bool {
+func (y GaxState) RevealTo1(a []gc.Key) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		t := y.io.RecvT()
@@ -201,7 +196,7 @@ func (y GaxState) RevealTo1(a []base.Key) []bool {
 	return result
 }
 
-func (y GaxState) ShareTo0(v uint64, bits int) []base.Key {
+func (y GaxState) ShareTo0(v uint64, bits int) []gc.Key {
 	a := make([]bool, bits)
 	for i := 0; i < len(a); i++ {
 		bit := (v >> uint(i)) % 2
@@ -211,39 +206,39 @@ func (y GaxState) ShareTo0(v uint64, bits int) []base.Key {
 			a[i] = false
 		}
 	}
-	result := make([]base.Key, len(a))
+	result := make([]gc.Key, len(a))
 	for i := 0; i < len(a); i++ {
 		selector := ot.Selector(0)
 		if a[i] {
 			selector = 1
 		}
-		result[i] = base.Key(y.io.Receive(selector))
+		result[i] = gc.Key(y.io.Receive(selector))
 	}
 	return result
 }
 
 // Random generates random bits.
-func (y GaxState) Random(bits int) []base.Key {
+func (y GaxState) Random(bits int) []gc.Key {
 	if bits < 1 {
 		panic("Random: bits < 1")
 	}
-	result := make([]base.Key, bits)
+	result := make([]gc.Key, bits)
 	for i, _ := range result {
 		selector := ot.Selector(0)
 		if rand.Intn(2) != 0 {
 			selector = 1
 		}
-		result[i] = base.Key(y.io.Receive(selector))
+		result[i] = gc.Key(y.io.Receive(selector))
 	}
 	return result
 }
 
 /* Bit transfer: Generator knows the bits, evaluator gets keys */
-func (y GaxState) ShareTo1(bits int) []base.Key {
+func (y GaxState) ShareTo1(bits int) []gc.Key {
 	if bits > 64 {
 		panic("BT: bits > 64")
 	}
-	result := make([]base.Key, bits)
+	result := make([]gc.Key, bits)
 	for i := 0; i < bits; i++ {
 		result[i] = y.io.RecvK()
 	}
