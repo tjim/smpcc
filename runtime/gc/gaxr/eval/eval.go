@@ -25,6 +25,10 @@ var (
 	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
 
+func NewState(io gc.Evalio, id int) GaxState {
+	return GaxState{io, ConcurrentId(id), 0}
+}
+
 func IO(id int64) (gen.GaxState, GaxState) {
 	io := gc.NewChanio()
 	gchan := make(chan gc.GenX, 1)

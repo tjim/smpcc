@@ -24,6 +24,10 @@ var (
 	AESCount uint = 0
 )
 
+func NewState(io gc.Genio, id int) GaxState {
+	return GaxState{io, ConcurrentId(id), 0}
+}
+
 func NewGaxState(io gc.Genio, id ConcurrentId) GaxState {
 	return GaxState{io, id, 0}
 }

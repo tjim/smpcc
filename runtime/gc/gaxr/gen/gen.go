@@ -25,6 +25,10 @@ var (
 	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
 
+func NewState(io gc.Genio, id int) GaxState {
+	return GaxState{io, ConcurrentId(id), 0}
+}
+
 func NewGaxState(io gc.Genio, id ConcurrentId) GaxState {
 	return GaxState{io, id, 0}
 }

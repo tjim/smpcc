@@ -12,7 +12,8 @@ type YaoState struct {
 	io gc.Evalio
 }
 
-func NewState(io gc.Evalio) YaoState {
+func NewState(io gc.Evalio, id int) YaoState {
+	// id only to have the same type as other gc back ends (yaor, gax, gaxr)
 	return YaoState{io}
 }
 
@@ -28,7 +29,7 @@ func IO(id int) (gen.YaoState, YaoState) {
 	}()
 	gio := <-gchan
 	eio := <-echan
-	return gen.NewState(&gio), YaoState{&eio}
+	return gen.NewState(&gio, id), YaoState{&eio}
 }
 
 func IOs(n int) ([]basegen.GenVM, []baseeval.EvalVM) {

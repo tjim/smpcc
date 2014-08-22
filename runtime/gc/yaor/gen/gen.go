@@ -29,6 +29,10 @@ var (
 	ALL_ZEROS gc.Key = make([]byte, KEY_SIZE)
 )
 
+func NewState(io gc.Genio, id int) YaoRState {
+	return YaoRState{io, ConcurrentId(id), 0}
+}
+
 func NewYaoRState(io gc.Genio, id ConcurrentId) YaoRState {
 	return YaoRState{io, id, 0}
 }

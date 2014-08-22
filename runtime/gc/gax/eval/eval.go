@@ -50,6 +50,10 @@ func IOs(n int) ([]basegen.GenVM, []baseeval.EvalVM) {
 	return result1, result2
 }
 
+func NewState(io gc.Evalio, id int) GaxState {
+	return GaxState{io, ConcurrentId(id), 0}
+}
+
 var const0 gc.Key
 var const1 gc.Key
 

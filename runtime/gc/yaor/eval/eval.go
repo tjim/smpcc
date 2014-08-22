@@ -30,6 +30,10 @@ var (
 	ALL_ZEROS gc.Key = make([]byte, KEY_SIZE)
 )
 
+func NewState(io gc.Evalio, id int) YaoRState {
+	return YaoRState{io, ConcurrentId(id), 0}
+}
+
 func IO(id int64) (gen.YaoRState, YaoRState) {
 	io := gc.NewChanio()
 	gchan := make(chan gc.GenX, 1)

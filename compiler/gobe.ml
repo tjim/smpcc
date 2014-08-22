@@ -495,8 +495,8 @@ let print_function_circuit m f =
     bprintf b "\n";
     bprintf b "import \"github.com/tjim/smpcc/runtime/gc\"\n";
     bprintf b "import \"github.com/tjim/smpcc/runtime/fatchanio\"\n";
-    bprintf b "import \"github.com/tjim/smpcc/runtime/gc/yao/eval\"\n";
-    bprintf b "import \"github.com/tjim/smpcc/runtime/gc/yao/gen\"\n";
+    bprintf b "import \"github.com/tjim/smpcc/runtime/gc/%s/eval\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
+    bprintf b "import \"github.com/tjim/smpcc/runtime/gc/%s/gen\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
     bprintf b "import baseeval \"github.com/tjim/smpcc/runtime/gc/eval\"\n";
     bprintf b "import basegen \"github.com/tjim/smpcc/runtime/gc/gen\"\n";
     bprintf b "import \"fmt\"\n";
@@ -527,7 +527,7 @@ let print_function_circuit m f =
     bprintf b "\tios := make([]baseeval.EvalVM, %d)\n" (List.length f.fblocks + 1);
     bprintf b "\tfor i := range ios {\n";
     bprintf b "\t\tio := <-nu\n";
-    bprintf b "\t\tios[i] = eval.NewState(gc.NewEvalX(&io))\n";
+    bprintf b "\t\tios[i] = eval.NewState(gc.NewEvalX(&io), i)\n";
     bprintf b "\t}\n";
     bprintf b "\tgo eval_main(ios)\n";
     bprintf b "\t<- _main_done\n";
@@ -538,7 +538,7 @@ let print_function_circuit m f =
     bprintf b "\tios := make([]basegen.GenVM, %d)\n" (List.length f.fblocks + 1);
     bprintf b "\tfor i := range ios {\n";
     bprintf b "\t\tio := fatchanio.NewGenio(nu)\n";
-    bprintf b "\t\tios[i] = gen.NewState(io)\n";
+    bprintf b "\t\tios[i] = gen.NewState(io, i)\n";
     bprintf b "\t}\n";
     bprintf b "\tgo gen_main(ios)\n";
     bprintf b "\t<- _main_done\n";

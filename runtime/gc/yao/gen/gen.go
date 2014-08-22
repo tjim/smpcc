@@ -19,7 +19,8 @@ type YaoState struct {
 	io gc.Genio
 }
 
-func NewState(io gc.Genio) YaoState {
+func NewState(io gc.Genio, id int) YaoState {
+	// id only to have the same type as other gc back ends (yaor, gax, gaxr)
 	return YaoState{io}
 }
 
