@@ -41,32 +41,17 @@ type EvalX struct {
 }
 
 func NewGenX(io *Chanio) *GenX {
-	//	log.Printf("rec params")
-	rcvParams := <-io.OtChans.ParamChan
-	//	log.Printf("done rec params")
-
-	npRecvr := ot.NewNPReceiver(rcvParams, io.OtChans.NpSendPk, io.OtChans.NpRecvPk, io.OtChans.NpSendEncs)
-	otSender := ot.NewExtendSender(io.OtChans.OtExtChan, io.OtChans.OtExtSelChan, npRecvr, ot.SEC_PARAM, ot.NUM_PAIRS)
-
 	result := &GenX{
 		io,
-		otSender,
+		ot.NewOTChansSender(&io.OtChans),
 	}
 	return result
 }
 
 func NewEvalX(io *Chanio) *EvalX {
-	sndParams, rcvParams := ot.GenNPParams()
-	//	log.Printf("send params")
-	io.OtChans.ParamChan <- rcvParams
-	//	log.Printf("done send params")
-
-	npSndr := ot.NewNPSender(sndParams, io.OtChans.NpSendPk, io.OtChans.NpRecvPk, io.OtChans.NpSendEncs)
-	otRecvr := ot.NewExtendReceiver(io.OtChans.OtExtChan, io.OtChans.OtExtSelChan, npSndr, ot.SEC_PARAM, ot.NUM_PAIRS)
-
 	result := &EvalX{
 		io,
-		otRecvr,
+		ot.NewOTChansReceiver(&io.OtChans),
 	}
 	return result
 }
