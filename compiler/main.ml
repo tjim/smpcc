@@ -1,11 +1,3 @@
-(* mpcc: compile LLVM object file to circuit *)
-
-(* Compile this program with
- *
- *     ocamlbuild mpcc.byte
- *
- *)
-
 open Util
 open Printf
 open Options
@@ -43,7 +35,7 @@ module V = State.V
 
   So we create new blocks L1' and L2', each of which will branch to L.
 
-  In block L1 we replace the branch to L with a branch to L1', 
+  In block L1 we replace the branch to L with a branch to L1',
   and in block L2 we replace the branch to L with a branch to L2'.
 
   Then in L1' we add the appropriate assignments, using a temporary so
@@ -177,39 +169,39 @@ and repl_value var replacement x =
   | Vector ops                 -> Vector(List.map rtv ops)
   | Struct(is_packed, ops)     -> Struct(is_packed, List.map rtv ops)
   | Trunc(x, y)                -> Trunc(rtv x, y)
-  | Zext(x, y)                 -> Zext(rtv x, y)         
-  | Sext(x, y)                 -> Sext(rtv x, y)         
-  | Fptrunc(x, y)              -> Fptrunc(rtv x, y)      
-  | Fpext(x, y)                -> Fpext(rtv x, y)        
-  | Bitcast(x, y)              -> Bitcast(rtv x, y)      
+  | Zext(x, y)                 -> Zext(rtv x, y)
+  | Sext(x, y)                 -> Sext(rtv x, y)
+  | Fptrunc(x, y)              -> Fptrunc(rtv x, y)
+  | Fpext(x, y)                -> Fpext(rtv x, y)
+  | Bitcast(x, y)              -> Bitcast(rtv x, y)
   | Addrspacecast(x, y)        -> Addrspacecast(rtv x, y)
-  | Uitofp(x, y)               -> Uitofp(rtv x, y)       
-  | Sitofp(x, y)               -> Sitofp(rtv x, y)       
-  | Fptoui(x, y)               -> Fptoui(rtv x, y)       
-  | Fptosi(x, y)               -> Fptosi(rtv x, y)       
-  | Inttoptr(x, y)             -> Inttoptr(rtv x, y)     
-  | Ptrtoint(x, y)             -> Ptrtoint(rtv x, y)     
+  | Uitofp(x, y)               -> Uitofp(rtv x, y)
+  | Sitofp(x, y)               -> Sitofp(rtv x, y)
+  | Fptoui(x, y)               -> Fptoui(rtv x, y)
+  | Fptosi(x, y)               -> Fptosi(rtv x, y)
+  | Inttoptr(x, y)             -> Inttoptr(rtv x, y)
+  | Ptrtoint(x, y)             -> Ptrtoint(rtv x, y)
   | Extractvalue(x, y)         -> Extractvalue(rtv x, y)
   | Insertvalue(x, y, z)       -> Insertvalue(rtv x, rtv y, z)
   | Icmp(cmp, x, y)            -> Icmp(cmp, rtv x, rtv y)
   | Fcmp(cmp, x, y)            -> Fcmp(cmp, rtv x, rtv y)
-  | Sdiv(e, x, y)              -> Sdiv(e, rtv x, rtv y)  
-  | Udiv(e, x, y)              -> Udiv(e, rtv x, rtv y)  
-  | Lshr(e, x, y)              -> Lshr(e, rtv x, rtv y)  
-  | Ashr(e, x, y)              -> Ashr(e, rtv x, rtv y)  
-  | Fadd(x, y)                 -> Fadd(rtv x, rtv y)     
-  | Fsub(x, y)                 -> Fsub(rtv x, rtv y)     
-  | Fmul(x, y)                 -> Fmul(rtv x, rtv y)     
-  | Fdiv(x, y)                 -> Fdiv(rtv x, rtv y)     
-  | Frem(x, y)                 -> Frem(rtv x, rtv y)     
-  | Urem(x, y)                 -> Urem(rtv x, rtv y)     
-  | Srem(x, y)                 -> Srem(rtv x, rtv y)     
-  | And (x, y)                 -> And (rtv x, rtv y)     
-  | Or  (x, y)                 -> Or  (rtv x, rtv y)     
-  | Xor (x, y)                 -> Xor (rtv x, rtv y)     
+  | Sdiv(e, x, y)              -> Sdiv(e, rtv x, rtv y)
+  | Udiv(e, x, y)              -> Udiv(e, rtv x, rtv y)
+  | Lshr(e, x, y)              -> Lshr(e, rtv x, rtv y)
+  | Ashr(e, x, y)              -> Ashr(e, rtv x, rtv y)
+  | Fadd(x, y)                 -> Fadd(rtv x, rtv y)
+  | Fsub(x, y)                 -> Fsub(rtv x, rtv y)
+  | Fmul(x, y)                 -> Fmul(rtv x, rtv y)
+  | Fdiv(x, y)                 -> Fdiv(rtv x, rtv y)
+  | Frem(x, y)                 -> Frem(rtv x, rtv y)
+  | Urem(x, y)                 -> Urem(rtv x, rtv y)
+  | Srem(x, y)                 -> Srem(rtv x, rtv y)
+  | And (x, y)                 -> And (rtv x, rtv y)
+  | Or  (x, y)                 -> Or  (rtv x, rtv y)
+  | Xor (x, y)                 -> Xor (rtv x, rtv y)
   | Getelementptr(inbounds, x) -> Getelementptr(inbounds, List.map rtv x)
   | Shufflevector x            -> Shufflevector(List.map rtv x)
-  | Insertelement x            -> Insertelement(List.map rtv x) 
+  | Insertelement x            -> Insertelement(List.map rtv x)
   | Extractelement x           -> Extractelement(List.map rtv x)
   | Select x                   -> Select(List.map rtv x)
   | Add(nuw, nsw, x, y)        -> Add(nuw, nsw, rtv x, rtv y)
@@ -220,7 +212,7 @@ and repl_instr var replacement x =
   let rv = repl_value var replacement in
   let rtv = repl_typ_value var replacement in
   let rtvl = List.map (repl_typ_value var replacement) in
-  match x with 
+  match x with
   | Add(nuw, nsw, x, y, md) -> Add(nuw, nsw, rtv x, rv y, md)
   | Sub(nuw, nsw, x, y, md) -> Sub(nuw, nsw, rtv x, rv y, md)
   | Mul(nuw, nsw, x, y, md) -> Mul(nuw, nsw, rtv x, rv y, md)
@@ -241,20 +233,20 @@ and repl_instr var replacement x =
   | Xor (x, y, md)           -> Xor (rtv x, rv y, md)
   | Icmp(icmp, x, y, md) -> Icmp(icmp, rtv x, rv y, md)
   | Fcmp(fcmp, x, y, md) -> Fcmp(fcmp, rtv x, rv y, md)
-  | Trunc(x, y, md)          -> Trunc(rtv x, y, md)        
-  | Zext(x, y, md)           -> Zext(rtv x, y, md)         
-  | Sext(x, y, md)           -> Sext(rtv x, y, md)         
-  | Fptrunc(x, y, md)        -> Fptrunc(rtv x, y, md)      
-  | Fpext(x, y, md)          -> Fpext(rtv x, y, md)        
-  | Bitcast(x, y, md)        -> Bitcast(rtv x, y, md)      
+  | Trunc(x, y, md)          -> Trunc(rtv x, y, md)
+  | Zext(x, y, md)           -> Zext(rtv x, y, md)
+  | Sext(x, y, md)           -> Sext(rtv x, y, md)
+  | Fptrunc(x, y, md)        -> Fptrunc(rtv x, y, md)
+  | Fpext(x, y, md)          -> Fpext(rtv x, y, md)
+  | Bitcast(x, y, md)        -> Bitcast(rtv x, y, md)
   | Addrspacecast(x, y, md)  -> Addrspacecast(rtv x, y, md)
-  | Uitofp(x, y, md)         -> Uitofp(rtv x, y, md)       
-  | Sitofp(x, y, md)         -> Sitofp(rtv x, y, md)       
-  | Fptoui(x, y, md)         -> Fptoui(rtv x, y, md)       
-  | Fptosi(x, y, md)         -> Fptosi(rtv x, y, md)       
-  | Inttoptr(x, y, md)       -> Inttoptr(rtv x, y, md)     
-  | Ptrtoint(x, y, md)       -> Ptrtoint(rtv x, y, md)     
-  | Va_arg(x, y, md)         -> Va_arg(rtv x, y, md)       
+  | Uitofp(x, y, md)         -> Uitofp(rtv x, y, md)
+  | Sitofp(x, y, md)         -> Sitofp(rtv x, y, md)
+  | Fptoui(x, y, md)         -> Fptoui(rtv x, y, md)
+  | Fptosi(x, y, md)         -> Fptosi(rtv x, y, md)
+  | Inttoptr(x, y, md)       -> Inttoptr(rtv x, y, md)
+  | Ptrtoint(x, y, md)       -> Ptrtoint(rtv x, y, md)
+  | Va_arg(x, y, md)         -> Va_arg(rtv x, y, md)
   | Getelementptr(inbounds, x, md) -> Getelementptr(inbounds, x, md)
   | Shufflevector(x,md) -> Shufflevector(rtvl x, md)
   | Insertelement(x,md) -> Insertelement(rtvl x, md)
@@ -479,7 +471,7 @@ let gep_elimination ctyps f =
                   ::(loop (Var new_x) ety' tl)
               | Vartyp v, _ ->
                   let ety' =
-                    try 
+                    try
                       match List.assoc v ctyps with
                       | None -> failwith ("getelementptr: opaque type "^(Util.string_of_var v))
                       | Some typ -> typ
