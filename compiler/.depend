@@ -1,15 +1,15 @@
 echo.cmo : util.cmx lllex.cmx
 echo.cmx : util.cmx lllex.cmx
-gmw.cmo : util.cmx state.cmx options.cmx gobe.cmx
-gmw.cmx : util.cmx state.cmx options.cmx gobe.cmx
-gobe.cmo : util.cmx state.cmx options.cmx
-gobe.cmx : util.cmx state.cmx options.cmx
+gc.cmo : util.cmx state.cmx options.cmx
+gc.cmx : util.cmx state.cmx options.cmx
+gmw.cmo : util.cmx state.cmx options.cmx gc.cmx
+gmw.cmx : util.cmx state.cmx options.cmx gc.cmx
 lllex.cmo : util.cmx state.cmx llparse.cmi
 lllex.cmx : util.cmx state.cmx llparse.cmx
 llparse.cmo : util.cmx llparse.cmi
 llparse.cmx : util.cmx llparse.cmi
-main.cmo : util.cmx state.cmx options.cmx lllex.cmx gobe.cmx gmw.cmx
-main.cmx : util.cmx state.cmx options.cmx lllex.cmx gobe.cmx gmw.cmx
+main.cmo : util.cmx state.cmx options.cmx lllex.cmx gmw.cmx gc.cmx
+main.cmx : util.cmx state.cmx options.cmx lllex.cmx gmw.cmx gc.cmx
 oli.cmo :
 oli.cmx :
 options.cmo :

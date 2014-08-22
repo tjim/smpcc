@@ -591,7 +591,7 @@ let branch_elimination f =
       let elim (nopt,instr) =
         match instr with
         | Switch _ ->
-            (* Ought to deal with switch better here but see gobe.ml instead *)
+            (* Ought to deal with switch better here but see gc.ml instead *)
             [(Some(V.attsrcStateO()), instr)]
         | Br((ty,op), None, _) ->
             [assign_instr (V.attsrcStateO()) ty ty op]
@@ -827,7 +827,7 @@ begin
       if options.circuitlib = Some "gmw" then
         Gmw.print_function_circuit m f
       else
-        Gobe.print_function_circuit m f;
+        Gc.print_function_circuit m f;
       if options.run then begin
         let prefix = match options.output with Some x -> x | None -> failwith "impossible" in
         if options.circuitlib = Some "gmw" then begin

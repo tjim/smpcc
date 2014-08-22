@@ -1,4 +1,4 @@
-(* go back end *)
+(* garbled circuit back end *)
 
 open Util
 open Printf
