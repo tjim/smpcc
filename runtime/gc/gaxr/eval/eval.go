@@ -13,7 +13,7 @@ import "math/rand"
 
 type ConcurrentId int64
 
-/* GaxState implements the EvalVM interface */
+/* GaxState implements the "gc/eval".VM interface */
 type GaxState struct {
 	io           gc.Evalio
 	concurrentId ConcurrentId
@@ -44,9 +44,9 @@ func IO(id int64) (gen.GaxState, GaxState) {
 	return gen.NewGaxState(&gio, gen.ConcurrentId(id)), GaxState{&eio, ConcurrentId(id), 0}
 }
 
-func IOs(n int) ([]basegen.GenVM, []baseeval.EvalVM) {
-	result1 := make([]basegen.GenVM, n)
-	result2 := make([]baseeval.EvalVM, n)
+func IOs(n int) ([]basegen.VM, []baseeval.VM) {
+	result1 := make([]basegen.VM, n)
+	result2 := make([]baseeval.VM, n)
 	for i := 0; i < n; i++ {
 		gio, eio := IO(int64(i))
 		result1[i] = gio

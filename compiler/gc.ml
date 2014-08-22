@@ -176,9 +176,6 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
   end);
   declared_vars
 
-let io_type is_gen =
-  if is_gen then "GenVM" else "EvalVM"
-
 let bit_type is_gen =
   if is_gen then "gc.Wire" else "gc.Key"
 
@@ -210,10 +207,9 @@ let bpr_go_block b blocks_fv is_gen bl =
     | Id(_,n) -> string_of_int n
     | Name(_,n) -> n in
   bprintf b "// <label>:%s\n" name;
-  bprintf b "func %s%d(io %s, ch chan []%s, block_num%a []%s) {\n"
+  bprintf b "func %s%d(io VM, ch chan []%s, block_num%a []%s) {\n"
     (gen_or_eval is_gen)
     (State.bl_num bl.bname)
-    (io_type is_gen)
     (bit_type is_gen)
     bpr_go_block_args bl
     (bit_type is_gen);
@@ -253,7 +249,7 @@ let bpr_main b f is_gen =
   let blocks = f.fblocks in
   let blocks_fv = List.fold_left VSet.union VSet.empty
       (List.map free_of_block blocks) in
-  bprintf b "func %s_main(ios []%s) {\n" (gen_or_eval is_gen) (io_type is_gen);
+  bprintf b "func %s_main(ios []VM) {\n" (gen_or_eval is_gen);
   bprintf b "\n";
   if is_gen then
     bprintf b "\tinitialize_ram(ios[0])\n\n";
@@ -409,7 +405,7 @@ let bpr_globals b m =
               Hashtbl.add string_constants loc s
         | _ -> ()) in
   List.iter pr_global m.cglobals;
-  bprintf b "func initialize_ram(io GenVM) {\n";
+  bprintf b "func initialize_ram(io VM) {\n";
   if !State.loc <> 0 then begin
     bprintf b "\tram := make([]byte, 0x%x)\n" !State.loc;
     Buffer.add_buffer b b1;
@@ -524,7 +520,7 @@ let print_function_circuit m f =
     bprintf b "var _main_done = make(chan bool, 1)\n";
     bprintf b "\n";
     bprintf b "func eval_comm(nu chan gc.Chanio) {\n";
-    bprintf b "\tios := make([]baseeval.EvalVM, %d)\n" (List.length f.fblocks + 1);
+    bprintf b "\tios := make([]baseeval.VM, %d)\n" (List.length f.fblocks + 1);
     bprintf b "\tfor i := range ios {\n";
     bprintf b "\t\tio := <-nu\n";
     bprintf b "\t\tios[i] = eval.NewState(gc.NewEvalX(&io), i)\n";
@@ -535,7 +531,7 @@ let print_function_circuit m f =
     bprintf b "\n";
     bprintf b "func gen_comm(nu chan gc.Chanio) {\n";
     bprintf b "\tdefer close(nu)\n";
-    bprintf b "\tios := make([]basegen.GenVM, %d)\n" (List.length f.fblocks + 1);
+    bprintf b "\tios := make([]basegen.VM, %d)\n" (List.length f.fblocks + 1);
     bprintf b "\tfor i := range ios {\n";
     bprintf b "\t\tio := fatchanio.NewGenio(nu)\n";
     bprintf b "\t\tios[i] = gen.NewState(io, i)\n";

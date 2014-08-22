@@ -7,7 +7,7 @@ import basegen "github.com/tjim/smpcc/runtime/gc/gen"
 import baseeval "github.com/tjim/smpcc/runtime/gc/eval"
 import "math/rand"
 
-/* YaoState implements the EvalVM interface */
+/* YaoState implements the "gc/eval".VM interface */
 type YaoState struct {
 	io gc.Evalio
 }
@@ -32,9 +32,9 @@ func IO(id int) (gen.YaoState, YaoState) {
 	return gen.NewState(&gio, id), YaoState{&eio}
 }
 
-func IOs(n int) ([]basegen.GenVM, []baseeval.EvalVM) {
-	result1 := make([]basegen.GenVM, n)
-	result2 := make([]baseeval.EvalVM, n)
+func IOs(n int) ([]basegen.VM, []baseeval.VM) {
+	result1 := make([]basegen.VM, n)
+	result2 := make([]baseeval.VM, n)
 	for i := 0; i < n; i++ {
 		gio, eio := IO(i)
 		result1[i] = gio

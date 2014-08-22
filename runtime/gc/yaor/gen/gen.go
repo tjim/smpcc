@@ -17,7 +17,7 @@ const (
 // type ConcurrentId [KEY_SIZE / 2]byte
 type ConcurrentId int64
 
-/* YaoRState implements the GenVM interface */
+/* YaoRState implements the "gc/gen".VM interface */
 type YaoRState struct {
 	io           gc.Genio
 	concurrentId ConcurrentId

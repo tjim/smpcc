@@ -13,7 +13,7 @@ import (
 // type ConcurrentId [KEY_SIZE / 2]byte
 type ConcurrentId int64
 
-/* GaxState implements the GenVM interface */
+/* GaxState implements the "gc/gen".VM interface */
 type GaxState struct {
 	io           gc.Genio
 	concurrentId ConcurrentId

@@ -14,7 +14,7 @@ var (
 	AESCount int = 0
 )
 
-/* YaoState implements the GenVM interface */
+/* YaoState implements the "gc/gen".VM interface */
 type YaoState struct {
 	io gc.Genio
 }

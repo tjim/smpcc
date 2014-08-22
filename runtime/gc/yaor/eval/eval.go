@@ -14,7 +14,7 @@ import "math/rand"
 
 type ConcurrentId int64
 
-/* YaoRState implements the EvalVM interface */
+/* YaoRState implements the "gc/eval".VM interface */
 type YaoRState struct {
 	io           gc.Evalio
 	concurrentId ConcurrentId
@@ -26,7 +26,7 @@ const (
 )
 
 var (
-	AESCount  uint     = 0
+	AESCount  uint   = 0
 	ALL_ZEROS gc.Key = make([]byte, KEY_SIZE)
 )
 
@@ -49,9 +49,9 @@ func IO(id int64) (gen.YaoRState, YaoRState) {
 	return gen.NewYaoRState(&gio, gen.ConcurrentId(id)), YaoRState{&eio, ConcurrentId(id), 0}
 }
 
-func IOs(n int) ([]basegen.GenVM, []baseeval.EvalVM) {
-	result1 := make([]basegen.GenVM, n)
-	result2 := make([]baseeval.EvalVM, n)
+func IOs(n int) ([]basegen.VM, []baseeval.VM) {
+	result1 := make([]basegen.VM, n)
+	result2 := make([]baseeval.VM, n)
 	for i := 0; i < n; i++ {
 		gio, eio := IO(int64(i))
 		result1[i] = gio

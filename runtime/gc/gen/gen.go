@@ -3,7 +3,7 @@ package gen
 import "fmt"
 import base "github.com/tjim/smpcc/runtime/gc"
 
-type GenVM interface {
+type VM interface {
 	And(a, b []base.Wire) []base.Wire
 	Or(a, b []base.Wire) []base.Wire
 	Xor(a, b []base.Wire) []base.Wire
@@ -16,7 +16,7 @@ type GenVM interface {
 	Random(bits int) []base.Wire
 }
 
-func Mul(io GenVM, a, b []base.Wire) []base.Wire {
+func Mul(io VM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("argument mismatch in Mul()")
 	}
@@ -36,7 +36,7 @@ func Mul(io GenVM, a, b []base.Wire) []base.Wire {
 	return result
 }
 
-func Add(io GenVM, a, b []base.Wire) []base.Wire {
+func Add(io VM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic(fmt.Sprintf("Wire mismatch in gen.Add(), %d vs %d", len(a), len(b)))
 	}
@@ -58,7 +58,7 @@ func Add(io GenVM, a, b []base.Wire) []base.Wire {
 	return result
 }
 
-func Sub(io GenVM, a, b []base.Wire) []base.Wire {
+func Sub(io VM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic(fmt.Sprintf("Wire mismatch in gen.Sub(), %d vs %d", len(a), len(b)))
 	}
@@ -81,7 +81,7 @@ func Sub(io GenVM, a, b []base.Wire) []base.Wire {
 }
 
 /* constant shift left; TODO: variable Shl */
-func Shl(io GenVM, a []base.Wire, b int) []base.Wire {
+func Shl(io VM, a []base.Wire, b int) []base.Wire {
 	if len(a) <= b {
 		panic("Shl() too far")
 	}
@@ -94,7 +94,7 @@ func Shl(io GenVM, a []base.Wire, b int) []base.Wire {
 }
 
 /* constant logical shift right; TODO: variable Lshr */
-func Lshr(io GenVM, a []base.Wire, b int) []base.Wire {
+func Lshr(io VM, a []base.Wire, b int) []base.Wire {
 	if len(a) <= b {
 		panic("Lshr() too far")
 	}
@@ -103,7 +103,7 @@ func Lshr(io GenVM, a []base.Wire, b int) []base.Wire {
 }
 
 /* constant arithmetic shift right; TODO: variable Ashr */
-func Ashr(io GenVM, a []base.Wire, b int) []base.Wire {
+func Ashr(io VM, a []base.Wire, b int) []base.Wire {
 	if len(a) <= b {
 		panic("Ashr() too far")
 	}
@@ -111,26 +111,26 @@ func Ashr(io GenVM, a []base.Wire, b int) []base.Wire {
 	return result[b:]
 }
 
-func And(io GenVM, a, b []base.Wire) []base.Wire {
+func And(io VM, a, b []base.Wire) []base.Wire {
 	return io.And(a, b)
 }
 
-func Or(io GenVM, a, b []base.Wire) []base.Wire {
+func Or(io VM, a, b []base.Wire) []base.Wire {
 	return io.Or(a, b)
 }
 
-func Xor(io GenVM, a, b []base.Wire) []base.Wire {
+func Xor(io VM, a, b []base.Wire) []base.Wire {
 	return io.Xor(a, b)
 }
 
-func Trunc(io GenVM, a []base.Wire, b int) []base.Wire {
+func Trunc(io VM, a []base.Wire, b int) []base.Wire {
 	if len(a) <= b {
 		panic("trunc must truncate operand")
 	}
 	return a[:b]
 }
 
-func Zext(io GenVM, a []base.Wire, b int) []base.Wire {
+func Zext(io VM, a []base.Wire, b int) []base.Wire {
 	if len(a) >= b {
 		panic("zext must extend operand")
 	}
@@ -140,7 +140,7 @@ func Zext(io GenVM, a []base.Wire, b int) []base.Wire {
 	return Sext(io, append(a, False(io)...), b)
 }
 
-func Sext(io GenVM, a []base.Wire, b int) []base.Wire {
+func Sext(io VM, a []base.Wire, b int) []base.Wire {
 	if len(a) >= b {
 		panic("sext must extend operand")
 	}
@@ -154,7 +154,7 @@ func Sext(io GenVM, a []base.Wire, b int) []base.Wire {
 	return append(a, newbits...)
 }
 
-func Icmp_eq(io GenVM, a, b []base.Wire) []base.Wire {
+func Icmp_eq(io VM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("Wire mismatch in gen.Icmp_eq()")
 	}
@@ -165,7 +165,7 @@ func Icmp_eq(io GenVM, a, b []base.Wire) []base.Wire {
 	return Not(io, []base.Wire{treeOr0(io, bitwise_inequality...)})
 }
 
-func Icmp_ugt(io GenVM, a, b []base.Wire) []base.Wire {
+func Icmp_ugt(io VM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("argument mismatch in gen.Icmp_ugt()")
 	}
@@ -178,14 +178,14 @@ func Icmp_ugt(io GenVM, a, b []base.Wire) []base.Wire {
 	return c
 }
 
-func Icmp_ult(io GenVM, a, b []base.Wire) []base.Wire {
+func Icmp_ult(io VM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("argument mismatch in Icmp_ult()")
 	}
 	return Icmp_ugt(io, b, a)
 }
 
-func Icmp_sgt(io GenVM, a, b []base.Wire) []base.Wire {
+func Icmp_sgt(io VM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("argument mismatch in Icmp_sgt()")
 	}
@@ -200,14 +200,14 @@ func Icmp_sgt(io GenVM, a, b []base.Wire) []base.Wire {
 			Icmp_ugt(io, a_rest, b_rest))) // a_rest > b_rest (unsigned)
 }
 
-func Icmp_slt(io GenVM, a, b []base.Wire) []base.Wire {
+func Icmp_slt(io VM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("argument mismatch in Icmp_slt()")
 	}
 	return Icmp_sgt(io, b, a)
 }
 
-func Icmp_uge(io GenVM, a, b []base.Wire) []base.Wire {
+func Icmp_uge(io VM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("argument mismatch in Icmp_uge()")
 	}
@@ -220,14 +220,14 @@ func Icmp_uge(io GenVM, a, b []base.Wire) []base.Wire {
 	return c
 }
 
-func Icmp_ule(io GenVM, a, b []base.Wire) []base.Wire {
+func Icmp_ule(io VM, a, b []base.Wire) []base.Wire {
 	if len(a) != len(b) {
 		panic("argument mismatch in Icmp_ule()")
 	}
 	return Icmp_uge(io, b, a)
 }
 
-func Select(io GenVM, s, a, b []base.Wire) []base.Wire {
+func Select(io VM, s, a, b []base.Wire) []base.Wire {
 	if len(s) != 1 {
 		panic("Wire mismatch in gen.Select()")
 	}
@@ -242,7 +242,7 @@ func Select(io GenVM, s, a, b []base.Wire) []base.Wire {
 	return result
 }
 
-func Mask(io GenVM, s, a []base.Wire) []base.Wire {
+func Mask(io VM, s, a []base.Wire) []base.Wire {
 	if len(s) != 1 {
 		panic("Mask: mask must be one bit")
 	}
@@ -257,7 +257,7 @@ func Mask(io GenVM, s, a []base.Wire) []base.Wire {
 	panic("unreachable")
 }
 
-func LoadDebug(io GenVM, mask, loc, eltsize []base.Wire) []base.Wire {
+func LoadDebug(io VM, mask, loc, eltsize []base.Wire) []base.Wire {
 	if len(mask) != 1 {
 		panic("LoadDebug")
 	}
@@ -268,7 +268,7 @@ func LoadDebug(io GenVM, mask, loc, eltsize []base.Wire) []base.Wire {
 	return Load(io, loc, eltsize)[:r_eltsize*8]
 }
 
-func StoreDebug(io GenVM, mask, loc, eltsize, val []base.Wire) {
+func StoreDebug(io VM, mask, loc, eltsize, val []base.Wire) {
 	if len(mask) != 1 {
 		panic("StoreDebug")
 	}
@@ -283,7 +283,7 @@ func Unsupported(x string) []base.Wire {
 }
 
 // NB Printf() reveals the active block as well as the values of its arguments
-func Printf(io GenVM, mask []base.Wire, f string, args ...[]base.Wire) {
+func Printf(io VM, mask []base.Wire, f string, args ...[]base.Wire) {
 	if len(mask) != 1 {
 		panic("Printf")
 	}
@@ -298,7 +298,7 @@ func Printf(io GenVM, mask []base.Wire, f string, args ...[]base.Wire) {
 }
 
 // NB Input32() reveals the active block
-func Input32(io GenVM, mask []base.Wire, party []base.Wire, next_arg func() uint64) []base.Wire {
+func Input32(io VM, mask []base.Wire, party []base.Wire, next_arg func() uint64) []base.Wire {
 	if len(mask) != 1 {
 		panic("Input32")
 	}
@@ -317,7 +317,7 @@ func Input32(io GenVM, mask []base.Wire, party []base.Wire, next_arg func() uint
 // Switch(io, s, dflt, c0, c1, ...) tests s.
 // If s == 0 it returns c0, if s == 1 it returns c1, etc.
 // If s is not the index of any c, it returns dflt.
-func Switch(io GenVM, s, dflt []base.Wire, cases ...[]base.Wire) []base.Wire {
+func Switch(io VM, s, dflt []base.Wire, cases ...[]base.Wire) []base.Wire {
 	if len(cases) == 0 {
 		return dflt
 	}
@@ -332,7 +332,7 @@ func Switch(io GenVM, s, dflt []base.Wire, cases ...[]base.Wire) []base.Wire {
 	return Select(io, []base.Wire{m}, x, dflt)
 }
 
-func TreeOr(io GenVM, x ...[]base.Wire) []base.Wire {
+func TreeOr(io VM, x ...[]base.Wire) []base.Wire {
 	switch len(x) {
 	case 0:
 		panic("TreeOr with no arguments")
@@ -347,12 +347,12 @@ func TreeOr(io GenVM, x ...[]base.Wire) []base.Wire {
 	panic("unreachable")
 }
 
-func Xor0(io GenVM, a, b base.Wire) base.Wire {
+func Xor0(io VM, a, b base.Wire) base.Wire {
 	result := Xor(io, []base.Wire{a}, []base.Wire{b})[0]
 	return result
 }
 
-func TreeXor0(io GenVM, x ...base.Wire) base.Wire {
+func TreeXor0(io VM, x ...base.Wire) base.Wire {
 	switch len(x) {
 	case 0:
 		panic("TreeXor0 with no arguments")
@@ -367,7 +367,7 @@ func TreeXor0(io GenVM, x ...base.Wire) base.Wire {
 	panic("unreachable")
 }
 
-func TreeXor(io GenVM, x ...[]base.Wire) []base.Wire {
+func TreeXor(io VM, x ...[]base.Wire) []base.Wire {
 	switch len(x) {
 	case 0:
 		panic("TreeXor with no arguments")
@@ -382,12 +382,12 @@ func TreeXor(io GenVM, x ...[]base.Wire) []base.Wire {
 	panic("unreachable")
 }
 
-func or0(io GenVM, a, b base.Wire) base.Wire {
+func or0(io VM, a, b base.Wire) base.Wire {
 	result := Or(io, []base.Wire{a}, []base.Wire{b})[0]
 	return result
 }
 
-func treeOr0(io GenVM, x ...base.Wire) base.Wire {
+func treeOr0(io VM, x ...base.Wire) base.Wire {
 	switch len(x) {
 	case 0:
 		panic("TreeOr with no arguments")
@@ -402,15 +402,15 @@ func treeOr0(io GenVM, x ...base.Wire) base.Wire {
 	panic("unreachable")
 }
 
-func True(io GenVM) []base.Wire {
+func True(io VM) []base.Wire {
 	return io.True()
 }
 
-func False(io GenVM) []base.Wire {
+func False(io VM) []base.Wire {
 	return io.False()
 }
 
-func Uint(io GenVM, a uint64, width int) []base.Wire {
+func Uint(io VM, a uint64, width int) []base.Wire {
 	if width > 64 {
 		panic("Uint: width > 64")
 	}
@@ -427,11 +427,11 @@ func Uint(io GenVM, a uint64, width int) []base.Wire {
 	return result
 }
 
-func Int(io GenVM, a int64, width int) []base.Wire {
+func Int(io VM, a int64, width int) []base.Wire {
 	return Uint(io, uint64(a), width)
 }
 
-func Not(io GenVM, a []base.Wire) []base.Wire {
+func Not(io VM, a []base.Wire) []base.Wire {
 	const1 := True(io)[0]
 	ones := make([]base.Wire, len(a))
 	for i := 0; i < len(ones); i++ {
@@ -441,16 +441,16 @@ func Not(io GenVM, a []base.Wire) []base.Wire {
 }
 
 /* Reveal to all parties */
-func Reveal(io GenVM, a []base.Wire) []bool {
+func Reveal(io VM, a []base.Wire) []bool {
 	RevealTo1(io, a)
 	return RevealTo0(io, a)
 }
 
-func RevealTo0(io GenVM, a []base.Wire) []bool {
+func RevealTo0(io VM, a []base.Wire) []bool {
 	return io.RevealTo0(a)
 }
 
-func RevealTo1(io GenVM, a []base.Wire) {
+func RevealTo1(io VM, a []base.Wire) {
 	io.RevealTo1(a)
 }
 
@@ -464,7 +464,7 @@ func bits2Uint32(bits []bool) uint32 {
 	return result
 }
 
-func RevealUint32(io GenVM, a []base.Wire) uint32 {
+func RevealUint32(io VM, a []base.Wire) uint32 {
 	if len(a) > 32 {
 		panic("RevealUint32: argument too large")
 	}
@@ -473,7 +473,7 @@ func RevealUint32(io GenVM, a []base.Wire) uint32 {
 }
 
 /* Use with Reveal0() on the eval side */
-func Reveal0Uint32(io GenVM, a []base.Wire) uint32 {
+func Reveal0Uint32(io VM, a []base.Wire) uint32 {
 	if len(a) > 32 {
 		panic("RevealUint32: argument too large")
 	}
@@ -481,7 +481,7 @@ func Reveal0Uint32(io GenVM, a []base.Wire) uint32 {
 	return bits2Uint32(bits)
 }
 
-func RevealInt32(io GenVM, a []base.Wire) int32 {
+func RevealInt32(io VM, a []base.Wire) int32 {
 	if len(a) > 32 {
 		panic("RevealInt32: argument too large")
 	}
@@ -498,7 +498,7 @@ func bits2Uint64(bits []bool) uint64 {
 	return result
 }
 
-func RevealUint64(io GenVM, a []base.Wire) uint64 {
+func RevealUint64(io VM, a []base.Wire) uint64 {
 	if len(a) > 64 {
 		panic("RevealUint64: argument too large")
 	}
@@ -507,7 +507,7 @@ func RevealUint64(io GenVM, a []base.Wire) uint64 {
 }
 
 /* Use with Reveal0() on the eval side */
-func Reveal0Uint64(io GenVM, a []base.Wire) uint64 {
+func Reveal0Uint64(io VM, a []base.Wire) uint64 {
 	if len(a) > 64 {
 		panic("Reveal0Uint64: argument too large")
 	}
@@ -515,15 +515,15 @@ func Reveal0Uint64(io GenVM, a []base.Wire) uint64 {
 	return bits2Uint64(bits)
 }
 
-func ShareTo0(io GenVM, bits int) []base.Wire {
+func ShareTo0(io VM, bits int) []base.Wire {
 	return io.ShareTo0(bits)
 }
 
-func ShareTo1(io GenVM, a uint64, bits int) []base.Wire {
+func ShareTo1(io VM, a uint64, bits int) []base.Wire {
 	return io.ShareTo1(a, bits)
 }
 
-func Random(io GenVM, bits int) []base.Wire {
+func Random(io VM, bits int) []base.Wire {
 	return io.Random(bits)
 }
 
@@ -535,7 +535,7 @@ func InitRam(contents []byte) {
 }
 
 /* Gen-side load */
-func Load(io GenVM, loc, eltsize []base.Wire) []base.Wire {
+func Load(io VM, loc, eltsize []base.Wire) []base.Wire {
 	fmt.Printf("Ram[0x")
 	address := int(Reveal0Uint64(io, loc))
 	fmt.Printf("%x]", address)
@@ -556,7 +556,7 @@ func Load(io GenVM, loc, eltsize []base.Wire) []base.Wire {
 }
 
 /* Gen-side store */
-func Store(io GenVM, loc, eltsize, val []base.Wire) {
+func Store(io VM, loc, eltsize, val []base.Wire) {
 	address := int(Reveal0Uint64(io, loc))
 	bytes := int(Reveal0Uint32(io, eltsize))
 	switch bytes {
