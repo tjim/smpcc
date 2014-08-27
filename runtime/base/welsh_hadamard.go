@@ -24,10 +24,11 @@ func inner_product(x, y []byte) (res byte) {
 }
 
 func WH(alpha []byte) []byte {
-	result := make([]byte, int(math.Pow(255, len(alpha))))
+	result := make([]byte, int(math.Pow(255, float64(len(alpha)))))
 	x := make([]byte, len(alpha))
-	for i := 0; x[len(x)-1] != 0xff; {
-		result
+	for i, j := 0, 0; x[len(x)-1] != 0xff; {
+		result[j] = inner_product(x, alpha)
+		j++
 		if x[i] == 0xff {
 			i++
 		} else {
@@ -39,6 +40,6 @@ func WH(alpha []byte) []byte {
 }
 
 func main() {
-	x := []byte{1, 3, 7}
-	fmt.Printf("%v\n", inner_product(x, x))
+	x := []byte{3}
+	fmt.Printf("%v\n", WH(x))
 }
