@@ -1,11 +1,11 @@
 package gc
 
 import (
-	//	"log"
-
-	"math/big"
-
+	"github.com/tjim/fatchan"
 	"github.com/tjim/smpcc/runtime/ot"
+	"log"
+	"math/big"
+	"net"
 )
 
 type Genio interface {
@@ -107,4 +107,42 @@ func NewChanio() (io *Chanio) {
 		},
 	}
 	return io
+}
+
+func NewGenio(nu chan Chanio) Genio {
+	io := NewChanio()
+	//	defer close(io.Tchan)
+	//	defer close(io.Kchan)
+	nu <- *io
+	return NewGenX(io)
+}
+
+func EvalServer(addr string, eval func(nu chan Chanio)) {
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("listen(%q): %s", addr, err)
+	}
+
+	conn, err := listener.Accept()
+	if err != nil {
+		log.Fatalf("accept(): %s", err)
+	}
+	xport := fatchan.New(conn, nil)
+	nu := make(chan Chanio)
+	xport.ToChan(nu)
+
+	eval(nu)
+}
+
+func GenClient(addr string, gen func(nu chan Chanio)) {
+	server, err := net.Dial("tcp", addr)
+	if err != nil {
+		log.Fatalf("dial(%q): %s", addr, err)
+	}
+
+	xport := fatchan.New(server, nil)
+	nu := make(chan Chanio)
+	xport.FromChan(nu)
+
+	gen(nu)
 }
