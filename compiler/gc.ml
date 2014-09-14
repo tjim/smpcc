@@ -490,7 +490,6 @@ let print_function_circuit m f =
     bprintf b "package main\n";
     bprintf b "\n";
     bprintf b "import \"github.com/tjim/smpcc/runtime/gc\"\n";
-    bprintf b "import \"github.com/tjim/smpcc/runtime/fatchanio\"\n";
     bprintf b "import \"github.com/tjim/smpcc/runtime/gc/%s/eval\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
     bprintf b "import \"github.com/tjim/smpcc/runtime/gc/%s/gen\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
     bprintf b "import baseeval \"github.com/tjim/smpcc/runtime/gc/eval\"\n";
@@ -533,7 +532,7 @@ let print_function_circuit m f =
     bprintf b "\tdefer close(nu)\n";
     bprintf b "\tios := make([]basegen.VM, %d)\n" (List.length f.fblocks + 1);
     bprintf b "\tfor i := range ios {\n";
-    bprintf b "\t\tio := fatchanio.NewGenio(nu)\n";
+    bprintf b "\t\tio := gc.NewGenio(nu)\n";
     bprintf b "\t\tios[i] = gen.NewState(io, i)\n";
     bprintf b "\t}\n";
     bprintf b "\tgo gen_main(ios)\n";
@@ -543,9 +542,9 @@ let print_function_circuit m f =
     bprintf b "func main() {\n";
     bprintf b "\tinit_args()\n";
     bprintf b "\tif id == 0 {\n";
-    bprintf b "\t\tfatchanio.GenClient(addr, gen_comm)\n";
+    bprintf b "\t\tgc.GenClient(addr, gen_comm)\n";
     bprintf b "\t} else {\n";
-    bprintf b "\t\tfatchanio.EvalServer(addr, eval_comm)\n";
+    bprintf b "\t\tgc.EvalServer(addr, eval_comm)\n";
     bprintf b "\t}\n";
     bprintf b "}\n";
   end;
