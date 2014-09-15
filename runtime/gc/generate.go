@@ -7,9 +7,9 @@
 package gc
 
 import (
-	"github.com/tjim/smpcc/runtime/base"
 	"crypto/rand"
 	"fmt"
+	"github.com/tjim/smpcc/runtime/base"
 	"io"
 )
 

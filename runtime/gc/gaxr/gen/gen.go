@@ -21,7 +21,7 @@ type GaxState struct {
 }
 
 var (
-	AESCount  uint     = 0
+	AESCount  uint   = 0
 	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
 
@@ -95,7 +95,7 @@ func init_key0() {
 	}
 	key0 = make([]byte, base.KEY_SIZE)
 	gc.GenKey(key0) // least significant bit is random...
-	key0[0] |= 1      // ...force it to 1
+	key0[0] |= 1    // ...force it to 1
 }
 
 func init_constants(io gc.Genio) {

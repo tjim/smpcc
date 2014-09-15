@@ -21,7 +21,7 @@ type GaxState struct {
 }
 
 var (
-	AESCount  uint     = 0
+	AESCount  uint   = 0
 	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
 

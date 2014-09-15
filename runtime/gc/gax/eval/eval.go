@@ -1,8 +1,8 @@
 package eval
 
 import (
-	"github.com/tjim/smpcc/runtime/gc"
 	"github.com/tjim/smpcc/runtime/base"
+	"github.com/tjim/smpcc/runtime/gc"
 )
 
 import "github.com/tjim/smpcc/runtime/gc/gax/gen"
