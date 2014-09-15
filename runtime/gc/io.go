@@ -117,7 +117,7 @@ func NewGenio(nu chan Chanio) Genio {
 	return NewGenX(io)
 }
 
-func EvalServer(addr string, eval func(nu chan Chanio)) {
+func Server(addr string, eval func(nu chan Chanio)) {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("listen(%q): %s", addr, err)
@@ -134,7 +134,7 @@ func EvalServer(addr string, eval func(nu chan Chanio)) {
 	eval(nu)
 }
 
-func GenClient(addr string, gen func(nu chan Chanio)) {
+func Client(addr string, gen func(nu chan Chanio)) {
 	server, err := net.Dial("tcp", addr)
 	if err != nil {
 		log.Fatalf("dial(%q): %s", addr, err)

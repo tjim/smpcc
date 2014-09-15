@@ -542,9 +542,9 @@ let print_function_circuit m f =
     bprintf b "func main() {\n";
     bprintf b "\tinit_args()\n";
     bprintf b "\tif id == 0 {\n";
-    bprintf b "\t\tgc.GenClient(addr, gen_comm)\n";
+    bprintf b "\t\tgc.Client(addr, gen_comm)\n";
     bprintf b "\t} else {\n";
-    bprintf b "\t\tgc.EvalServer(addr, eval_comm)\n";
+    bprintf b "\t\tgc.Server(addr, eval_comm)\n";
     bprintf b "\t}\n";
     bprintf b "}\n";
   end;
