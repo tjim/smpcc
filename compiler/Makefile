@@ -16,7 +16,7 @@ install: smpcc
 	mv $< $(BIN)/$<
 
 uninstall:
-	$(RM) $(BIN)/$<
+	$(RM) $(BIN)/smpcc
 
 %.cmi: %.mli
 	ocamlc -c $<
