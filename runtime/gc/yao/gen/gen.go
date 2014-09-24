@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"crypto/aes"
 	"fmt"
-	"math/rand"
-
 	"github.com/tjim/smpcc/runtime/gc"
+	basegen "github.com/tjim/smpcc/runtime/gc/gen"
 	"github.com/tjim/smpcc/runtime/ot"
+	"math/rand"
 )
 
 var (
@@ -16,10 +16,10 @@ var (
 
 /* YaoState implements the "gc/gen".VM interface */
 type YaoState struct {
-	io gc.Genio
+	io basegen.IO
 }
 
-func NewState(io gc.Genio, id int) YaoState {
+func NewState(io basegen.IO, id int) YaoState {
 	// id only to have the same type as other gc back ends (yaor, gax, gaxr)
 	return YaoState{io}
 }
@@ -76,7 +76,7 @@ func init_key0() {
 	key0[0] |= 1    // ...force it to 1
 }
 
-func init_constants(io gc.Genio) {
+func init_constants(io basegen.IO) {
 	if const0 == nil {
 		const0 = genWire()
 		const1 = genWire()

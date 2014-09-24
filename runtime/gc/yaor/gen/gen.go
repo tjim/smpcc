@@ -5,8 +5,8 @@ import (
 	"crypto/aes"
 	"fmt"
 	"math/rand"
-
 	"github.com/tjim/smpcc/runtime/gc"
+	basegen "github.com/tjim/smpcc/runtime/gc/gen"
 	"github.com/tjim/smpcc/runtime/ot"
 )
 
@@ -19,7 +19,7 @@ type ConcurrentId int64
 
 /* YaoRState implements the "gc/gen".VM interface */
 type YaoRState struct {
-	io           gc.Genio
+	io           basegen.IO
 	concurrentId ConcurrentId
 	gateId       uint16
 }
@@ -29,11 +29,11 @@ var (
 	ALL_ZEROS gc.Key = make([]byte, KEY_SIZE)
 )
 
-func NewState(io gc.Genio, id int) YaoRState {
+func NewState(io basegen.IO, id int) YaoRState {
 	return YaoRState{io, ConcurrentId(id), 0}
 }
 
-func NewYaoRState(io gc.Genio, id ConcurrentId) YaoRState {
+func NewYaoRState(io basegen.IO, id ConcurrentId) YaoRState {
 	return YaoRState{io, id, 0}
 }
 
@@ -91,7 +91,7 @@ func init_key0() {
 	key0[0] |= 1    // ...force it to 1
 }
 
-func init_constants(io gc.Genio) {
+func init_constants(io basegen.IO) {
 	if const0 == nil {
 		const0 = genWire()
 		const1 = genWire()

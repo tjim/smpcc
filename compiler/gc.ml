@@ -522,7 +522,7 @@ let print_function_circuit m f =
     bprintf b "\tios := make([]baseeval.VM, %d)\n" (List.length f.fblocks + 1);
     bprintf b "\tfor i := range ios {\n";
     bprintf b "\t\tio := <-nu\n";
-    bprintf b "\t\tios[i] = eval.NewState(gc.NewEvalX(&io), i)\n";
+    bprintf b "\t\tios[i] = eval.NewState(baseeval.NewIOX(&io), i)\n";
     bprintf b "\t}\n";
     bprintf b "\tgo eval_main(ios)\n";
     bprintf b "\t<- _main_done\n";
@@ -532,7 +532,7 @@ let print_function_circuit m f =
     bprintf b "\tdefer close(nu)\n";
     bprintf b "\tios := make([]basegen.VM, %d)\n" (List.length f.fblocks + 1);
     bprintf b "\tfor i := range ios {\n";
-    bprintf b "\t\tio := gc.NewGenio(nu)\n";
+    bprintf b "\t\tio := basegen.NewIO(nu)\n";
     bprintf b "\t\tios[i] = gen.NewState(io, i)\n";
     bprintf b "\t}\n";
     bprintf b "\tgo gen_main(ios)\n";
@@ -542,9 +542,9 @@ let print_function_circuit m f =
     bprintf b "func main() {\n";
     bprintf b "\tinit_args()\n";
     bprintf b "\tif id == 0 {\n";
-    bprintf b "\t\tgc.Client(addr, gen_comm)\n";
+    bprintf b "\t\tbasegen.Client(addr, gen_comm)\n";
     bprintf b "\t} else {\n";
-    bprintf b "\t\tgc.Server(addr, eval_comm)\n";
+    bprintf b "\t\tbaseeval.Server(addr, eval_comm)\n";
     bprintf b "\t}\n";
     bprintf b "}\n";
   end;

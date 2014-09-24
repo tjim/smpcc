@@ -3,11 +3,11 @@ package gen
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
-
 	"github.com/tjim/smpcc/runtime/base"
 	"github.com/tjim/smpcc/runtime/gc"
+	basegen "github.com/tjim/smpcc/runtime/gc/gen"
 	"github.com/tjim/smpcc/runtime/ot"
+	"math/rand"
 )
 
 // type ConcurrentId [KEY_SIZE / 2]byte
@@ -15,7 +15,7 @@ type ConcurrentId int64
 
 /* GaxState implements the "gc/gen".VM interface */
 type GaxState struct {
-	io           gc.Genio
+	io           basegen.IO
 	concurrentId ConcurrentId
 	gateId       uint16
 }
@@ -25,11 +25,11 @@ var (
 	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
 
-func NewState(io gc.Genio, id int) GaxState {
+func NewState(io basegen.IO, id int) GaxState {
 	return GaxState{io, ConcurrentId(id), 0}
 }
 
-func NewGaxState(io gc.Genio, id ConcurrentId) GaxState {
+func NewGaxState(io basegen.IO, id ConcurrentId) GaxState {
 	return GaxState{io, id, 0}
 }
 
@@ -98,7 +98,7 @@ func init_key0() {
 	key0[0] |= 1    // ...force it to 1
 }
 
-func init_constants(io gc.Genio) {
+func init_constants(io basegen.IO) {
 	if const0 == nil {
 		const0 = genWire()
 		const1 = genWire()

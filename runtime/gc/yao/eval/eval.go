@@ -9,23 +9,23 @@ import "math/rand"
 
 /* YaoState implements the "gc/eval".VM interface */
 type YaoState struct {
-	io gc.Evalio
+	io baseeval.IO
 }
 
-func NewState(io gc.Evalio, id int) YaoState {
+func NewState(io baseeval.IO, id int) YaoState {
 	// id only to have the same type as other gc back ends (yaor, gax, gaxr)
 	return YaoState{io}
 }
 
 func IO(id int) (gen.YaoState, YaoState) {
 	io := gc.NewChanio()
-	gchan := make(chan gc.GenX, 1)
-	echan := make(chan gc.EvalX, 1)
+	gchan := make(chan basegen.IOX, 1)
+	echan := make(chan baseeval.IOX, 1)
 	go func() {
-		echan <- *gc.NewEvalX(io)
+		echan <- *baseeval.NewIOX(io)
 	}()
 	go func() {
-		gchan <- *gc.NewGenX(io)
+		gchan <- *basegen.NewIOX(io)
 	}()
 	gio := <-gchan
 	eio := <-echan
@@ -46,7 +46,7 @@ func IOs(n int) ([]basegen.VM, []baseeval.VM) {
 var const0 gc.Key
 var const1 gc.Key
 
-func init_constants(io gc.Evalio) {
+func init_constants(io baseeval.IO) {
 	if const0 == nil {
 		const0 = io.RecvK()
 		const1 = io.RecvK()
@@ -58,7 +58,7 @@ func reset() {
 	const1 = nil
 }
 
-func bitwise_binary_operator(io gc.Evalio, a, b []gc.Key) []gc.Key {
+func bitwise_binary_operator(io baseeval.IO, a, b []gc.Key) []gc.Key {
 	if len(a) != len(b) {
 		panic("Wire mismatch in eval.bitwise_binary_operator()")
 	}
