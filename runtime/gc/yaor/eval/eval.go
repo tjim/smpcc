@@ -2,23 +2,24 @@ package eval
 
 import (
 	"crypto/aes"
-
 	"github.com/tjim/smpcc/runtime/gc"
+	baseeval "github.com/tjim/smpcc/runtime/gc/eval"
+	basegen "github.com/tjim/smpcc/runtime/gc/gen"
+	"github.com/tjim/smpcc/runtime/gc/yaor/gen"
+	"github.com/tjim/smpcc/runtime/ot"
+	"math/rand"
 )
-
-import "github.com/tjim/smpcc/runtime/gc/yaor/gen"
-import "github.com/tjim/smpcc/runtime/ot"
-import basegen "github.com/tjim/smpcc/runtime/gc/gen"
-import baseeval "github.com/tjim/smpcc/runtime/gc/eval"
-import "math/rand"
 
 type ConcurrentId int64
 
-/* YaoRState implements the "gc/eval".VM interface */
-type YaoRState struct {
+type vm struct {
 	io           baseeval.IO
 	concurrentId ConcurrentId
 	gateId       uint16
+}
+
+func NewVM(io baseeval.IO, id int) baseeval.VM {
+	return vm{io, ConcurrentId(id), 0}
 }
 
 const (
@@ -30,11 +31,7 @@ var (
 	ALL_ZEROS gc.Key = make([]byte, KEY_SIZE)
 )
 
-func NewState(io baseeval.IO, id int) YaoRState {
-	return YaoRState{io, ConcurrentId(id), 0}
-}
-
-func IO(id int64) (gen.YaoRState, YaoRState) {
+func IO(id int64) (basegen.VM, baseeval.VM) {
 	io := gc.NewChanio()
 	gchan := make(chan basegen.IOX, 1)
 	echan := make(chan baseeval.IOX, 1)
@@ -46,7 +43,7 @@ func IO(id int64) (gen.YaoRState, YaoRState) {
 	}()
 	gio := <-gchan
 	eio := <-echan
-	return gen.NewYaoRState(&gio, gen.ConcurrentId(id)), YaoRState{&eio, ConcurrentId(id), 0}
+	return gen.Newvm(&gio, gen.ConcurrentId(id)), vm{&eio, ConcurrentId(id), 0}
 }
 
 func IOs(n int) ([]basegen.VM, []baseeval.VM) {
@@ -114,7 +111,7 @@ func encrypt(keys []gc.Key, result []byte) []byte {
 	return result
 }
 
-func (gax YaoRState) Decrypt(t gc.GarbledTable, keys ...gc.Key) []byte {
+func (gax vm) Decrypt(t gc.GarbledTable, keys ...gc.Key) []byte {
 	if len(keys) != 2 {
 		// log.Println("Non-optimized decrypt slot")
 		return Decrypt_nonoptimized(t, keys)
@@ -123,7 +120,7 @@ func (gax YaoRState) Decrypt(t gc.GarbledTable, keys ...gc.Key) []byte {
 	return decrypt(keys, t[slot(keys)])
 }
 
-func (y YaoRState) bitwise_binary_operator(io baseeval.IO, a, b []gc.Key) []gc.Key {
+func (y vm) bitwise_binary_operator(io baseeval.IO, a, b []gc.Key) []gc.Key {
 	if len(a) != len(b) {
 		panic("Wire mismatch in eval.bitwise_binary_operator()")
 	}
@@ -141,15 +138,15 @@ func (y YaoRState) bitwise_binary_operator(io baseeval.IO, a, b []gc.Key) []gc.K
 	return result
 }
 
-func (y YaoRState) And(a, b []gc.Key) []gc.Key {
+func (y vm) And(a, b []gc.Key) []gc.Key {
 	return y.bitwise_binary_operator(y.io, a, b)
 }
 
-func (y YaoRState) Or(a, b []gc.Key) []gc.Key {
+func (y vm) Or(a, b []gc.Key) []gc.Key {
 	return y.bitwise_binary_operator(y.io, a, b)
 }
 
-func (y YaoRState) Xor(a, b []gc.Key) []gc.Key {
+func (y vm) Xor(a, b []gc.Key) []gc.Key {
 	if len(a) != len(b) {
 		panic("Xor(): mismatch")
 	}
@@ -160,25 +157,25 @@ func (y YaoRState) Xor(a, b []gc.Key) []gc.Key {
 	return result
 }
 
-func (y YaoRState) True() []gc.Key {
+func (y vm) True() []gc.Key {
 	init_constants(y.io)
 	return []gc.Key{const1}
 }
 
-func (y YaoRState) False() []gc.Key {
+func (y vm) False() []gc.Key {
 	init_constants(y.io)
 	return []gc.Key{const0}
 }
 
 /* Reveal to party 0 = gen */
-func (y YaoRState) RevealTo0(a []gc.Key) {
+func (y vm) RevealTo0(a []gc.Key) {
 	for i := 0; i < len(a); i++ {
 		y.io.SendK2(a[i])
 	}
 }
 
 /* Reveal to party 1 = eval */
-func (y YaoRState) RevealTo1(a []gc.Key) []bool {
+func (y vm) RevealTo1(a []gc.Key) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		t := y.io.RecvT()
@@ -194,7 +191,7 @@ func (y YaoRState) RevealTo1(a []gc.Key) []bool {
 	return result
 }
 
-func (y YaoRState) ShareTo0(v uint64, bits int) []gc.Key {
+func (y vm) ShareTo0(v uint64, bits int) []gc.Key {
 	a := make([]bool, bits)
 	for i := 0; i < len(a); i++ {
 		bit := (v >> uint(i)) % 2
@@ -216,7 +213,7 @@ func (y YaoRState) ShareTo0(v uint64, bits int) []gc.Key {
 }
 
 // Random generates random bits.
-func (y YaoRState) Random(bits int) []gc.Key {
+func (y vm) Random(bits int) []gc.Key {
 	if bits < 1 {
 		panic("Random: bits < 1")
 	}
@@ -232,7 +229,7 @@ func (y YaoRState) Random(bits int) []gc.Key {
 }
 
 /* Bit transfer: Generator knows the bits, evaluator gets keys */
-func (y YaoRState) ShareTo1(bits int) []gc.Key {
+func (y vm) ShareTo1(bits int) []gc.Key {
 	if bits > 64 {
 		panic("BT: bits > 64")
 	}

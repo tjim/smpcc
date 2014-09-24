@@ -1,23 +1,24 @@
 package eval
 
-import "github.com/tjim/smpcc/runtime/gc"
-import "github.com/tjim/smpcc/runtime/gc/yao/gen"
-import "github.com/tjim/smpcc/runtime/ot"
-import basegen "github.com/tjim/smpcc/runtime/gc/gen"
-import baseeval "github.com/tjim/smpcc/runtime/gc/eval"
-import "math/rand"
+import (
+	"github.com/tjim/smpcc/runtime/gc"
+	baseeval "github.com/tjim/smpcc/runtime/gc/eval"
+	basegen "github.com/tjim/smpcc/runtime/gc/gen"
+	"github.com/tjim/smpcc/runtime/gc/yao/gen"
+	"github.com/tjim/smpcc/runtime/ot"
+	"math/rand"
+)
 
-/* YaoState implements the "gc/eval".VM interface */
-type YaoState struct {
+type vm struct {
 	io baseeval.IO
 }
 
-func NewState(io baseeval.IO, id int) YaoState {
+func NewVM(io baseeval.IO, id int) baseeval.VM {
 	// id only to have the same type as other gc back ends (yaor, gax, gaxr)
-	return YaoState{io}
+	return vm{io}
 }
 
-func IO(id int) (gen.YaoState, YaoState) {
+func IO(id int) (basegen.VM, vm) {
 	io := gc.NewChanio()
 	gchan := make(chan basegen.IOX, 1)
 	echan := make(chan baseeval.IOX, 1)
@@ -29,7 +30,7 @@ func IO(id int) (gen.YaoState, YaoState) {
 	}()
 	gio := <-gchan
 	eio := <-echan
-	return gen.NewState(&gio, id), YaoState{&eio}
+	return gen.NewVM(&gio, id), vm{&eio}
 }
 
 func IOs(n int) ([]basegen.VM, []baseeval.VM) {
@@ -70,15 +71,15 @@ func bitwise_binary_operator(io baseeval.IO, a, b []gc.Key) []gc.Key {
 	return result
 }
 
-func (y YaoState) And(a, b []gc.Key) []gc.Key {
+func (y vm) And(a, b []gc.Key) []gc.Key {
 	return bitwise_binary_operator(y.io, a, b)
 }
 
-func (y YaoState) Or(a, b []gc.Key) []gc.Key {
+func (y vm) Or(a, b []gc.Key) []gc.Key {
 	return bitwise_binary_operator(y.io, a, b)
 }
 
-func (y YaoState) Xor(a, b []gc.Key) []gc.Key {
+func (y vm) Xor(a, b []gc.Key) []gc.Key {
 	if len(a) != len(b) {
 		panic("Xor(): mismatch")
 	}
@@ -89,25 +90,25 @@ func (y YaoState) Xor(a, b []gc.Key) []gc.Key {
 	return result
 }
 
-func (y YaoState) True() []gc.Key {
+func (y vm) True() []gc.Key {
 	init_constants(y.io)
 	return []gc.Key{const1}
 }
 
-func (y YaoState) False() []gc.Key {
+func (y vm) False() []gc.Key {
 	init_constants(y.io)
 	return []gc.Key{const0}
 }
 
 /* Reveal to party 0 = gen */
-func (y YaoState) RevealTo0(a []gc.Key) {
+func (y vm) RevealTo0(a []gc.Key) {
 	for i := 0; i < len(a); i++ {
 		y.io.SendK2(a[i])
 	}
 }
 
 /* Reveal to party 1 = eval */
-func (y YaoState) RevealTo1(a []gc.Key) []bool {
+func (y vm) RevealTo1(a []gc.Key) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		t := y.io.RecvT()
@@ -123,7 +124,7 @@ func (y YaoState) RevealTo1(a []gc.Key) []bool {
 	return result
 }
 
-func (y YaoState) ShareTo0(v uint64, bits int) []gc.Key {
+func (y vm) ShareTo0(v uint64, bits int) []gc.Key {
 	a := make([]bool, bits)
 	for i := 0; i < len(a); i++ {
 		bit := (v >> uint(i)) % 2
@@ -145,7 +146,7 @@ func (y YaoState) ShareTo0(v uint64, bits int) []gc.Key {
 }
 
 // Random generates random bits.
-func (y YaoState) Random(bits int) []gc.Key {
+func (y vm) Random(bits int) []gc.Key {
 	if bits < 1 {
 		panic("Random: bits < 1")
 	}
@@ -161,7 +162,7 @@ func (y YaoState) Random(bits int) []gc.Key {
 }
 
 /* Bit transfer: Generator knows the bits, evaluator gets keys */
-func (y YaoState) ShareTo1(bits int) []gc.Key {
+func (y vm) ShareTo1(bits int) []gc.Key {
 	if bits > 64 {
 		panic("BT: bits > 64")
 	}

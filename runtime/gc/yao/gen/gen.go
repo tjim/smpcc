@@ -14,14 +14,13 @@ var (
 	AESCount int = 0
 )
 
-/* YaoState implements the "gc/gen".VM interface */
-type YaoState struct {
+type vm struct {
 	io basegen.IO
 }
 
-func NewState(io basegen.IO, id int) YaoState {
+func NewVM(io basegen.IO, id int) basegen.VM {
 	// id only to have the same type as other gc back ends (yaor, gax, gaxr)
-	return YaoState{io}
+	return vm{io}
 }
 
 func slot(keys []gc.Key) int {
@@ -114,7 +113,7 @@ func genWires(size int) []gc.Wire {
 
 /* http://www.llvm.org/docs/LangRef.html */
 
-func (y YaoState) And(a, b []gc.Wire) []gc.Wire {
+func (y vm) And(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Wire mismatch in gen.And()")
 	}
@@ -132,7 +131,7 @@ func (y YaoState) And(a, b []gc.Wire) []gc.Wire {
 	return result
 }
 
-func (y YaoState) Or(a, b []gc.Wire) []gc.Wire {
+func (y vm) Or(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Wire mismatch in gen.Or()")
 	}
@@ -150,7 +149,7 @@ func (y YaoState) Or(a, b []gc.Wire) []gc.Wire {
 	return result
 }
 
-func (y YaoState) Xor(a, b []gc.Wire) []gc.Wire {
+func (y vm) Xor(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Xor(): mismatch")
 	}
@@ -163,18 +162,18 @@ func (y YaoState) Xor(a, b []gc.Wire) []gc.Wire {
 	return result
 }
 
-func (y YaoState) True() []gc.Wire {
+func (y vm) True() []gc.Wire {
 	init_constants(y.io)
 	return []gc.Wire{const1}
 }
 
-func (y YaoState) False() []gc.Wire {
+func (y vm) False() []gc.Wire {
 	init_constants(y.io)
 	return []gc.Wire{const0}
 }
 
 /* Reveal to party 0 = gen */
-func (y YaoState) RevealTo0(a []gc.Wire) []bool {
+func (y vm) RevealTo0(a []gc.Wire) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		bit := resolveKey(a[i], y.io.RecvK2())
@@ -188,7 +187,7 @@ func (y YaoState) RevealTo0(a []gc.Wire) []bool {
 }
 
 /* Reveal to party 1 = eval */
-func (y YaoState) RevealTo1(a []gc.Wire) {
+func (y vm) RevealTo1(a []gc.Wire) {
 	for i := 0; i < len(a); i++ {
 		t := make([]gc.Ciphertext, 2)
 		w := genWire()
@@ -200,7 +199,7 @@ func (y YaoState) RevealTo1(a []gc.Wire) {
 	}
 }
 
-func (y YaoState) ShareTo0(bits int) []gc.Wire {
+func (y vm) ShareTo0(bits int) []gc.Wire {
 	a := make([]gc.Wire, bits)
 	for i := 0; i < len(a); i++ {
 		w := genWire()
@@ -210,7 +209,7 @@ func (y YaoState) ShareTo0(bits int) []gc.Wire {
 	return a
 }
 
-func (y YaoState) ShareTo1(a uint64, bits int) []gc.Wire {
+func (y vm) ShareTo1(a uint64, bits int) []gc.Wire {
 	if bits > 64 {
 		panic("BT: bits > 64")
 	}
@@ -228,7 +227,7 @@ func (y YaoState) ShareTo1(a uint64, bits int) []gc.Wire {
 }
 
 // Random generates random bits.
-func (y YaoState) Random(bits int) []gc.Wire {
+func (y vm) Random(bits int) []gc.Wire {
 	if bits < 1 {
 		panic("Random: bits < 1")
 	}

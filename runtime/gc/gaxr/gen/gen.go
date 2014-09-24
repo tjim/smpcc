@@ -13,11 +13,14 @@ import (
 // type ConcurrentId [KEY_SIZE / 2]byte
 type ConcurrentId int64
 
-/* GaxState implements the "gc/gen".VM interface */
-type GaxState struct {
+type vm struct {
 	io           basegen.IO
 	concurrentId ConcurrentId
 	gateId       uint16
+}
+
+func NewVM(io basegen.IO, id int) basegen.VM {
+	return vm{io, ConcurrentId(id), 0}
 }
 
 var (
@@ -25,12 +28,8 @@ var (
 	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
 
-func NewState(io basegen.IO, id int) GaxState {
-	return GaxState{io, ConcurrentId(id), 0}
-}
-
-func NewGaxState(io basegen.IO, id ConcurrentId) GaxState {
-	return GaxState{io, id, 0}
+func Newvm(io basegen.IO, id ConcurrentId) vm {
+	return vm{io, id, 0}
 }
 
 func slot(keys []gc.Key) int {
@@ -63,7 +62,7 @@ func encrypt_slot_nonoptimized(t gc.GarbledTable, plaintext []byte, keys []gc.Ke
 	t[slot(keys)] = encrypt_nonoptimized(keys, plaintext)
 }
 
-func (gax GaxState) encrypt_slot(t gc.GarbledTable, plaintext []byte, keys ...gc.Key) {
+func (gax vm) encrypt_slot(t gc.GarbledTable, plaintext []byte, keys ...gc.Key) {
 	if len(keys) != 2 {
 		// log.Println("Non optimized encrypt_slot")
 		encrypt_slot_nonoptimized(t, plaintext, keys)
@@ -74,7 +73,7 @@ func (gax GaxState) encrypt_slot(t gc.GarbledTable, plaintext []byte, keys ...gc
 	t[slot(keys)] = encrypt(keys, plaintext, tweak)
 }
 
-func (gax *GaxState) computeTweak() gc.Key {
+func (gax *vm) computeTweak() gc.Key {
 	tweak := make([]byte, base.KEY_SIZE)
 	tweak[0] = byte(gax.gateId)
 	tweak[1] = byte(gax.gateId >> 8)
@@ -122,7 +121,7 @@ func genWire() gc.Wire {
 	return []gc.Key{k0, k1}
 }
 
-func (g *GaxState) genWireRR(inKey0, inKey1 gc.Key, gateVal byte) gc.Wire {
+func (g *vm) genWireRR(inKey0, inKey1 gc.Key, gateVal byte) gc.Wire {
 	init_key0()
 	var k0, k1 gc.Key
 	if gateVal == 0 {
@@ -153,7 +152,7 @@ func genWires(size int) []gc.Wire {
 
 // Gates built directly using encrypt_slot
 
-func (y GaxState) And(a, b []gc.Wire) []gc.Wire {
+func (y vm) And(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Wire mismatch in gen.And()")
 	}
@@ -184,7 +183,7 @@ func (y GaxState) And(a, b []gc.Wire) []gc.Wire {
 	return result
 }
 
-func (y GaxState) Or(a, b []gc.Wire) []gc.Wire {
+func (y vm) Or(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Wire mismatch in gen.And()")
 	}
@@ -215,7 +214,7 @@ func (y GaxState) Or(a, b []gc.Wire) []gc.Wire {
 	return result
 }
 
-func (y GaxState) Xor(a, b []gc.Wire) []gc.Wire {
+func (y vm) Xor(a, b []gc.Wire) []gc.Wire {
 	if len(a) != len(b) {
 		panic("Xor(): mismatch")
 	}
@@ -228,12 +227,12 @@ func (y GaxState) Xor(a, b []gc.Wire) []gc.Wire {
 	return result
 }
 
-func (y GaxState) True() []gc.Wire {
+func (y vm) True() []gc.Wire {
 	init_constants(y.io)
 	return []gc.Wire{const1}
 }
 
-func (y GaxState) False() []gc.Wire {
+func (y vm) False() []gc.Wire {
 	init_constants(y.io)
 	return []gc.Wire{const0}
 }
@@ -241,7 +240,7 @@ func (y GaxState) False() []gc.Wire {
 // Other gates and helper functions
 
 /* Reveal to party 0 = gen */
-func (y GaxState) RevealTo0(a []gc.Wire) []bool {
+func (y vm) RevealTo0(a []gc.Wire) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		bit := resolveKey(a[i], y.io.RecvK2())
@@ -255,7 +254,7 @@ func (y GaxState) RevealTo0(a []gc.Wire) []bool {
 }
 
 /* Reveal to party 1 = eval */
-func (y GaxState) RevealTo1(a []gc.Wire) {
+func (y vm) RevealTo1(a []gc.Wire) {
 	for i := 0; i < len(a); i++ {
 		t := make([]gc.Ciphertext, 2)
 		w := genWire()
@@ -267,7 +266,7 @@ func (y GaxState) RevealTo1(a []gc.Wire) {
 	}
 }
 
-func (y GaxState) ShareTo0(bits int) []gc.Wire {
+func (y vm) ShareTo0(bits int) []gc.Wire {
 	a := make([]gc.Wire, bits)
 	for i := 0; i < len(a); i++ {
 		w := genWire()
@@ -277,7 +276,7 @@ func (y GaxState) ShareTo0(bits int) []gc.Wire {
 	return a
 }
 
-func (y GaxState) ShareTo1(a uint64, bits int) []gc.Wire {
+func (y vm) ShareTo1(a uint64, bits int) []gc.Wire {
 	if bits > 64 {
 		panic("BT: bits > 64")
 	}
@@ -295,7 +294,7 @@ func (y GaxState) ShareTo1(a uint64, bits int) []gc.Wire {
 }
 
 // Random generates random bits.
-func (y GaxState) Random(bits int) []gc.Wire {
+func (y vm) Random(bits int) []gc.Wire {
 	if bits < 1 {
 		panic("Random: bits < 1")
 	}

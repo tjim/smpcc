@@ -3,21 +3,23 @@ package eval
 import (
 	"github.com/tjim/smpcc/runtime/base"
 	"github.com/tjim/smpcc/runtime/gc"
+	baseeval "github.com/tjim/smpcc/runtime/gc/eval"
+	"github.com/tjim/smpcc/runtime/gc/gaxr/gen"
+	basegen "github.com/tjim/smpcc/runtime/gc/gen"
+	"github.com/tjim/smpcc/runtime/ot"
+	"math/rand"
 )
-
-import "github.com/tjim/smpcc/runtime/gc/gaxr/gen"
-import "github.com/tjim/smpcc/runtime/ot"
-import basegen "github.com/tjim/smpcc/runtime/gc/gen"
-import baseeval "github.com/tjim/smpcc/runtime/gc/eval"
-import "math/rand"
 
 type ConcurrentId int64
 
-/* GaxState implements the "gc/eval".VM interface */
-type GaxState struct {
+type vm struct {
 	io           baseeval.IO
 	concurrentId ConcurrentId
 	gateId       uint16
+}
+
+func NewVM(io baseeval.IO, id int) baseeval.VM {
+	return vm{io, ConcurrentId(id), 0}
 }
 
 var (
@@ -25,11 +27,7 @@ var (
 	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
 
-func NewState(io baseeval.IO, id int) GaxState {
-	return GaxState{io, ConcurrentId(id), 0}
-}
-
-func IO(id int64) (gen.GaxState, GaxState) {
+func IO(id int64) (basegen.VM, baseeval.VM) {
 	io := gc.NewChanio()
 	gchan := make(chan basegen.IOX, 1)
 	echan := make(chan baseeval.IOX, 1)
@@ -41,7 +39,7 @@ func IO(id int64) (gen.GaxState, GaxState) {
 	}()
 	gio := <-gchan
 	eio := <-echan
-	return gen.NewGaxState(&gio, gen.ConcurrentId(id)), GaxState{&eio, ConcurrentId(id), 0}
+	return gen.Newvm(&gio, gen.ConcurrentId(id)), vm{&eio, ConcurrentId(id), 0}
 }
 
 func IOs(n int) ([]basegen.VM, []baseeval.VM) {
@@ -100,7 +98,7 @@ func decrypt(keys []gc.Key, ciphertext, tweak []byte) (result gc.Key) {
 	return gc.GaXDKC_D(keys[0], keys[1], tweak, ciphertext)
 }
 
-func (gax GaxState) Decrypt(t gc.GarbledTable, keys ...gc.Key) []byte {
+func (gax vm) Decrypt(t gc.GarbledTable, keys ...gc.Key) []byte {
 	if len(keys) != 2 {
 		// log.Println("Non-optimized decrypt slot")
 		return Decrypt_nonoptimized(t, keys)
@@ -117,7 +115,7 @@ func (gax GaxState) Decrypt(t gc.GarbledTable, keys ...gc.Key) []byte {
 	return decrypt(keys, t[slot(keys)], tweak)
 }
 
-func (gax *GaxState) computeTweak() gc.Key {
+func (gax *vm) computeTweak() gc.Key {
 	tweak := make([]byte, base.KEY_SIZE)
 	tweak[0] = byte(gax.gateId)
 	tweak[1] = byte(gax.gateId >> 8)
@@ -128,7 +126,7 @@ func (gax *GaxState) computeTweak() gc.Key {
 	return tweak
 }
 
-func (y GaxState) bitwise_binary_operator(io baseeval.IO, a, b []gc.Key) []gc.Key {
+func (y vm) bitwise_binary_operator(io baseeval.IO, a, b []gc.Key) []gc.Key {
 	if len(a) != len(b) {
 		panic("Wire mismatch in eval.bitwise_binary_operator()")
 	}
@@ -147,15 +145,15 @@ func (y GaxState) bitwise_binary_operator(io baseeval.IO, a, b []gc.Key) []gc.Ke
 	return result
 }
 
-func (y GaxState) And(a, b []gc.Key) []gc.Key {
+func (y vm) And(a, b []gc.Key) []gc.Key {
 	return y.bitwise_binary_operator(y.io, a, b)
 }
 
-func (y GaxState) Or(a, b []gc.Key) []gc.Key {
+func (y vm) Or(a, b []gc.Key) []gc.Key {
 	return y.bitwise_binary_operator(y.io, a, b)
 }
 
-func (y GaxState) Xor(a, b []gc.Key) []gc.Key {
+func (y vm) Xor(a, b []gc.Key) []gc.Key {
 	if len(a) != len(b) {
 		panic("Xor(): mismatch")
 	}
@@ -166,25 +164,25 @@ func (y GaxState) Xor(a, b []gc.Key) []gc.Key {
 	return result
 }
 
-func (y GaxState) True() []gc.Key {
+func (y vm) True() []gc.Key {
 	init_constants(y.io)
 	return []gc.Key{const1}
 }
 
-func (y GaxState) False() []gc.Key {
+func (y vm) False() []gc.Key {
 	init_constants(y.io)
 	return []gc.Key{const0}
 }
 
 /* Reveal to party 0 = gen */
-func (y GaxState) RevealTo0(a []gc.Key) {
+func (y vm) RevealTo0(a []gc.Key) {
 	for i := 0; i < len(a); i++ {
 		y.io.SendK2(a[i])
 	}
 }
 
 /* Reveal to party 1 = eval */
-func (y GaxState) RevealTo1(a []gc.Key) []bool {
+func (y vm) RevealTo1(a []gc.Key) []bool {
 	result := make([]bool, len(a))
 	for i := 0; i < len(a); i++ {
 		t := y.io.RecvT()
@@ -200,7 +198,7 @@ func (y GaxState) RevealTo1(a []gc.Key) []bool {
 	return result
 }
 
-func (y GaxState) ShareTo0(v uint64, bits int) []gc.Key {
+func (y vm) ShareTo0(v uint64, bits int) []gc.Key {
 	a := make([]bool, bits)
 	for i := 0; i < len(a); i++ {
 		bit := (v >> uint(i)) % 2
@@ -222,7 +220,7 @@ func (y GaxState) ShareTo0(v uint64, bits int) []gc.Key {
 }
 
 // Random generates random bits.
-func (y GaxState) Random(bits int) []gc.Key {
+func (y vm) Random(bits int) []gc.Key {
 	if bits < 1 {
 		panic("Random: bits < 1")
 	}
@@ -238,7 +236,7 @@ func (y GaxState) Random(bits int) []gc.Key {
 }
 
 /* Bit transfer: Generator knows the bits, evaluator gets keys */
-func (y GaxState) ShareTo1(bits int) []gc.Key {
+func (y vm) ShareTo1(bits int) []gc.Key {
 	if bits > 64 {
 		panic("BT: bits > 64")
 	}
