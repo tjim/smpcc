@@ -3,7 +3,6 @@ package eval
 import (
 	"github.com/tjim/smpcc/runtime/gc"
 	baseeval "github.com/tjim/smpcc/runtime/gc/eval"
-	basegen "github.com/tjim/smpcc/runtime/gc/gen"
 	"github.com/tjim/smpcc/runtime/gc/yao/gen"
 	"github.com/tjim/smpcc/runtime/ot"
 	"math/rand"
@@ -13,35 +12,9 @@ type vm struct {
 	io baseeval.IO
 }
 
-func NewVM(io baseeval.IO, id int) baseeval.VM {
+func NewVM(io baseeval.IO, id gc.ConcurrentId) baseeval.VM {
 	// id only to have the same type as other gc back ends (yaor, gax, gaxr)
 	return vm{io}
-}
-
-func IO(id int) (basegen.VM, vm) {
-	io := gc.NewChanio()
-	gchan := make(chan basegen.IOX, 1)
-	echan := make(chan baseeval.IOX, 1)
-	go func() {
-		echan <- *baseeval.NewIOX(io)
-	}()
-	go func() {
-		gchan <- *basegen.NewIOX(io)
-	}()
-	gio := <-gchan
-	eio := <-echan
-	return gen.NewVM(&gio, id), vm{&eio}
-}
-
-func IOs(n int) ([]basegen.VM, []baseeval.VM) {
-	result1 := make([]basegen.VM, n)
-	result2 := make([]baseeval.VM, n)
-	for i := 0; i < n; i++ {
-		gio, eio := IO(i)
-		result1[i] = gio
-		result2[i] = eio
-	}
-	return result1, result2
 }
 
 var const0 gc.Key

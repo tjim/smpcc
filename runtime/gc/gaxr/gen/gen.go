@@ -10,27 +10,20 @@ import (
 	"math/rand"
 )
 
-// type ConcurrentId [KEY_SIZE / 2]byte
-type ConcurrentId int64
-
 type vm struct {
 	io           basegen.IO
-	concurrentId ConcurrentId
+	concurrentId gc.ConcurrentId
 	gateId       uint16
 }
 
-func NewVM(io basegen.IO, id int) basegen.VM {
-	return vm{io, ConcurrentId(id), 0}
+func NewVM(io basegen.IO, id gc.ConcurrentId) basegen.VM {
+	return vm{io, id, 0}
 }
 
 var (
 	AESCount  uint   = 0
 	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
-
-func Newvm(io basegen.IO, id ConcurrentId) vm {
-	return vm{io, id, 0}
-}
 
 func slot(keys []gc.Key) int {
 	result := 0

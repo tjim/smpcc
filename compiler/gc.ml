@@ -445,7 +445,7 @@ let print_function_circuit m f =
   if options.sim then begin
     bprintf b "package main\n";
     bprintf b "\n";
-    bprintf b "import \"%sgc/%s/eval\"\n" package_prefix (match options.circuitlib with None -> "yao" | Some x -> x);
+    bprintf b "import \"%sgc/%s/sim\"\n" package_prefix (match options.circuitlib with None -> "yao" | Some x -> x);
     bprintf b "import \"fmt\"\n";
     bprintf b "import \"os\"\n";
     bprintf b "import \"runtime/pprof\"\n";
@@ -478,7 +478,7 @@ let print_function_circuit m f =
     bprintf b "\n";
     bprintf b "func main() {\n";
     bprintf b "\tinit_args()\n";
-    bprintf b "\tgvms, evms := eval.IOs(%d)\n" (List.length f.fblocks + 1);
+    bprintf b "\tgvms, evms := sim.VMs(%d)\n" (List.length f.fblocks + 1);
     bprintf b "\tgo gen_main(gvms)\n";
     bprintf b "\tgo eval_main(evms)\n";
     bprintf b "\t<-%s_done\n" (govar f.fname);
@@ -522,7 +522,7 @@ let print_function_circuit m f =
     bprintf b "\tvms := make([]baseeval.VM, %d)\n" (List.length f.fblocks + 1);
     bprintf b "\tfor i := range vms {\n";
     bprintf b "\t\tio := <-nu\n";
-    bprintf b "\t\tvms[i] = eval.NewVM(baseeval.NewIOX(&io), i)\n";
+    bprintf b "\t\tvms[i] = eval.NewVM(baseeval.NewIOX(&io), gc.ConcurrentId(i))\n";
     bprintf b "\t}\n";
     bprintf b "\tgo eval_main(vms)\n";
     bprintf b "\t<- _main_done\n";
@@ -533,7 +533,7 @@ let print_function_circuit m f =
     bprintf b "\tvms := make([]basegen.VM, %d)\n" (List.length f.fblocks + 1);
     bprintf b "\tfor i := range vms {\n";
     bprintf b "\t\tio := basegen.NewIO(nu)\n";
-    bprintf b "\t\tvms[i] = gen.NewVM(io, i)\n";
+    bprintf b "\t\tvms[i] = gen.NewVM(io, gc.ConcurrentId(i))\n";
     bprintf b "\t}\n";
     bprintf b "\tgo gen_main(vms)\n";
     bprintf b "\t<- _main_done\n";

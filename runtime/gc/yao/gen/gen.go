@@ -18,7 +18,7 @@ type vm struct {
 	io basegen.IO
 }
 
-func NewVM(io basegen.IO, id int) basegen.VM {
+func NewVM(io basegen.IO, id gc.ConcurrentId) basegen.VM {
 	// id only to have the same type as other gc back ends (yaor, gax, gaxr)
 	return vm{io}
 }

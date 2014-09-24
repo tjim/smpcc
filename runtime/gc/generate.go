@@ -13,6 +13,7 @@ import (
 	"io"
 )
 
+type ConcurrentId int64
 type Ciphertext []byte
 type Key []byte
 type GarbledTable []Ciphertext

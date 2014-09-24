@@ -4,54 +4,24 @@ import (
 	"github.com/tjim/smpcc/runtime/base"
 	"github.com/tjim/smpcc/runtime/gc"
 	baseeval "github.com/tjim/smpcc/runtime/gc/eval"
-	"github.com/tjim/smpcc/runtime/gc/gaxr/gen"
-	basegen "github.com/tjim/smpcc/runtime/gc/gen"
 	"github.com/tjim/smpcc/runtime/ot"
 	"math/rand"
 )
 
-type ConcurrentId int64
-
 type vm struct {
 	io           baseeval.IO
-	concurrentId ConcurrentId
+	concurrentId gc.ConcurrentId
 	gateId       uint16
 }
 
-func NewVM(io baseeval.IO, id int) baseeval.VM {
-	return vm{io, ConcurrentId(id), 0}
+func NewVM(io baseeval.IO, id gc.ConcurrentId) baseeval.VM {
+	return vm{io, id, 0}
 }
 
 var (
 	AESCount  uint   = 0
 	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
-
-func IO(id int64) (basegen.VM, baseeval.VM) {
-	io := gc.NewChanio()
-	gchan := make(chan basegen.IOX, 1)
-	echan := make(chan baseeval.IOX, 1)
-	go func() {
-		echan <- *baseeval.NewIOX(io)
-	}()
-	go func() {
-		gchan <- *basegen.NewIOX(io)
-	}()
-	gio := <-gchan
-	eio := <-echan
-	return gen.Newvm(&gio, gen.ConcurrentId(id)), vm{&eio, ConcurrentId(id), 0}
-}
-
-func IOs(n int) ([]basegen.VM, []baseeval.VM) {
-	result1 := make([]basegen.VM, n)
-	result2 := make([]baseeval.VM, n)
-	for i := 0; i < n; i++ {
-		gio, eio := IO(int64(i))
-		result1[i] = gio
-		result2[i] = eio
-	}
-	return result1, result2
-}
 
 var const0 gc.Key
 var const1 gc.Key
