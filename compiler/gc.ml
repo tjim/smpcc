@@ -342,7 +342,6 @@ let bpr_main b f is_gen =
   bprintf b "\t}\n";
   bprintf b "\tanswer := RevealInt32(vms[0], _attsrcAnswer)\n";
   bprintf b "\tfmt.Printf(\"%s: %%v\\n\", answer)\n" (gen_or_eval is_gen);
-  bprintf b "\t%s_done <- true\n" (govar f.fname);
   bprintf b "}\n";
   bprintf b "\n"
 
@@ -474,15 +473,12 @@ let print_function_circuit m f =
     bprintf b "\treturn uint64(arg)\n";
     bprintf b "}\n";
     bprintf b "\n";
-    bprintf b "var %s_done = make(chan bool, 1)\n" (govar f.fname);
     bprintf b "\n";
     bprintf b "func main() {\n";
     bprintf b "\tinit_args()\n";
     bprintf b "\tgvms, evms := sim.VMs(%d)\n" (List.length f.fblocks + 1);
     bprintf b "\tgo gen_main(gvms)\n";
-    bprintf b "\tgo eval_main(evms)\n";
-    bprintf b "\t<-%s_done\n" (govar f.fname);
-    bprintf b "\t<-%s_done\n" (govar f.fname);
+    bprintf b "\teval_main(evms)\n";
     bprintf b "\n";
     bprintf b "\tfmt.Println(\"Done\")\n";
     bprintf b "}\n";
@@ -516,7 +512,6 @@ let print_function_circuit m f =
     bprintf b "\treturn uint64(arg)\n";
     bprintf b "}\n";
     bprintf b "\n";
-    bprintf b "var _main_done = make(chan bool, 1)\n";
     bprintf b "\n";
     bprintf b "func eval_comm(nu chan gc.Chanio) {\n";
     bprintf b "\tvms := make([]baseeval.VM, %d)\n" (List.length f.fblocks + 1);
@@ -524,8 +519,7 @@ let print_function_circuit m f =
     bprintf b "\t\tio := <-nu\n";
     bprintf b "\t\tvms[i] = eval.NewVM(baseeval.NewIOX(&io), gc.ConcurrentId(i))\n";
     bprintf b "\t}\n";
-    bprintf b "\tgo eval_main(vms)\n";
-    bprintf b "\t<- _main_done\n";
+    bprintf b "\teval_main(vms)\n";
     bprintf b "}\n";
     bprintf b "\n";
     bprintf b "func gen_comm(nu chan gc.Chanio) {\n";
@@ -535,8 +529,7 @@ let print_function_circuit m f =
     bprintf b "\t\tio := basegen.NewIO(nu)\n";
     bprintf b "\t\tvms[i] = gen.NewVM(io, gc.ConcurrentId(i))\n";
     bprintf b "\t}\n";
-    bprintf b "\tgo gen_main(vms)\n";
-    bprintf b "\t<- _main_done\n";
+    bprintf b "\tgen_main(vms)\n";
     bprintf b "}\n";
     bprintf b "\n";
     bprintf b "func main() {\n";
