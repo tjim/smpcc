@@ -2,8 +2,8 @@ package eval
 
 import (
 	"github.com/tjim/fatchan"
-	"github.com/tjim/smpcc/runtime/ot"
 	. "github.com/tjim/smpcc/runtime/gc"
+	"github.com/tjim/smpcc/runtime/ot"
 	"log"
 	"net"
 )
@@ -47,7 +47,7 @@ func (io *IOX) Receive(s ot.Selector) ot.Message {
 	return io.otRecvr.Receive(s)
 }
 
-func Server(addr string, eval func(nu chan Chanio)) {
+func Server(addr string, main func([]VM), numBlocks int, newVM func(io IO, id ConcurrentId) VM) {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("listen(%q): %s", addr, err)
@@ -61,5 +61,10 @@ func Server(addr string, eval func(nu chan Chanio)) {
 	nu := make(chan Chanio)
 	xport.ToChan(nu)
 
-	eval(nu)
+	vms := make([]VM, numBlocks)
+	for i := range vms {
+		io := <-nu
+		vms[i] = newVM(NewIOX(&io), ConcurrentId(i))
+	}
+	main(vms)
 }

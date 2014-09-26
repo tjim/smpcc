@@ -54,7 +54,7 @@ func NewIO(nu chan Chanio) IO {
 	return NewIOX(io)
 }
 
-func Client(addr string, gen func(nu chan Chanio)) {
+func Client(addr string, main func([]VM), numBlocks int, newVM func(io IO, id ConcurrentId) VM) {
 	server, err := net.Dial("tcp", addr)
 	if err != nil {
 		log.Fatalf("dial(%q): %s", addr, err)
@@ -64,5 +64,11 @@ func Client(addr string, gen func(nu chan Chanio)) {
 	nu := make(chan Chanio)
 	xport.FromChan(nu)
 
-	gen(nu)
+	defer close(nu)
+	vms := make([]VM, 14)
+	for i := range vms {
+		io := NewIO(nu)
+		vms[i] = newVM(io, ConcurrentId(i))
+	}
+	main(vms)
 }

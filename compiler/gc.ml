@@ -206,7 +206,7 @@ let bpr_go_block b blocks_fv is_gen bl =
     match bl.bname with
     | Id(_,n) -> string_of_int n
     | Name(_,n) -> n in
-  bprintf b "// <label>:%s\n" name;
+  bprintf b "\n// <label>:%s\n" name;
   bprintf b "func %s%d(vm VM, ch chan []%s, block_num%a []%s) {\n"
     (gen_or_eval is_gen)
     (State.bl_num bl.bname)
@@ -243,7 +243,7 @@ let bpr_go_block b blocks_fv is_gen bl =
         bprintf b "\tch <- Mask(vm, mask, %a)\n" bpr_go_value (State.typ_of_var var, value))
       outputs
   end;
-  bprintf b "}\n\n"
+  bprintf b "}\n"
 
 let bpr_main b f is_gen =
   let blocks = f.fblocks in
@@ -295,10 +295,10 @@ let bpr_main b f is_gen =
     (fun bl ->
       let outputs = outputs_of_block blocks_fv bl in
       if not(VSet.is_empty (VSet.diff outputs State.V.special)) then
-        bprintf b "\t\tmask_%d := <- ch%d\n" (State.bl_num bl.bname) (State.bl_num bl.bname);
+        bprintf b "\t\tmask_%d := <-ch%d\n" (State.bl_num bl.bname) (State.bl_num bl.bname);
       VSet.iter
         (fun var ->
-          bprintf b "\t\t%s_%d := <- ch%d\n"
+          bprintf b "\t\t%s_%d := <-ch%d\n"
             (govar var)
             (State.bl_num bl.bname)
             (State.bl_num bl.bname))
@@ -342,8 +342,7 @@ let bpr_main b f is_gen =
   bprintf b "\t}\n";
   bprintf b "\tanswer := RevealInt32(vms[0], _attsrcAnswer)\n";
   bprintf b "\tfmt.Printf(\"%s: %%v\\n\", answer)\n" (gen_or_eval is_gen);
-  bprintf b "}\n";
-  bprintf b "\n"
+  bprintf b "}\n"
 
 let rec bytes_of_value b bytes = function
   | typ, Int x ->
@@ -485,7 +484,6 @@ let print_function_circuit m f =
   end else begin
     bprintf b "package main\n";
     bprintf b "\n";
-    bprintf b "import \"github.com/tjim/smpcc/runtime/gc\"\n";
     bprintf b "import \"github.com/tjim/smpcc/runtime/gc/%s/eval\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
     bprintf b "import \"github.com/tjim/smpcc/runtime/gc/%s/gen\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
     bprintf b "import baseeval \"github.com/tjim/smpcc/runtime/gc/eval\"\n";
@@ -496,6 +494,7 @@ let print_function_circuit m f =
     bprintf b "var id int\n";
     bprintf b "var addr string\n";
     bprintf b "var args []string\n";
+    bprintf b "\n";
     bprintf b "func init_args() {\n";
     bprintf b "\tflag.IntVar(&id, \"id\", 0, \"identity (default 0)\")\n";
     bprintf b "\tflag.StringVar(&addr, \"addr\", \"127.0.0.1:3042\", \"network address (default 127.0.0.1:3042)\")\n";
@@ -512,32 +511,12 @@ let print_function_circuit m f =
     bprintf b "\treturn uint64(arg)\n";
     bprintf b "}\n";
     bprintf b "\n";
-    bprintf b "\n";
-    bprintf b "func eval_comm(nu chan gc.Chanio) {\n";
-    bprintf b "\tvms := make([]baseeval.VM, %d)\n" (List.length f.fblocks + 1);
-    bprintf b "\tfor i := range vms {\n";
-    bprintf b "\t\tio := <-nu\n";
-    bprintf b "\t\tvms[i] = eval.NewVM(baseeval.NewIOX(&io), gc.ConcurrentId(i))\n";
-    bprintf b "\t}\n";
-    bprintf b "\teval_main(vms)\n";
-    bprintf b "}\n";
-    bprintf b "\n";
-    bprintf b "func gen_comm(nu chan gc.Chanio) {\n";
-    bprintf b "\tdefer close(nu)\n";
-    bprintf b "\tvms := make([]basegen.VM, %d)\n" (List.length f.fblocks + 1);
-    bprintf b "\tfor i := range vms {\n";
-    bprintf b "\t\tio := basegen.NewIO(nu)\n";
-    bprintf b "\t\tvms[i] = gen.NewVM(io, gc.ConcurrentId(i))\n";
-    bprintf b "\t}\n";
-    bprintf b "\tgen_main(vms)\n";
-    bprintf b "}\n";
-    bprintf b "\n";
     bprintf b "func main() {\n";
     bprintf b "\tinit_args()\n";
     bprintf b "\tif id == 0 {\n";
-    bprintf b "\t\tbasegen.Client(addr, gen_comm)\n";
+    bprintf b "\t\tbasegen.Client(addr, gen_main, %d, gen.NewVM)\n" (List.length f.fblocks + 1);
     bprintf b "\t} else {\n";
-    bprintf b "\t\tbaseeval.Server(addr, eval_comm)\n";
+    bprintf b "\t\tbaseeval.Server(addr, eval_main, %d, eval.NewVM)\n" (List.length f.fblocks + 1);
     bprintf b "\t}\n";
     bprintf b "}\n";
   end;
