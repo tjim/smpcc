@@ -10,7 +10,7 @@ type getRequest struct {
 	result chan []byte
 }
 
-type sendRequest struct {
+type SendRequest struct {
 	s     Selector
 	index int
 }
@@ -21,12 +21,12 @@ type sendRequest struct {
 type MplexChans struct {
 	refreshCh chan int         `fatchan:"reply"`   // One per SET of multiplexed sender/receiver, receiver->sender
 	repCh     chan []byte      `fatchan:"request"` // One per sender/receiver pair, sender->receiver
-	reqCh     chan sendRequest `fatchan:"reply"`   // One per sender/receiver pair, receiver->sender
+	reqCh     chan SendRequest `fatchan:"reply"`   // One per sender/receiver pair, receiver->sender
 }
 
 type MplexSender struct {
 	repCh chan []byte
-	reqCh chan sendRequest // for receiving send requests from MplexReceiver
+	reqCh chan SendRequest // for receiving send requests from MplexReceiver
 	getCh chan getRequest  // for making get requests
 }
 
@@ -38,11 +38,11 @@ type nextRequest struct {
 
 type MplexReceiver struct {
 	repCh  chan []byte
-	reqCh  chan sendRequest // for sending send requests to MplexSender
+	reqCh  chan SendRequest // for sending send requests to MplexSender
 	nextCh chan nextRequest
 }
 
-func NewMplexSender(c chan []byte, reqCh chan sendRequest, getCh chan getRequest) Sender {
+func NewMplexSender(c chan []byte, reqCh chan SendRequest, getCh chan getRequest) Sender {
 	sender := new(MplexSender)
 	sender.reqCh = reqCh
 	sender.repCh = c
@@ -50,7 +50,7 @@ func NewMplexSender(c chan []byte, reqCh chan sendRequest, getCh chan getRequest
 	return sender
 }
 
-func NewMplexReceiver(c chan []byte, reqCh chan sendRequest, nextCh chan nextRequest) Receiver {
+func NewMplexReceiver(c chan []byte, reqCh chan SendRequest, nextCh chan nextRequest) Receiver {
 	receiver := new(MplexReceiver)
 	receiver.reqCh = reqCh
 	receiver.repCh = c
@@ -174,7 +174,7 @@ func PrimaryReceiver(S Sender, refreshCh chan int, k, m int) chan nextRequest {
 func (self *MplexReceiver) Receive(s Selector) Message {
 	nextReq := <-self.nextCh
 	smod := Selector(byte(s) ^ nextReq.r)
-	var sendReq sendRequest
+	var sendReq SendRequest
 	sendReq.s = smod
 	sendReq.index = nextReq.index
 	self.reqCh <- sendReq

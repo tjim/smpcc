@@ -2,8 +2,8 @@ package gen
 
 import (
 	"github.com/tjim/fatchan"
-	"github.com/tjim/smpcc/runtime/ot"
 	. "github.com/tjim/smpcc/runtime/gc"
+	"github.com/tjim/smpcc/runtime/ot"
 	"log"
 	"net"
 )

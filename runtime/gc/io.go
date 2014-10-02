@@ -18,13 +18,12 @@ func NewChanio() (io *Chanio) {
 		make(chan Key, 50),
 		make(chan Key, 50),
 		ot.OTChans{
-			make(chan ot.PublicKey, 100),
 			make(chan big.Int, 100),
 			make(chan ot.HashedElGamalCiph, 100),
 
 			make(chan []byte, 100),
 			make(chan ot.Selector, 100),
-			make(chan ot.NPReceiverParams, 1),
+			make(chan big.Int, 1),
 		},
 	}
 	return io

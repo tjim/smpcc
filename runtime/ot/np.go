@@ -32,10 +32,9 @@ type HashedElGamalCiph struct {
 }
 
 type NPSender struct {
-	npSendPk   chan PublicKey
 	npRecvPk   chan big.Int
 	npSendEncs chan HashedElGamalCiph
-	NPSenderParams
+	C          big.Int
 }
 
 type NPSenderParams struct {
@@ -43,10 +42,9 @@ type NPSenderParams struct {
 }
 
 type NPReceiver struct {
-	npSendPk   chan PublicKey
 	npRecvPk   chan big.Int
 	npSendEncs chan HashedElGamalCiph
-	NPReceiverParams
+	C          big.Int
 }
 
 type NPReceiverParams struct {
@@ -60,53 +58,43 @@ func timeTrack(start time.Time, name string) {
 	log.Printf("%s took %s", name, elapsed)
 }
 
-func GenNPParams() (snd NPSenderParams, rcv NPReceiverParams) {
-	pri := new(PrivateKey)
-	pri.PublicKey = publicParams
-	pri.X = generateNumNonce(publicParams.P)
-	pri.Y = new(big.Int).Exp(pri.G, pri.X, pri.P)
-	snd.pri = pri
-	rcv.PkSender = pri.PublicKey
-	return
+func GenNPParam() big.Int {
+	X := generateNumNonce(publicParams.P)
+	C := *new(big.Int).Exp(publicParams.G, X, publicParams.P)
+	return C
 }
 
-func NewNPSender(
-	snd NPSenderParams,
-	npSendPk chan PublicKey,
+func NewNPSender(C big.Int,
 	npRecvPk chan big.Int,
 	npSendEncs chan HashedElGamalCiph) *NPSender {
 
 	sender := new(NPSender)
-	sender.npSendPk = npSendPk
 	sender.npRecvPk = npRecvPk
 	sender.npSendEncs = npSendEncs
-	sender.NPSenderParams = snd
+	sender.C = C
 
 	return sender
 }
 
-func NewNPReceiver(rcv NPReceiverParams,
-	npSendPk chan PublicKey,
+func NewNPReceiver(C big.Int,
 	npRecvPk chan big.Int,
 	npSendEncs chan HashedElGamalCiph) *NPReceiver {
 
 	receiver := new(NPReceiver)
-	receiver.npSendPk = npSendPk
 	receiver.npRecvPk = npRecvPk
 	receiver.npSendEncs = npSendEncs
-	receiver.NPReceiverParams = rcv
+	receiver.C = C
 
 	return receiver
 }
 
 func NewNP() (*NPSender, *NPReceiver) {
-	snd, rcv := GenNPParams()
-	npSendPk := make(chan PublicKey)
+	C := GenNPParam()
 	npRecvPk := make(chan big.Int)
 	npSendEncs := make(chan HashedElGamalCiph)
 
-	return NewNPSender(snd, npSendPk, npRecvPk, npSendEncs),
-		NewNPReceiver(rcv, npSendPk, npRecvPk, npSendEncs)
+	return NewNPSender(C, npRecvPk, npSendEncs),
+		NewNPReceiver(C, npRecvPk, npSendEncs)
 }
 
 func (self *NPSender) Send(m0, m1 Message) {
@@ -118,7 +106,7 @@ func (self *NPSender) Send(m0, m1 Message) {
 	pks := make([]big.Int, 2)
 	pks[0] = <-self.npRecvPk
 	pks[1].ModInverse(&pks[0], publicParams.P)
-	pks[1].Mul(&pks[1], self.pri.PublicKey.Y).Mod(&pks[1], publicParams.P)
+	pks[1].Mul(&pks[1], &self.C).Mod(&pks[1], publicParams.P)
 	r0 := generateNumNonce(publicParams.P)
 	r1 := generateNumNonce(publicParams.P)
 
@@ -139,7 +127,7 @@ func (self *NPReceiver) Receive(s Selector) Message {
 	k := generateNumNonce(publicParams.P)
 	pks[s] = gExpModP(k)
 	pks[1-s] = new(big.Int).ModInverse(pks[s], publicParams.P)
-	pks[1-s].Mul(pks[1-s], self.PkSender.Y).Mod(pks[1-s], publicParams.P)
+	pks[1-s].Mul(pks[1-s], &self.C).Mod(pks[1-s], publicParams.P)
 	self.npRecvPk <- *pks[0]
 	ciphs := []HashedElGamalCiph{<-self.npSendEncs, <-self.npSendEncs}
 	if len(ciphs[0].C1) != len(ciphs[1].C1) {

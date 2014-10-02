@@ -541,7 +541,7 @@ func Example(n int) []*X {
 				make(chan ot.NPReceiverParams, 5),
 			}
 
-			sndParams, rcvParams := ot.GenNPParams()
+			sndParams, rcvParams := ot.GenNPParam()
 			npRecvr := ot.NewNPReceiver(rcvParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
 			otSChannels[i][j] = ot.NewExtendSender(otChans.OtExtChan, otChans.OtExtSelChan, npRecvr, ot.SEC_PARAM, ot.NUM_PAIRS)
 			npSndr := ot.NewNPSender(sndParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
