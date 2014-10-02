@@ -37,18 +37,10 @@ type NPSender struct {
 	C          big.Int
 }
 
-type NPSenderParams struct {
-	pri *PrivateKey
-}
-
 type NPReceiver struct {
 	npRecvPk   chan big.Int
 	npSendEncs chan HashedElGamalCiph
 	C          big.Int
-}
-
-type NPReceiverParams struct {
-	PkSender PublicKey
 }
 
 var publicParams = PublicKey{G: fromHex(generatorHex), P: fromHex(primeHex)}
