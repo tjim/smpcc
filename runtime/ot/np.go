@@ -53,6 +53,8 @@ type NPReceiverParams struct {
 	PkSender PublicKey
 }
 
+var publicParams = PublicKey{G: fromHex(generatorHex), P: fromHex(primeHex)}
+
 func timeTrack(start time.Time, name string) {
 	elapsed := time.Since(start)
 	log.Printf("%s took %s", name, elapsed)
@@ -166,8 +168,6 @@ func expModP(g, x *big.Int) *big.Int {
 func gExpModP(x *big.Int) *big.Int {
 	return expModP(publicParams.G, x)
 }
-
-var publicParams = PublicKey{G: fromHex(generatorHex), P: fromHex(primeHex)}
 
 func fromHex(hex string) *big.Int {
 	n, ok := new(big.Int).SetString(hex, 16)
