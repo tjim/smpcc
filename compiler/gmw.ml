@@ -24,10 +24,10 @@ let rec bpr_gmw_value b (typ, value) =
           let loc = Hashtbl.find State.global_locations v in
           bprintf b "Uint64(io, %d)" loc
         with Not_found ->
-          eprintf "global not there %s\n" (Gobe.govar v);
-          bprintf b "%s" (Gobe.govar v))
+          eprintf "global not there %s\n" (Gc.govar v);
+          bprintf b "%s" (Gc.govar v))
       else
-        bprintf b "%s" (Gobe.govar v)
+        bprintf b "%s" (Gc.govar v)
   | Basicblock bl ->
       bprintf b "Uint%d(io, %d)" (State.get_bl_bits()) (State.bl_num bl)
   | Int x ->
@@ -75,9 +75,9 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
         if unused then
           bprintf b "\t" (* don't declare an unused variable *)
         else if VSet.mem v declared_vars then
-          bprintf b "\t%s = " (Gobe.govar v)
+          bprintf b "\t%s = " (Gc.govar v)
         else
-          bprintf b "\t%s := " (Gobe.govar v);
+          bprintf b "\t%s := " (Gc.govar v);
         VSet.add v declared_vars) in
   (match i with
   | Call(_,_,_,_,Var(Name(true, "printf")),(_,_,Int x)::ops,_,_) ->
@@ -204,9 +204,9 @@ let bpr_sharetyp b typ =
 let bpr_gmw_block_args print_types b bl =
   let fv = free_of_block bl in
   if print_types then
-    VSet.iter (fun var -> bprintf b ", %s %a" (Gobe.govar var) bpr_sharetyp (State.typ_of_var var)) fv
+    VSet.iter (fun var -> bprintf b ", %s %a" (Gc.govar var) bpr_sharetyp (State.typ_of_var var)) fv
   else
-    VSet.iter (fun var -> bprintf b ", %s" (Gobe.govar var)) fv
+    VSet.iter (fun var -> bprintf b ", %s" (Gc.govar var)) fv
 
 let outputs_of_block blocks_fv bl =
   VSet.inter (assigned_of_block bl) (VSet.union State.V.special blocks_fv)
@@ -295,7 +295,7 @@ let bpr_main b f =
   bprintf b "\t/* special variables */\n";
   VSet.iter
     (fun var ->
-      bprintf b "\t%s := Uint%d(io, 0)\n" (Gobe.govar var) (roundup_bitwidth (State.typ_of_var var));
+      bprintf b "\t%s := Uint%d(io, 0)\n" (Gc.govar var) (roundup_bitwidth (State.typ_of_var var));
     )
     (VSet.add (State.V.attsrcStateO()) (* if there is only one block this is used but not assigned *)
        (VSet.inter State.V.special (assigned_of_blocks blocks)));
@@ -303,7 +303,7 @@ let bpr_main b f =
   bprintf b "\t/* block free variables */\n";
   VSet.iter
     (fun var ->
-      bprintf b "\t%s := Uint%d(io, 0)\n" (Gobe.govar var) (roundup_bitwidth (State.typ_of_var var));
+      bprintf b "\t%s := Uint%d(io, 0)\n" (Gc.govar var) (roundup_bitwidth (State.typ_of_var var));
     )
     blocks_fv;
   bprintf b "\n";
@@ -331,12 +331,12 @@ let bpr_main b f =
           let w = (roundup_bitwidth (State.typ_of_var var)) in
           if w = 1 then
           bprintf b "\t\t%s_%d := (<-ch%d) > 0\n"
-              (Gobe.govar var)
+              (Gc.govar var)
               (State.bl_num bl.bname)
               (State.bl_num bl.bname)
           else
             bprintf b "\t\t%s_%d := uint%d(<-ch%d)\n"
-              (Gobe.govar var)
+              (Gc.govar var)
               (State.bl_num bl.bname)
               w
               (State.bl_num bl.bname))
@@ -348,18 +348,18 @@ let bpr_main b f =
       if VSet.mem var State.V.special then
         (* specials are assigned 0 unless the active block assigned them *)
         bprintf b "\t\t%s = TreeXor%d(io, %s)\n"
-          (Gobe.govar var)
+          (Gc.govar var)
           (roundup_bitwidth (State.typ_of_var var))
-          (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (Gobe.govar var) (State.bl_num bl.bname)) sources))
+          (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (Gc.govar var) (State.bl_num bl.bname)) sources))
       else
         (* non-specials keep their value from before the blocks unless the active block assigned them *)
         bprintf b "\t\t%s = Select%d(io, TreeXor1(io, %s), TreeXor%d(io, %s), %s)\n"
-          (Gobe.govar var)
+          (Gc.govar var)
           (roundup_bitwidth (State.typ_of_var var))
           (String.concat ", " (List.map (fun bl -> sprintf "mask_%d" (State.bl_num bl.bname)) sources))
           (roundup_bitwidth (State.typ_of_var var))
-          (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (Gobe.govar var) (State.bl_num bl.bname)) sources))
-          (Gobe.govar var))
+          (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (Gc.govar var) (State.bl_num bl.bname)) sources))
+          (Gc.govar var))
     (outputs_of_blocks blocks);
   if VSet.mem State.V.attsrcMemRes blocks_fv then begin
     (* We need to load from memory iff some block uses attsrcMemRes *)
@@ -383,7 +383,7 @@ let bpr_main b f =
   bprintf b "\t}\n";
   bprintf b "\tanswer := Reveal32(io, _attsrcAnswer)\n";
   bprintf b "\tfmt.Printf(\"%%d: %%v\\n\", io.Id(), answer)\n";
-  bprintf b "\t%s_done <- true\n" (Gobe.govar f.fname);
+  bprintf b "\t%s_done <- true\n" (Gc.govar f.fname);
   bprintf b "}\n";
   bprintf b "\n"
 
@@ -502,7 +502,7 @@ let print_function_circuit m f =
   bprintf b "\treturn uint32(arg)\n";
   bprintf b "}\n";
   bprintf b "\n";
-  bprintf b "var %s_done = make(chan bool, 1)\n" (Gobe.govar f.fname);
+  bprintf b "var %s_done = make(chan bool, 1)\n" (Gc.govar f.fname);
   bprintf b "\n";
   bprintf b "func main() {\n";
   bprintf b "\tstart_time := time.Now()\n";
@@ -539,7 +539,7 @@ let print_function_circuit m f =
     bprintf b "\tgo blocks_main(io[%d], ios[%d])\n" i i;
   done;
   for i = 0 to num_parties-1 do
-    bprintf b "\t<-%s_done\n" (Gobe.govar f.fname);
+    bprintf b "\t<-%s_done\n" (Gc.govar f.fname);
   done;
   bprintf b "\tfmt.Println(\"Done\")\n";
   bprintf b "\tif log_stats {\n";
