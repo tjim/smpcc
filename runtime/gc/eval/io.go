@@ -17,13 +17,13 @@ type IO interface {
 
 /* TODO: instead of exposing IOX make it private and use IO externally */
 type IOX struct {
-	Chanio
+	CircuitChans
 	ot.Receiver
 }
 
 func NewIOX(io Chanio) *IOX {
 	return &IOX{
-		io,
+		io.CircuitChans,
 		ot.NewOTChansReceiver(io.NPChans, io.ExtChans),
 	}
 }
