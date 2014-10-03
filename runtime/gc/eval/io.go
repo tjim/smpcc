@@ -17,34 +17,15 @@ type IO interface {
 
 /* TODO: instead of exposing IOX make it private and use IO externally */
 type IOX struct {
-	channels *Chanio
-	otRecvr  ot.Receiver
+	Chanio
+	ot.Receiver
 }
 
-func NewIOX(io *Chanio) *IOX {
-	result := &IOX{
+func NewIOX(io Chanio) *IOX {
+	return &IOX{
 		io,
-		ot.NewOTChansReceiver(&io.OtChans),
+		ot.NewOTChansReceiver(io.NPChans, io.ExtChans),
 	}
-	return result
-}
-
-func (io *IOX) SendK2(x Key) {
-	io.channels.Kchan2 <- x
-}
-
-func (io *IOX) RecvT() GarbledTable {
-	result := <-io.channels.Tchan
-	return result
-}
-
-func (io *IOX) RecvK() Key {
-	result := <-io.channels.Kchan
-	return result
-}
-
-func (io *IOX) Receive(s ot.Selector) ot.Message {
-	return io.otRecvr.Receive(s)
 }
 
 func Server(addr string, main func([]VM), numBlocks int, newVM func(io IO, id ConcurrentId) VM) {
@@ -64,7 +45,7 @@ func Server(addr string, main func([]VM), numBlocks int, newVM func(io IO, id Co
 	vms := make([]VM, numBlocks)
 	for i := range vms {
 		io := <-nu
-		vms[i] = newVM(NewIOX(&io), ConcurrentId(i))
+		vms[i] = newVM(NewIOX(io), ConcurrentId(i))
 	}
 	main(vms)
 }

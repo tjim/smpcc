@@ -5,25 +5,60 @@ import (
 	"math/big"
 )
 
+type CircuitChans struct {
+	Tchan  chan GarbledTable `fatchan:"request"`
+	Kchan  chan Key          `fatchan:"request"`
+	Kchan2 chan Key          `fatchan:"reply"`
+}
+
+func (io CircuitChans) SendT(x GarbledTable) {
+	io.Tchan <- x
+}
+
+func (io CircuitChans) SendK(x Key) {
+	io.Kchan <- x
+}
+
+func (io CircuitChans) RecvK2() Key {
+	result := <-io.Kchan2
+	return result
+}
+
+func (io CircuitChans) SendK2(x Key) {
+	io.Kchan2 <- x
+}
+
+func (io CircuitChans) RecvT() GarbledTable {
+	result := <-io.Tchan
+	return result
+}
+
+func (io CircuitChans) RecvK() Key {
+	result := <-io.Kchan
+	return result
+}
+
 type Chanio struct {
-	Tchan   chan GarbledTable `fatchan:"request"`
-	Kchan   chan Key          `fatchan:"request"`
-	Kchan2  chan Key          `fatchan:"reply"`
-	OtChans ot.OTChans
+	CircuitChans
+	ot.NPChans
+	ot.ExtChans
 }
 
 func NewChanio() (io *Chanio) {
 	io = &Chanio{
-		make(chan GarbledTable, 50),
-		make(chan Key, 50),
-		make(chan Key, 50),
-		ot.OTChans{
+		CircuitChans{
+			make(chan GarbledTable, 50),
+			make(chan Key, 50),
+			make(chan Key, 50),
+		},
+		ot.NPChans{
 			make(chan big.Int, 100),
+			make(chan big.Int, 1),
 			make(chan ot.HashedElGamalCiph, 100),
-
+		},
+		ot.ExtChans{
 			make(chan []byte, 100),
 			make(chan ot.Selector, 100),
-			make(chan big.Int, 1),
 		},
 	}
 	return io

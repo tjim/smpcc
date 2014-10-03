@@ -13,10 +13,10 @@ func pairVM(id gc.ConcurrentId) (basegen.VM, baseeval.VM) {
 	gchan := make(chan basegen.IOX, 1)
 	echan := make(chan baseeval.IOX, 1)
 	go func() {
-		echan <- *baseeval.NewIOX(io)
+		echan <- *baseeval.NewIOX(*io)
 	}()
 	go func() {
-		gchan <- *basegen.NewIOX(io)
+		gchan <- *basegen.NewIOX(*io)
 	}()
 	gio := <-gchan
 	eio := <-echan
