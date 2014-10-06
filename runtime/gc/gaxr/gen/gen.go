@@ -21,7 +21,6 @@ func NewVM(io basegen.IO, id gc.ConcurrentId) basegen.VM {
 }
 
 var (
-	AESCount  uint   = 0
 	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
 
@@ -37,7 +36,6 @@ func slot(keys []gc.Key) int {
 
 func encrypt(keys []gc.Key, plaintext, tweak []byte) []byte {
 	// log.Printf("Computing encrypt with inputs %v, %v, %v\n", keys, plaintext, tweak)
-	AESCount++
 	result := gc.GaXDKC_E(keys[0], keys[1], tweak, plaintext)
 	return result
 }
@@ -45,7 +43,6 @@ func encrypt(keys []gc.Key, plaintext, tweak []byte) []byte {
 func encrypt_nonoptimized(keys []gc.Key, result []byte) []byte {
 	for i := 0; i < len(keys); i++ {
 		result = gc.Encrypt(keys[i], result)
-		AESCount++
 	}
 	return result
 }

@@ -23,7 +23,6 @@ const (
 )
 
 var (
-	AESCount  uint   = 0
 	ALL_ZEROS gc.Key = make([]byte, KEY_SIZE)
 )
 
@@ -56,7 +55,6 @@ func decrypt_nonoptimized(keys []gc.Key, ciphertext []byte) []byte {
 	result := ciphertext
 	for i := len(keys); i > 0; i-- {
 		result = gc.Decrypt(keys[i-1], result)
-		AESCount++
 	}
 	// log.Printf("Decrypt_nonoptimized, result = %v\n", result)
 	return result

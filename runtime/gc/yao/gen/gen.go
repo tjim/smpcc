@@ -10,10 +10,6 @@ import (
 	"math/rand"
 )
 
-var (
-	AESCount int = 0
-)
-
 type vm struct {
 	io basegen.IO
 }
@@ -36,7 +32,6 @@ func slot(keys []gc.Key) int {
 func encrypt(keys []gc.Key, result []byte) []byte {
 	for i := 0; i < len(keys); i++ {
 		result = gc.Encrypt(keys[i], result)
-		AESCount++
 	}
 	return result
 }
@@ -45,7 +40,6 @@ func decrypt(keys []gc.Key, ciphertext []byte) []byte {
 	result := ciphertext
 	for i := len(keys); i > 0; i-- {
 		result = gc.Decrypt(keys[i-1], result)
-		AESCount++
 	}
 	return result
 }

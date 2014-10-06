@@ -19,7 +19,6 @@ func NewVM(io baseeval.IO, id gc.ConcurrentId) baseeval.VM {
 }
 
 var (
-	AESCount  uint   = 0
 	ALL_ZEROS gc.Key = make([]byte, base.KEY_SIZE)
 )
 
@@ -52,7 +51,6 @@ func decrypt_nonoptimized(keys []gc.Key, ciphertext []byte) []byte {
 	result := ciphertext
 	for i := len(keys); i > 0; i-- {
 		result = gc.Decrypt(keys[i-1], result)
-		AESCount++
 	}
 	// log.Printf("Decrypt_nonoptimized, result = %v\n", result)
 	return result
@@ -64,7 +62,6 @@ func Decrypt_nonoptimized(t gc.GarbledTable, keys []gc.Key) []byte {
 
 func decrypt(keys []gc.Key, ciphertext, tweak []byte) (result gc.Key) {
 	// log.Printf("Computing decrypt with inputs %v, %v, %v\n", keys, ciphertext, tweak)
-	AESCount++
 	return gc.GaXDKC_D(keys[0], keys[1], tweak, ciphertext)
 }
 
