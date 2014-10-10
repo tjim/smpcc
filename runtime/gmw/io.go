@@ -4,7 +4,6 @@ import "fmt"
 import "math/big"
 import "crypto/rand"
 import "github.com/tjim/smpcc/runtime/ot"
-import "github.com/tjim/smpcc/runtime/base"
 
 var log_mem bool = true
 var log_results bool = false
@@ -531,21 +530,19 @@ func Example(n int) []*X {
 			if i == j {
 				continue
 			}
-			otChans := base.OTChans{
-				make(chan ot.PublicKey, 5),
-				make(chan big.Int, 5),
-				make(chan ot.HashedElGamalCiph, 5),
-
-				make(chan []byte, 5),
-				make(chan ot.Selector, 5),
-				make(chan ot.NPReceiverParams, 5),
+			npchans := ot.NPChans{
+				make(chan big.Int),
+				make(chan big.Int),
+				make(chan ot.HashedElGamalCiph),
 			}
-
-			sndParams, rcvParams := ot.GenNPParam()
-			npRecvr := ot.NewNPReceiver(rcvParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
-			otSChannels[i][j] = ot.NewExtendSender(otChans.OtExtChan, otChans.OtExtSelChan, npRecvr, ot.SEC_PARAM, ot.NUM_PAIRS)
-			npSndr := ot.NewNPSender(sndParams, otChans.NpSendPk, otChans.NpRecvPk, otChans.NpSendEncs)
-			otRChannels[j][i] = ot.NewExtendReceiver(otChans.OtExtChan, otChans.OtExtSelChan, npSndr, ot.SEC_PARAM, ot.NUM_PAIRS)
+			extchans := ot.ExtChans{
+				make(chan []byte),
+				make(chan ot.Selector),
+			}
+			baseReceiver := ot.NewNPReceiver(npchans.ParamChan, npchans.NpRecvPk, npchans.NpSendEncs)
+			otSChannels[i][j] = ot.NewExtendSender(extchans.OtExtChan, extchans.OtExtSelChan, baseReceiver, ot.SEC_PARAM, ot.NUM_PAIRS)
+			baseSender := ot.NewNPSender(npchans.ParamChan, npchans.NpRecvPk, npchans.NpSendEncs)
+			otRChannels[j][i] = ot.NewExtendReceiver(extchans.OtExtChan, extchans.OtExtSelChan, baseSender, ot.SEC_PARAM, ot.NUM_PAIRS)
 		}
 	}
 

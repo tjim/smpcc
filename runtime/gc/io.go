@@ -63,3 +63,15 @@ func NewChanio() (io *Chanio) {
 	}
 	return io
 }
+
+// MPlex OT version
+type PerBlock struct {
+	ot.PerBlockMplexChans
+	CircuitChans
+}
+
+type PerNodePair struct {
+	ot.NPChans
+	ot.PerNodePairMplexChans
+	BlockChans []PerBlock
+}

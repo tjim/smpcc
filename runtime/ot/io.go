@@ -14,16 +14,13 @@ type ExtChans struct {
 }
 
 func NewOTChansSender(npchans NPChans, extchans ExtChans) Sender {
-	C := <-npchans.ParamChan
-	baseReceiver := NewNPReceiver(C, npchans.NpRecvPk, npchans.NpSendEncs)
+	baseReceiver := NewNPReceiver(npchans.ParamChan, npchans.NpRecvPk, npchans.NpSendEncs)
 	sender := NewExtendSender(extchans.OtExtChan, extchans.OtExtSelChan, baseReceiver, SEC_PARAM, NUM_PAIRS)
 	return sender
 }
 
 func NewOTChansReceiver(npchans NPChans, extchans ExtChans) Receiver {
-	C := GenNPParam()
-	npchans.ParamChan <- C
-	baseSender := NewNPSender(C, npchans.NpRecvPk, npchans.NpSendEncs)
+	baseSender := NewNPSender(npchans.ParamChan, npchans.NpRecvPk, npchans.NpSendEncs)
 	receiver := NewExtendReceiver(extchans.OtExtChan, extchans.OtExtSelChan, baseSender, SEC_PARAM, NUM_PAIRS)
 	return receiver
 }

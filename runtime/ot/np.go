@@ -11,7 +11,6 @@ package ot
 // This is the "basic oblivious transfer protocol" of section 2.3
 
 import (
-	//	"log"
 	"crypto/aes"
 	"log"
 	"math/big"
@@ -34,12 +33,14 @@ type HashedElGamalCiph struct {
 type NPSender struct {
 	npRecvPk   chan big.Int
 	npSendEncs chan HashedElGamalCiph
+	npC        chan big.Int
 	C          big.Int
 }
 
 type NPReceiver struct {
 	npRecvPk   chan big.Int
 	npSendEncs chan HashedElGamalCiph
+	npC        chan big.Int
 	C          big.Int
 }
 
@@ -56,43 +57,48 @@ func GenNPParam() big.Int {
 	return C
 }
 
-func NewNPSender(C big.Int,
+func NewNPSender(npC chan big.Int,
 	npRecvPk chan big.Int,
 	npSendEncs chan HashedElGamalCiph) *NPSender {
 
 	sender := new(NPSender)
 	sender.npRecvPk = npRecvPk
 	sender.npSendEncs = npSendEncs
-	sender.C = C
+	sender.npC = npC
 
 	return sender
 }
 
-func NewNPReceiver(C big.Int,
+func NewNPReceiver(npC chan big.Int,
 	npRecvPk chan big.Int,
 	npSendEncs chan HashedElGamalCiph) *NPReceiver {
 
 	receiver := new(NPReceiver)
 	receiver.npRecvPk = npRecvPk
 	receiver.npSendEncs = npSendEncs
-	receiver.C = C
+	receiver.npC = npC
 
 	return receiver
 }
 
 func NewNP() (*NPSender, *NPReceiver) {
-	C := GenNPParam()
+	npC := make(chan big.Int)
 	npRecvPk := make(chan big.Int)
 	npSendEncs := make(chan HashedElGamalCiph)
 
-	return NewNPSender(C, npRecvPk, npSendEncs),
-		NewNPReceiver(C, npRecvPk, npSendEncs)
+	return NewNPSender(npC, npRecvPk, npSendEncs),
+		NewNPReceiver(npC, npRecvPk, npSendEncs)
 }
 
 func (self *NPSender) Send(m0, m1 Message) {
 	//	log.Println("Starting run of OTNPSender.Send")
 	if len(m0) != len(m1) {
 		panic("(*ot.NPSender).Send: messages have different lengths")
+	}
+	if self.npC != nil {
+		self.C = GenNPParam()
+		self.npC <- self.C
+		self.npC = nil
 	}
 	msglen := len(m0)
 	pks := make([]big.Int, 2)
@@ -115,6 +121,10 @@ func (self *NPSender) Send(m0, m1 Message) {
 
 func (self *NPReceiver) Receive(s Selector) Message {
 	//	log.Printf("Starting run of OTNPSender.Receive.\n")
+	if self.npC != nil {
+		self.C = <-self.npC
+		self.npC = nil
+	}
 	pks := make([]*big.Int, 2)
 	k := generateNumNonce(publicParams.P)
 	pks[s] = gExpModP(k)

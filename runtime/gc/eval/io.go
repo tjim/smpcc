@@ -6,6 +6,7 @@ import (
 	"github.com/tjim/smpcc/runtime/ot"
 	"log"
 	"net"
+	"fmt"
 )
 
 type IO interface {
@@ -46,6 +47,48 @@ func Server(addr string, main func([]VM), numBlocks int, newVM func(io IO, id Co
 	for i := range vms {
 		io := <-nu
 		vms[i] = newVM(NewIOX(io), ConcurrentId(i))
+	}
+	main(vms)
+}
+
+func Server2(addr string, main func([]VM), numBlocks int, newVM func(io IO, id ConcurrentId) VM) {
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("listen(%q): %s", addr, err)
+	}
+
+	conn, err := listener.Accept()
+	if err != nil {
+		log.Fatalf("accept(): %s", err)
+	}
+	xport := fatchan.New(conn, nil)
+	nu := make(chan PerNodePair)
+	xport.ToChan(nu)
+
+	k := 80
+	m := 1024
+
+	fmt.Println("Step 0")
+	x := <-nu
+	fmt.Println("Got nu")
+	if numBlocks != len(x.BlockChans) {
+		panic("Block mismatch")
+	}
+
+	baseSender := ot.NewNPSender(x.NPChans.ParamChan, x.NPChans.NpRecvPk, x.NPChans.NpSendEncs)
+	chR := ot.PrimaryReceiver(baseSender, x.PerNodePairMplexChans.RefreshCh, k, m)
+	ios := make([]IO, numBlocks)
+	for i, v := range x.BlockChans {
+		receiver := ot.NewMplexReceiver(v.PerBlockMplexChans.RepCh, v.PerBlockMplexChans.ReqCh, chR)
+		tchan := v.Tchan
+		kchan := v.Kchan
+		kchan2 := v.Kchan2
+		ios[i] = IOX{CircuitChans{tchan, kchan, kchan2}, receiver}
+	}
+
+	vms := make([]VM, numBlocks)
+	for i := range vms {
+		vms[i] = newVM(ios[i], ConcurrentId(i))
 	}
 	main(vms)
 }

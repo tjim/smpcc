@@ -18,10 +18,12 @@ type SendRequest struct {
 // Channels needed for multiplex OT to function
 // In gc case, generator is client and sender, evaluator is server and receiver
 // We send an MplexChans from client to server, so fatchan notations are relative to generator/client/sender
-type MplexChans struct {
-	refreshCh chan int         `fatchan:"reply"`   // One per SET of multiplexed sender/receiver, receiver->sender
-	repCh     chan []byte      `fatchan:"request"` // One per sender/receiver pair, sender->receiver
-	reqCh     chan SendRequest `fatchan:"reply"`   // One per sender/receiver pair, receiver->sender
+type PerNodePairMplexChans struct {
+	RefreshCh chan int         `fatchan:"reply"`   // One per SET of multiplexed sender/receiver, receiver->sender
+}
+type PerBlockMplexChans struct {
+	RepCh     chan []byte      `fatchan:"request"` // One per sender/receiver pair, sender->receiver
+	ReqCh     chan SendRequest `fatchan:"reply"`   // One per sender/receiver pair, receiver->sender
 }
 
 type MplexSender struct {
