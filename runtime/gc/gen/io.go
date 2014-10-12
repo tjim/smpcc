@@ -7,7 +7,7 @@ import (
 	"log"
 	"math/big"
 	"net"
-	"fmt"
+	"time"
 )
 
 type IO interface {
@@ -33,8 +33,6 @@ func NewIOX(io Chanio) *IOX {
 
 func NewIO(nu chan Chanio) IO {
 	io := NewChanio()
-	//	defer close(io.Tchan)
-	//	defer close(io.Kchan)
 	nu <- *io
 	return NewIOX(*io)
 }
@@ -55,6 +53,9 @@ func Client(addr string, main func([]VM), numBlocks int, newVM func(io IO, id Co
 		io := NewIO(nu)
 		vms[i] = newVM(io, ConcurrentId(i))
 	}
+	// temporary hack to avoid a fatchan deadlock
+	// (this allows the eval side to finish registering channels and start block goroutines before we send on the channels)
+	time.Sleep(time.Second)
 	main(vms)
 }
 
@@ -81,11 +82,7 @@ func Client2(addr string, main func([]VM), numBlocks int, newVM func(io IO, id C
 
 	baseReceiver := ot.NewNPReceiver(ParamChan, NpRecvPk, NpSendEncs)
 
-	fmt.Println("Step 0")
-
 	chS := ot.PrimarySender(baseReceiver, RefreshCh, k, m) // chS for getrequests
-
-	fmt.Println("Step 1")
 
 	ios := make([]IO, len(x.BlockChans))
 	for i := 0; i < numBlocks; i++ {
@@ -99,11 +96,13 @@ func Client2(addr string, main func([]VM), numBlocks int, newVM func(io IO, id C
 		ios[i] = IOX{CircuitChans{Tchan, Kchan, Kchan2}, sender}
 	}
 	nu <- x
-	fmt.Println("Step 2")
 
 	vms := make([]VM, numBlocks)
 	for i := range vms {
 		vms[i] = newVM(ios[i], ConcurrentId(i))
 	}
+	// temporary hack to avoid a fatchan deadlock
+	// (this allows the eval side to finish registering channels and start block goroutines before we send on the channels)
+	time.Sleep(time.Second)
 	main(vms)
 }

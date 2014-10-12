@@ -6,7 +6,6 @@ import (
 	"github.com/tjim/smpcc/runtime/ot"
 	"log"
 	"net"
-	"fmt"
 )
 
 type IO interface {
@@ -68,9 +67,7 @@ func Server2(addr string, main func([]VM), numBlocks int, newVM func(io IO, id C
 	k := 80
 	m := 1024
 
-	fmt.Println("Step 0")
 	x := <-nu
-	fmt.Println("Got nu")
 	if numBlocks != len(x.BlockChans) {
 		panic("Block mismatch")
 	}
