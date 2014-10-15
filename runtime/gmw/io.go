@@ -4,6 +4,9 @@ import "fmt"
 import "math/big"
 import "crypto/rand"
 import "github.com/tjim/smpcc/runtime/ot"
+import "net"
+import "log"
+import "github.com/tjim/fatchan"
 
 var log_mem bool = true
 var log_results bool = false
@@ -657,4 +660,471 @@ func RunExample() uint32 {
 	}
 	fmt.Printf("Result: 0x%08x\n", result)
 	return result
+}
+
+type GlobalIO struct {
+	n      int      /* number of parties */
+	id     int      /* id of party, range is 0..n-1 */
+	inputs []uint32 /* inputs of this party */
+	ram    []byte
+}
+
+type BlockIO struct {
+	*GlobalIO
+	triples32   []Triple
+	triples8    []struct{ a, b, c uint8 }
+	triples1    []struct{ a, b, c bool }
+	rchannels   []chan uint32
+	wchannels   []chan uint32
+	otSenders   []ot.Sender
+	otReceivers []ot.Receiver
+}
+
+type PeerIO struct {
+	*GlobalIO // The GlobalIO of the peer and all of its blocks must be the same
+	blocks    []BlockIO
+}
+
+/*
+Each peer runs a server, it accepts requests that set up Receiver and rchannel.
+Each peer connects to all other peers and establishes Sender and wchannel.
+
+Port strategy:
+Each peer listens to n-1 ports: base port + n*id, plus next n-1 ports, ignoring own port.
+Each peer connects to n-1 ports: for i<n, base port + n*i + id
+*/
+
+// for establishing connections
+type PerBlock struct {
+	ot.PerBlockMplexChans
+	rchannel chan uint32
+}
+
+type PerNodePair struct {
+	ot.NPChans
+	ot.PerNodePairMplexChans
+	BlockChans []PerBlock
+}
+
+const (
+	base_port int = 3042
+)
+
+func (io PeerIO) connect(party int) chan<- PerNodePair {
+	if io.id == party {
+		panic("connect0")
+	}
+	addr := fmt.Sprintf("127.0.0.1:%d", base_port+(io.n*party)+io.id)
+	server, err := net.Dial("tcp", addr)
+	if err != nil {
+		log.Fatalf("dial(%q): %s", addr, err)
+	}
+
+	xport := fatchan.New(server, nil)
+	nu := make(chan PerNodePair)
+	xport.FromChan(nu)
+	return nu
+}
+
+func clientSideIOSetup(blocks []BlockIO, party int, nu chan<- PerNodePair) {
+	numBlocks := len(blocks)
+	k := 80
+	m := 1024
+
+	ParamChan := make(chan big.Int)
+	NpRecvPk := make(chan big.Int)
+	NpSendEncs := make(chan ot.HashedElGamalCiph)
+	RefreshCh := make(chan int)
+	x := PerNodePair{ot.NPChans{ParamChan, NpRecvPk, NpSendEncs}, ot.PerNodePairMplexChans{RefreshCh}, make([]PerBlock, numBlocks)}
+
+	baseReceiver := ot.NewNPReceiver(ParamChan, NpRecvPk, NpSendEncs)
+
+	chS := ot.PrimarySender(baseReceiver, RefreshCh, k, m) // chS for getrequests
+
+	for i := 0; i < numBlocks; i++ {
+		reqCh := make(chan ot.SendRequest)
+		repCh := make(chan []byte)
+		sender := ot.NewMplexSender(repCh, reqCh, chS)
+		rchannel := make(chan uint32)
+		x.BlockChans[i] = PerBlock{ot.PerBlockMplexChans{repCh, reqCh}, rchannel}
+		blocks[i].otSenders[party] = sender
+		blocks[i].rchannels[party] = rchannel
+	}
+	nu <- x
+}
+
+var done chan struct{} = make(chan struct{})
+
+func (io PeerIO) listen(party int) <-chan PerNodePair {
+	if io.id == party {
+		panic("listen0")
+	}
+	addr := fmt.Sprintf("127.0.0.1:%d", base_port+(io.n*io.id)+party)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("listen(%q): %s", addr, err)
+	}
+	conn, err := listener.Accept()
+	if err != nil {
+		log.Fatalf("accept(): %s", err)
+	}
+	xport := fatchan.New(conn, nil)
+	nu := make(chan PerNodePair)
+	xport.ToChan(nu)
+	return nu
+}
+
+func serverSideIOSetup(blocks []BlockIO, party int, nu <-chan PerNodePair) {
+	numBlocks := len(blocks)
+	k := 80
+	m := 1024
+
+	x := <-nu
+	if numBlocks != len(x.BlockChans) {
+		panic("Block mismatch")
+	}
+	baseSender := ot.NewNPSender(x.NPChans.ParamChan, x.NPChans.NpRecvPk, x.NPChans.NpSendEncs)
+	chR := ot.PrimaryReceiver(baseSender, x.PerNodePairMplexChans.RefreshCh, k, m)
+	for i, v := range x.BlockChans {
+		receiver := ot.NewMplexReceiver(v.PerBlockMplexChans.RepCh, v.PerBlockMplexChans.ReqCh, chR)
+		blocks[i].otReceivers[party] = receiver
+		blocks[i].wchannels[party] = v.rchannel
+	}
+	done <- struct{}{}
+}
+
+func NewPeerIO(numBlocks int, numParties int, id int) PeerIO {
+	var gio GlobalIO
+	gio.n = numParties
+	gio.id = id
+	var io PeerIO
+	io.GlobalIO = &gio
+	io.blocks = make([]BlockIO, numBlocks+1) // one extra BlockIO for main loop
+	for i := range io.blocks {
+		io.blocks[i].GlobalIO = io.GlobalIO
+		io.blocks[i].rchannels = make([]chan uint32, numParties)
+		io.blocks[i].wchannels = make([]chan uint32, numParties)
+		io.blocks[i].otSenders = make([]ot.Sender, numParties)
+		io.blocks[i].otReceivers = make([]ot.Receiver, numParties)
+	}
+	return io
+}
+
+func SetupPeer(numBlocks int, numParties int, id int) {
+	io := NewPeerIO(numBlocks, numParties, id)
+	for i := 0; i < numParties; i++ {
+		if io.id != i {
+			go serverSideIOSetup(io.blocks, i, io.listen(i))
+		}
+	}
+	for i := 0; i < numParties; i++ {
+		if io.id != i {
+			clientSideIOSetup(io.blocks, i, io.connect(i))
+		}
+	}
+	for i := 0; i < numParties; i++ {
+		if io.id != i {
+			<-done
+		}
+	}
+	// May need to sleep here to avoid fatchan deadlock
+}
+
+func Simulation(numParties int, numBlocks int, runPeer func(Io, []Io), peerDone <-chan bool) {
+	ios := make([]PeerIO, numParties)
+	for i := 0; i < numParties; i++ {
+		ios[i] = NewPeerIO(numBlocks, numParties, i)
+	}
+	nus := make([]chan PerNodePair, numParties*numParties)
+	for i := 0; i < numParties; i++ {
+		for j := 0; j < numParties; j++ {
+			if i != j {
+				nu := make(chan PerNodePair)
+				nus[i*numParties+j] = nu
+				go serverSideIOSetup(ios[i].blocks, j, nu) // i's setup server for party j
+			}
+		}
+	}
+	for i := 0; i < numParties; i++ {
+		for j := 0; j < numParties; j++ {
+			if i != j {
+				nu := nus[i*numParties+j]
+				clientSideIOSetup(ios[i].blocks, j, nu) // i's setup client for party j
+			}
+		}
+	}
+	for i := 0; i < numParties; i++ {
+		for j := 0; j < numParties; j++ {
+			if i != j {
+				<-done // wait for a setup server to finish
+			}
+		}
+	}
+	// all setup clients and servers have finished
+	for i := 0; i < numParties; i++ {
+		// copy ios[i].blocks[1:] to make an []Io; []BlockIO is not []Io
+		x := make([]Io, numBlocks)
+		for j := 0; j < numBlocks; j++ {
+			x[j] = ios[i].blocks[j+1]
+		}
+		go runPeer(ios[i].blocks[0], x)
+	}
+	for i := 0; i < numParties; i++ {
+		<-peerDone // wait for all peers to complete
+	}
+}
+
+func (x GlobalIO) N() int {
+	return x.n
+}
+
+func (x GlobalIO) Id() int {
+	return x.id
+}
+
+func (x BlockIO) Triple1() (a, b, c bool) {
+	if len(x.triples1) == 0 {
+		a32, b32, c32 := x.Triple32()
+		x.triples1 = make([]struct{ a, b, c bool }, 32)
+		for i := range x.triples1 {
+			ui := uint(i)
+			x.triples1[i] = struct{ a, b, c bool }{0 < (1 & (a32 >> ui)), 0 < (1 & (b32 >> ui)), 0 < (1 & (c32 >> ui))}
+		}
+	}
+	result := x.triples1[0]
+	x.triples1 = x.triples1[1:]
+	return result.a, result.b, result.c
+}
+
+func (x BlockIO) Triple8() (a, b, c uint8) {
+	if len(x.triples8) == 0 {
+		a32, b32, c32 := x.Triple32()
+		x.triples8 = []struct{ a, b, c uint8 }{{uint8(a32 >> 0), uint8(b32 >> 0), uint8(c32 >> 0)},
+			{uint8(a32 >> 8), uint8(b32 >> 8), uint8(c32 >> 8)},
+			{uint8(a32 >> 16), uint8(b32 >> 16), uint8(c32 >> 16)},
+			{uint8(a32 >> 24), uint8(b32 >> 24), uint8(c32 >> 24)}}
+	}
+	result := x.triples8[0]
+	x.triples8 = x.triples8[1:]
+	return result.a, result.b, result.c
+}
+
+func (x BlockIO) Triple32() (a, b, c uint32) {
+
+	done := make(chan bool, 10)
+	if len(x.triples32) == 0 {
+		fmt.Printf("X.id=%d out of triples, making more\n", x.id)
+		x.triples32 = make([]Triple, NUM_TRIPLES)
+		for triple_i := 0; triple_i < NUM_TRIPLES; triple_i++ {
+			go func(triple_i int) {
+				// fmt.Printf("triple_i=%d, len(triples32)=%d\n", triple_i, len(x.triples32))
+				x.triples32[triple_i] = triple32Secure(x.n, x.id, x.otSenders, x.otReceivers)
+				done <- true
+			}(triple_i)
+			<-done
+		}
+	}
+	result := x.triples32[0]
+	x.triples32 = x.triples32[1:]
+	return result.a, result.b, result.c
+}
+
+func (x BlockIO) Triple64() (a, b, c uint64) {
+	a0, b0, c0 := x.Triple32()
+	a1, b1, c1 := x.Triple32()
+	return (uint64(a0) << 32) | uint64(a1), (uint64(b0) << 32) | uint64(b1), (uint64(c0) << 32) | uint64(c1)
+}
+
+func (x BlockIO) Open1(s bool) bool {
+	x.Broadcast1(s)
+	result := s
+	id := x.Id()
+	for i := range x.rchannels {
+		if i == id {
+			continue
+		}
+		result = xor(result, x.Receive1(i))
+	}
+	return result
+}
+
+func (x BlockIO) Open8(s uint8) uint8 {
+	x.Broadcast8(s)
+	result := s
+	id := x.Id()
+	for i := range x.rchannels {
+		if i == id {
+			continue
+		}
+		result ^= x.Receive8(i)
+	}
+	return result
+}
+
+func (x BlockIO) Open32(s uint32) uint32 {
+	x.Broadcast32(s)
+	result := s
+	id := x.Id()
+	for i := range x.rchannels {
+		if i == id {
+			continue
+		}
+		result ^= x.Receive32(i)
+	}
+	return result
+}
+
+func (x BlockIO) Open64(s uint64) uint64 {
+	x.Broadcast64(s)
+	result := s
+	id := x.Id()
+	for i := range x.rchannels {
+		if i == id {
+			continue
+		}
+		result ^= x.Receive64(i)
+	}
+	return result
+}
+
+func (x BlockIO) Broadcast1(n bool) {
+	var n32 uint32 = 0
+	if n {
+		n32 = 1
+	}
+	id := x.Id()
+	if log_communication {
+		fmt.Printf("%d: BROADCAST 0x%1x\n", id, n32)
+	}
+	for i, ch := range x.wchannels {
+		if i == id {
+			continue
+		}
+		ch <- n32
+		if log_communication {
+			fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
+		}
+	}
+}
+
+func (x BlockIO) Broadcast8(n uint8) {
+	id := x.Id()
+	if log_communication {
+		fmt.Printf("%d: BROADCAST 0x%02x\n", id, n)
+	}
+	for i, ch := range x.wchannels {
+		if i == id {
+			continue
+		}
+		ch <- uint32(n)
+		if log_communication {
+			fmt.Printf("%d -- 0x%02x -> %d\n", id, n, i)
+		}
+	}
+}
+
+func (x BlockIO) Broadcast32(n uint32) {
+	id := x.Id()
+	if log_communication {
+		fmt.Printf("%d: BROADCAST 0x%08x\n", id, n)
+	}
+	for i, ch := range x.wchannels {
+		if i == id {
+			continue
+		}
+		ch <- n
+		if log_communication {
+			fmt.Printf("%d -- 0x%08x -> %d\n", id, n, i)
+		}
+	}
+}
+
+func (x BlockIO) Broadcast64(n uint64) {
+	n0 := uint32(n >> 32)
+	n1 := uint32(n)
+	x.Broadcast32(n0)
+	x.Broadcast32(n1)
+}
+
+func (x BlockIO) Send1(party int, n bool) {
+	var n32 uint32 = 0
+	if n {
+		n32 = 1
+	}
+	x.Send32(party, n32)
+}
+
+func (x BlockIO) Send8(party int, n uint8) {
+	var n32 uint32 = uint32(n)
+	id := x.Id()
+	if party == id {
+		return
+	}
+	x.Send32(party, n32)
+}
+
+func (x BlockIO) Send32(party int, n32 uint32) {
+	id := x.Id()
+	if party == id {
+		return
+	}
+	ch := x.wchannels[party]
+	ch <- n32
+	if log_communication {
+		fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, party)
+	}
+}
+
+func (x BlockIO) Send64(party int, n uint64) {
+	n0 := uint32(n >> 32)
+	n1 := uint32(n)
+	x.Send32(party, n0)
+	x.Send32(party, n1)
+}
+
+func (x BlockIO) Receive1(party int) bool {
+	result := x.Receive32(party)
+	return result > 0
+}
+
+func (x BlockIO) Receive8(party int) uint8 {
+	result := x.Receive32(party)
+	return uint8(result)
+}
+
+func (x BlockIO) Receive32(party int) uint32 {
+	id := x.Id()
+	if party == id {
+		return 0
+	}
+	// fmt.Printf("Receive32: party=%d, len(rchannels)=%d\n", party, len(x.rchannels))
+	ch := x.rchannels[party]
+	result, ok := <-ch
+	if !ok {
+		panic("channel closed")
+	}
+	if log_communication {
+		fmt.Printf("%d <- 0x%08x -- %d\n", id, result, party)
+	}
+	return result
+}
+
+func (x BlockIO) Receive64(party int) uint64 {
+	n0 := x.Receive32(party)
+	n1 := x.Receive32(party)
+	return (uint64(n0) << 32) | uint64(n1)
+}
+
+func (x BlockIO) GetInput() uint32 {
+	result := x.inputs[0]
+	x.inputs = x.inputs[1:]
+	return result
+}
+
+func (x BlockIO) InitRam(contents []byte) {
+	x.ram = contents
+}
+
+func (x BlockIO) Ram() []byte {
+	return x.ram
 }
