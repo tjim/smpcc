@@ -475,6 +475,7 @@ let print_function_circuit m f =
   bprintf b "package main\n";
   bprintf b "\n";
   bprintf b "import \"%sgmw\"\n" package_prefix;
+  bprintf b "import \"flag\"\n";
   bprintf b "import \"fmt\"\n";
   bprintf b "import \"os\"\n";
   bprintf b "import \"runtime/pprof\"\n";
@@ -483,14 +484,14 @@ let print_function_circuit m f =
   bprintf b "var log_stats bool = false\n";
   bprintf b "\n";
   bprintf b "var args []string\n";
+  bprintf b "var do_old bool\n";
   bprintf b "var do_pprof bool\n";
   bprintf b "\n";
   bprintf b "func init_args() {\n";
-  bprintf b "\targs = os.Args[1:]\n";
-  bprintf b "\tif len(args) > 0 && args[0] == \"-pprof\" {\n";
-  bprintf b "\t\targs = args[1:]\n";
-  bprintf b "\t\tdo_pprof = true\n";
-  bprintf b "\t}\n";
+  bprintf b "\tflag.BoolVar(&do_old, \"old\", false, \"use old simulation (default false/new simulation)\")\n";
+  bprintf b "\tflag.BoolVar(&do_pprof, \"pprof\", false, \"run for profiling\")\n";
+  bprintf b "\tflag.Parse()\n";
+  bprintf b "\targs = flag.Args()\n";
   bprintf b "}\n";
   bprintf b "func next_arg() uint32 {\n";
   bprintf b "\tif len(args) <= 0 {\n";
@@ -535,12 +536,16 @@ let print_function_circuit m f =
   bprintf b "\tif log_stats {\n";
   bprintf b "\t	fmt.Printf(\"Triple generation completed (%%s), starting computation\\n\", time.Since(start_time).String())\n";
   bprintf b "\t}\n";
+  bprintf b "\tif do_old {\n";
   for i = 0 to num_parties-1 do
-    bprintf b "\tgo blocks_main(io[%d], ios[%d])\n" i i;
+    bprintf b "\t\tgo blocks_main(io[%d], ios[%d])\n" i i;
   done;
   for i = 0 to num_parties-1 do
-    bprintf b "\t<-%s_done\n" (Gc.govar f.fname);
+    bprintf b "\t\t<-%s_done\n" (Gc.govar f.fname);
   done;
+  bprintf b "\t} else {\n";
+  bprintf b "\t\tgmw.Simulation(%d, %d, blocks_main, _main_done)\n" num_parties (List.length f.fblocks);
+  bprintf b "\t}\n";
   bprintf b "\tfmt.Println(\"Done\")\n";
   bprintf b "\tif log_stats {\n";
   bprintf b "\t\tfmt.Printf(\"Computation took %%s\\n\", time.Since(compute_start_time).String())\n";

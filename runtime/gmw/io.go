@@ -110,7 +110,7 @@ func (x *X) Triple32() (a, b, c uint32) {
 
 	done := make(chan bool, 10)
 	if len(x.triples32) == 0 {
-		fmt.Printf("X.id=%d out of triples, making more\n", x.id)
+		//		fmt.Printf("X.id=%d out of triples, making more\n", x.id)
 		x.triples32 = make([]Triple, NUM_TRIPLES)
 		for triple_i := 0; triple_i < NUM_TRIPLES; triple_i++ {
 			go func(triple_i int) {
@@ -118,7 +118,7 @@ func (x *X) Triple32() (a, b, c uint32) {
 				x.triples32[triple_i] = triple32Secure(x.n, x.id, x.otSenders, x.otReceivers)
 				done <- true
 			}(triple_i)
-			<-done
+			<-done // NB BUG this forces all the goroutines to run in sequence
 		}
 	}
 	result := x.triples32[0]
@@ -197,7 +197,7 @@ func (x *X) Broadcast1(n bool) {
 		if i == id {
 			continue
 		}
-		ch <- n32
+		ch <- n32 // NB channel is buffered, shouldn't block
 		if log_communication {
 			fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
 		}
@@ -213,7 +213,7 @@ func (x *X) Broadcast8(n uint8) {
 		if i == id {
 			continue
 		}
-		ch <- uint32(n)
+		ch <- uint32(n) // NB channel is buffered, shouldn't block
 		if log_communication {
 			fmt.Printf("%d -- 0x%02x -> %d\n", id, n, i)
 		}
@@ -229,7 +229,7 @@ func (x *X) Broadcast32(n uint32) {
 		if i == id {
 			continue
 		}
-		ch <- n
+		ch <- n // NB channel is buffered, shouldn't block
 		if log_communication {
 			fmt.Printf("%d -- 0x%08x -> %d\n", id, n, i)
 		}
@@ -266,7 +266,7 @@ func (x *X) Send32(party int, n32 uint32) {
 		return
 	}
 	ch := x.wchannels[party]
-	ch <- n32
+	ch <- n32 // NB channel is buffered, shouldn't block
 	if log_communication {
 		fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, party)
 	}
@@ -364,7 +364,7 @@ func split_uint32(x uint32, n int) []uint32 {
 func triples32TwoParties(num_triples, thisPartyId, otherPartyId int,
 	thisSender ot.Sender, thisReceiver ot.Receiver) []Triple {
 
-	fmt.Printf("%d, %d: triples32TwoParties\n", thisPartyId, otherPartyId)
+	//	fmt.Printf("%d, %d: triples32TwoParties\n", thisPartyId, otherPartyId)
 
 	if thisReceiver == nil {
 		panic("this receiver is nil")
@@ -461,14 +461,25 @@ func piMulS(val uint32, thisSender ot.Sender) uint32 {
 }
 
 func triple32Secure(n int, thisPartyId int, senders []ot.Sender, receivers []ot.Receiver) Triple {
-	// Notation is from figure 9, DO10, and Algorithm 1 from ALSZ13
+	// Notation is from Figure 9 (p11) of
+	//
+	// "Multiparty Computation for Dishonest Majority: from Passive to Active Security at Low Cost"
+	// by Damgard and Orlandi
+	// http://eprint.iacr.org/2010/318
+	//
+	// and Algorithm 1 from
+	//
+	// "More Efficient Oblivious Transfer and Extensions for Faster Secure Computation"
+	// Gilad Asharov and Yehuda Lindell and Thomas Schneider and Michael Zohner
+	// http://eprint.iacr.org/2013/552
+
 	var a, b uint32
 	a = rand32()
 	b = rand32()
 
 	d := make([]uint32, n)
 	e := make([]uint32, n)
-	// fmt.Printf("triple32Secure: n=%d, thisPartyId=%d, a=%d, b=%d\nd=%v\ne=%v\n", n, thisPartyId, a, b, d, e)
+	//	fmt.Printf("triple32Secure: n=%d, thisPartyId=%d, a=%032b, b=%032b\nd=%v\ne=%v\n", n, thisPartyId, a, b, d, e)
 
 	for i := 0; i < n; i++ {
 		if i == thisPartyId {
@@ -485,11 +496,13 @@ func triple32Secure(n int, thisPartyId int, senders []ot.Sender, receivers []ot.
 	}
 
 	result := Triple{a, b, a & b}
-	// fmt.Printf("secure triple id=%v res=%+v\n", thisPartyId, result)
+	//fmt.Printf("secure triple id=%v res=%+v\n", thisPartyId, result)
 	for i := 0; i < n; i++ {
 		result.c ^= d[i] ^ e[i]
 	}
-	// fmt.Printf("post secure triple id=%v res=%+v\n", thisPartyId, result)
+	//	fmt.Printf("[%d] a = 0x%032b\n", thisPartyId, result.a)
+	//	fmt.Printf("[%d] b = 0x%032b\n", thisPartyId, result.b)
+	//	fmt.Printf("[%d] c = 0x%032b\n", thisPartyId, result.c)
 
 	return result
 }
@@ -527,7 +540,7 @@ func Example(n int) []*X {
 		otSChannels[i] = make([]ot.Sender, n)
 	}
 
-	fmt.Println("Creating pairwise OT channels.")
+	//	fmt.Println("Creating pairwise OT channels.")
 	for i := 0; i < n; i++ {
 		for j := 0; j < n; j++ {
 			if i == j {
@@ -749,6 +762,7 @@ func clientSideIOSetup(blocks []BlockIO, party int, nu chan<- PerNodePair) {
 		x.BlockChans[i] = PerBlock{ot.PerBlockMplexChans{repCh, reqCh}, rchannel}
 		blocks[i].otSenders[party] = sender
 		blocks[i].rchannels[party] = rchannel
+		//		fmt.Printf("blocks[%d].rchannels[%d] = %v\n", i, party, rchannel)
 	}
 	nu <- x
 }
@@ -789,6 +803,7 @@ func serverSideIOSetup(blocks []BlockIO, party int, nu <-chan PerNodePair) {
 		receiver := ot.NewMplexReceiver(v.PerBlockMplexChans.RepCh, v.PerBlockMplexChans.ReqCh, chR)
 		blocks[i].otReceivers[party] = receiver
 		blocks[i].wchannels[party] = v.rchannel
+		//		fmt.Printf("blocks[%d].wchannels[%d] = %v\n", i, party, v.rchannel)
 	}
 	done <- struct{}{}
 }
@@ -840,7 +855,7 @@ func Simulation(numParties int, numBlocks int, runPeer func(Io, []Io), peerDone 
 		for j := 0; j < numParties; j++ {
 			if i != j {
 				nu := make(chan PerNodePair)
-				nus[i*numParties+j] = nu
+				nus[i*numParties+j] = nu                   // server i talking to client j
 				go serverSideIOSetup(ios[i].blocks, j, nu) // i's setup server for party j
 			}
 		}
@@ -848,7 +863,7 @@ func Simulation(numParties int, numBlocks int, runPeer func(Io, []Io), peerDone 
 	for i := 0; i < numParties; i++ {
 		for j := 0; j < numParties; j++ {
 			if i != j {
-				nu := nus[i*numParties+j]
+				nu := nus[j*numParties+i]               // client i talking to server j
 				clientSideIOSetup(ios[i].blocks, j, nu) // i's setup client for party j
 			}
 		}
@@ -911,17 +926,12 @@ func (x BlockIO) Triple8() (a, b, c uint8) {
 
 func (x BlockIO) Triple32() (a, b, c uint32) {
 
-	done := make(chan bool, 10)
 	if len(x.triples32) == 0 {
-		fmt.Printf("X.id=%d out of triples, making more\n", x.id)
+		//		fmt.Printf("X.id=%d out of triples, making more\n", x.id)
 		x.triples32 = make([]Triple, NUM_TRIPLES)
 		for triple_i := 0; triple_i < NUM_TRIPLES; triple_i++ {
-			go func(triple_i int) {
-				// fmt.Printf("triple_i=%d, len(triples32)=%d\n", triple_i, len(x.triples32))
-				x.triples32[triple_i] = triple32Secure(x.n, x.id, x.otSenders, x.otReceivers)
-				done <- true
-			}(triple_i)
-			<-done
+			// fmt.Printf("triple_i=%d, len(triples32)=%d\n", triple_i, len(x.triples32))
+			x.triples32[triple_i] = triple32Secure(x.n, x.id, x.otSenders, x.otReceivers)
 		}
 	}
 	result := x.triples32[0]
@@ -1000,7 +1010,8 @@ func (x BlockIO) Broadcast1(n bool) {
 		if i == id {
 			continue
 		}
-		ch <- n32
+		// goroutine to avoid deadlock, all nodes broadcast then receive simultaneously
+		go func(ch chan uint32) { ch <- n32 }(ch)
 		if log_communication {
 			fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
 		}
@@ -1016,7 +1027,8 @@ func (x BlockIO) Broadcast8(n uint8) {
 		if i == id {
 			continue
 		}
-		ch <- uint32(n)
+		// goroutine to avoid deadlock, all nodes broadcast then receive simultaneously
+		go func(ch chan uint32) { ch <- uint32(n) }(ch)
 		if log_communication {
 			fmt.Printf("%d -- 0x%02x -> %d\n", id, n, i)
 		}
@@ -1032,7 +1044,8 @@ func (x BlockIO) Broadcast32(n uint32) {
 		if i == id {
 			continue
 		}
-		ch <- n
+		// goroutine to avoid deadlock, all nodes broadcast then receive simultaneously
+		go func(ch chan uint32) { ch <- n }(ch)
 		if log_communication {
 			fmt.Printf("%d -- 0x%08x -> %d\n", id, n, i)
 		}
@@ -1069,7 +1082,7 @@ func (x BlockIO) Send32(party int, n32 uint32) {
 		return
 	}
 	ch := x.wchannels[party]
-	ch <- n32
+	ch <- n32 // NB nodes don't send32() simultaneously so no goroutine needed
 	if log_communication {
 		fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, party)
 	}
