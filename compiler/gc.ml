@@ -494,8 +494,10 @@ let print_function_circuit m f =
     bprintf b "var id int\n";
     bprintf b "var addr string\n";
     bprintf b "var args []string\n";
+    bprintf b "var do_old bool\n";
     bprintf b "\n";
     bprintf b "func init_args() {\n";
+    bprintf b "\tflag.BoolVar(&do_old, \"old\", false, \"use old, non-multiplex OT (default false)\")\n";
     bprintf b "\tflag.IntVar(&id, \"id\", 0, \"identity (default 0)\")\n";
     bprintf b "\tflag.StringVar(&addr, \"addr\", \"127.0.0.1:3042\", \"network address (default 127.0.0.1:3042)\")\n";
     bprintf b "\tflag.Parse()\n";
@@ -513,10 +515,14 @@ let print_function_circuit m f =
     bprintf b "\n";
     bprintf b "func main() {\n";
     bprintf b "\tinit_args()\n";
-    bprintf b "\tif id == 0 {\n";
+    bprintf b "\tif id == 0 && do_old {\n";
     bprintf b "\t\tbasegen.Client(addr, gen_main, %d, gen.NewVM)\n" (List.length f.fblocks + 1);
-    bprintf b "\t} else {\n";
+    bprintf b "\t} else if id == 0 {\n";
+    bprintf b "\t\tbasegen.Client2(addr, gen_main, %d, gen.NewVM)\n" (List.length f.fblocks + 1);
+    bprintf b "\t} else if do_old {\n";
     bprintf b "\t\tbaseeval.Server(addr, eval_main, %d, eval.NewVM)\n" (List.length f.fblocks + 1);
+    bprintf b "\t} else {\n";
+    bprintf b "\t\tbaseeval.Server2(addr, eval_main, %d, eval.NewVM)\n" (List.length f.fblocks + 1);
     bprintf b "\t}\n";
     bprintf b "}\n";
   end;
