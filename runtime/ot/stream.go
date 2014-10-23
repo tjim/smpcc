@@ -5,7 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"fmt"
-//	"time"
+	//	"time"
 )
 
 const (
@@ -158,8 +158,8 @@ func (R StreamReceiver) ReceiveBitwise(c []byte) []byte {
 }
 
 // Create a new StreamSender that can operate independently of the parent StreamSender (concurrent operation).
-// It must be paired (via to/from) with a StreamReceiver branched from the original StreamSender's StreamReceiver.
-func (S StreamSender) Branch(to chan<- MessagePair, from chan []byte) StreamSender {
+// It must be paired (via to/from) with a StreamReceiver forked from the original StreamSender's StreamReceiver.
+func (S StreamSender) Fork(to chan<- MessagePair, from chan []byte) StreamSender {
 	s := S.s
 	rstSeed := bytesFrom(S.rstStream, SeedBytes)
 	rstStream := sha3.NewCipher(rstSeed, nil)
@@ -167,8 +167,8 @@ func (S StreamSender) Branch(to chan<- MessagePair, from chan []byte) StreamSend
 }
 
 // Create a new StreamReceiver that can operate independently of the parent StreamReceiver (concurrent operation).
-// It must be paired (via to/from) with a StreamSender branched from the original StreamReceiver's StreamSender.
-func (R StreamReceiver) Branch(to chan []byte, from chan MessagePair) StreamReceiver {
+// It must be paired (via to/from) with a StreamSender forked from the original StreamReceiver's StreamSender.
+func (R StreamReceiver) Fork(to chan []byte, from chan MessagePair) StreamReceiver {
 	tSeed := bytesFrom(R.tStream, SeedBytes)
 	rtSeed := bytesFrom(R.rtStream, SeedBytes)
 	tStream := sha3.NewCipher(tSeed, nil)
@@ -203,16 +203,16 @@ func main() {
 
 	r2s = make(chan []byte)
 	s2r = make(chan MessagePair)
-	R2 := R.Branch(r2s, s2r)
-	S2 := S.Branch(s2r, r2s)
+	R2 := R.Fork(r2s, s2r)
+	S2 := S.Fork(s2r, r2s)
 	go func() {
 		S2.SendBitwise(hello, world)
 	}()
 	x = R2.ReceiveBitwise(spreadBytes(0, 5))
 	fmt.Printf("%s\n", x)
-//	// works out to about 64MB/1.23s
-//	compute_start_time := time.Now()
-//	numBytes := (2<<20)*64
-//	bytesFrom(R.tStream, numBytes)
-//	fmt.Printf("Computation took %s\n", time.Since(compute_start_time).String())
+	//	// works out to about 64MB/1.23s
+	//	compute_start_time := time.Now()
+	//	numBytes := (2<<20)*64
+	//	bytesFrom(R.tStream, numBytes)
+	//	fmt.Printf("Computation took %s\n", time.Since(compute_start_time).String())
 }
