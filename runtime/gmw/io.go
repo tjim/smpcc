@@ -689,8 +689,8 @@ type BlockIO struct {
 	triples1    []struct{ a, b, c bool }
 	rchannels   []chan uint32
 	wchannels   []chan uint32
-	otSenders   []ot.Sender
-	otReceivers []ot.Receiver
+	otSenders   []ot.StreamSender
+	otReceivers []ot.StreamReceiver
 }
 
 type PeerIO struct {
@@ -709,13 +709,12 @@ Each peer connects to n-1 ports: for i<n, base port + n*i + id
 
 // for establishing connections
 type PerBlock struct {
-	ot.PerBlockMplexChans
+	ot.PerBlockStreamChans
 	rchannel chan uint32
 }
 
 type PerNodePair struct {
 	ot.NPChans
-	ot.PerNodePairMplexChans
 	BlockChans []PerBlock
 }
 
@@ -741,30 +740,27 @@ func (io PeerIO) connect(party int) chan<- PerNodePair {
 
 func clientSideIOSetup(blocks []BlockIO, party int, nu chan<- PerNodePair) {
 	numBlocks := len(blocks)
-	k := 80
-	m := 1024
 
 	ParamChan := make(chan big.Int)
 	NpRecvPk := make(chan big.Int)
 	NpSendEncs := make(chan ot.HashedElGamalCiph)
-	RefreshCh := make(chan int)
-	x := PerNodePair{ot.NPChans{ParamChan, NpRecvPk, NpSendEncs}, ot.PerNodePairMplexChans{RefreshCh}, make([]PerBlock, numBlocks)}
+	x := PerNodePair{ot.NPChans{ParamChan, NpRecvPk, NpSendEncs}, make([]PerBlock, numBlocks)}
 
 	baseReceiver := ot.NewNPReceiver(ParamChan, NpRecvPk, NpSendEncs)
 
-	chS := ot.PrimarySender(baseReceiver, RefreshCh, k, m) // chS for getrequests
-
 	for i := 0; i < numBlocks; i++ {
-		reqCh := make(chan ot.SendRequest)
-		repCh := make(chan []byte)
-		sender := ot.NewMplexSender(repCh, reqCh, chS)
+		S2R := make(chan ot.MessagePair)
+		R2S := make(chan []byte)
 		rchannel := make(chan uint32)
-		x.BlockChans[i] = PerBlock{ot.PerBlockMplexChans{repCh, reqCh}, rchannel}
-		blocks[i].otSenders[party] = sender
+		x.BlockChans[i] = PerBlock{ot.PerBlockStreamChans{S2R, R2S}, rchannel}
 		blocks[i].rchannels[party] = rchannel
 		//		fmt.Printf("blocks[%d].rchannels[%d] = %v\n", i, party, rchannel)
 	}
 	nu <- x
+	sender0 := ot.NewStreamSender(baseReceiver, nil, nil)
+	for i := 0; i < numBlocks; i++ {
+		blocks[i].otSenders[party] = sender0.Fork(x.BlockChans[i].S2R, x.BlockChans[i].R2S)
+	}
 }
 
 var done chan struct{} = make(chan struct{})
@@ -790,17 +786,16 @@ func (io PeerIO) listen(party int) <-chan PerNodePair {
 
 func serverSideIOSetup(blocks []BlockIO, party int, nu <-chan PerNodePair) {
 	numBlocks := len(blocks)
-	k := 80
-	m := 1024
 
 	x := <-nu
 	if numBlocks != len(x.BlockChans) {
 		panic("Block mismatch")
 	}
 	baseSender := ot.NewNPSender(x.NPChans.ParamChan, x.NPChans.NpRecvPk, x.NPChans.NpSendEncs)
-	chR := ot.PrimaryReceiver(baseSender, x.PerNodePairMplexChans.RefreshCh, k, m)
+	receiver0 := ot.NewStreamReceiver(baseSender, nil, nil)
+
 	for i, v := range x.BlockChans {
-		receiver := ot.NewMplexReceiver(v.PerBlockMplexChans.RepCh, v.PerBlockMplexChans.ReqCh, chR)
+		receiver := receiver0.Fork(v.PerBlockStreamChans.R2S, v.PerBlockStreamChans.S2R)
 		blocks[i].otReceivers[party] = receiver
 		blocks[i].wchannels[party] = v.rchannel
 		//		fmt.Printf("blocks[%d].wchannels[%d] = %v\n", i, party, v.rchannel)
@@ -819,8 +814,8 @@ func NewPeerIO(numBlocks int, numParties int, id int) PeerIO {
 		io.blocks[i].GlobalIO = io.GlobalIO
 		io.blocks[i].rchannels = make([]chan uint32, numParties)
 		io.blocks[i].wchannels = make([]chan uint32, numParties)
-		io.blocks[i].otSenders = make([]ot.Sender, numParties)
-		io.blocks[i].otReceivers = make([]ot.Receiver, numParties)
+		io.blocks[i].otSenders = make([]ot.StreamSender, numParties)
+		io.blocks[i].otReceivers = make([]ot.StreamReceiver, numParties)
 	}
 	return io
 }
@@ -924,6 +919,83 @@ func (x BlockIO) Triple8() (a, b, c uint8) {
 	return result.a, result.b, result.c
 }
 
+func spread(val uint32) []byte {
+	arr := make([]byte, 4)
+	for i := range arr {
+		arr[i] = byte(val >> uint(i*8))
+	}
+	return arr
+}
+
+func combine(arr []byte) uint32 {
+	if len(arr) != 4 {
+		panic("combine")
+	}
+	result := uint32(0)
+	for i,v := range arr {
+		result |= uint32(v) << uint(i*8)
+	}
+	return result
+}
+
+func piMulRStream(val uint32, thisReceiver ot.StreamReceiver) uint32 {
+	return combine(thisReceiver.ReceiveBitwise(spread(val)))
+}
+
+func piMulSStream(val uint32, thisSender ot.StreamSender) uint32 {
+	x0 := rand32()
+	x1 := x0 ^ val
+	thisSender.SendBitwise(spread(x0), spread(x1))
+	return x0
+}
+
+func triple32Stream(n int, thisPartyId int, senders []ot.StreamSender, receivers []ot.StreamReceiver) Triple {
+	// Notation is from Figure 9 (p11) of
+	//
+	// "Multiparty Computation for Dishonest Majority: from Passive to Active Security at Low Cost"
+	// by Damgard and Orlandi
+	// http://eprint.iacr.org/2010/318
+	//
+	// and Algorithm 1 from
+	//
+	// "More Efficient Oblivious Transfer and Extensions for Faster Secure Computation"
+	// Gilad Asharov and Yehuda Lindell and Thomas Schneider and Michael Zohner
+	// http://eprint.iacr.org/2013/552
+
+	var a, b uint32
+	a = rand32()
+	b = rand32()
+
+	d := make([]uint32, n)
+	e := make([]uint32, n)
+	//	fmt.Printf("triple32Secure: n=%d, thisPartyId=%d, a=%032b, b=%032b\nd=%v\ne=%v\n", n, thisPartyId, a, b, d, e)
+
+	for i := 0; i < n; i++ {
+		if i == thisPartyId {
+			continue
+		}
+		// fmt.Printf("secure triple this=%d, other=%d\n", thisPartyId, i)
+		if thisPartyId > i {
+			d[i] = piMulRStream(a, receivers[i])
+			e[i] = piMulSStream(b, senders[i])
+		} else {
+			e[i] = piMulSStream(b, senders[i])
+			d[i] = piMulRStream(a, receivers[i])
+		}
+	}
+
+	result := Triple{a, b, a & b}
+	//fmt.Printf("secure triple id=%v res=%+v\n", thisPartyId, result)
+	for i := 0; i < n; i++ {
+		result.c ^= d[i] ^ e[i]
+	}
+	//fmt.Printf("[%d] a = 0x%032b\n", thisPartyId, result.a)
+	//fmt.Printf("[%d] b = 0x%032b\n", thisPartyId, result.b)
+	//fmt.Printf("[%d] c = 0x%032b\n", thisPartyId, result.c)
+
+	return result
+}
+
 func (x BlockIO) Triple32() (a, b, c uint32) {
 
 	if len(x.triples32) == 0 {
@@ -931,7 +1003,7 @@ func (x BlockIO) Triple32() (a, b, c uint32) {
 		x.triples32 = make([]Triple, NUM_TRIPLES)
 		for triple_i := 0; triple_i < NUM_TRIPLES; triple_i++ {
 			// fmt.Printf("triple_i=%d, len(triples32)=%d\n", triple_i, len(x.triples32))
-			x.triples32[triple_i] = triple32Secure(x.n, x.id, x.otSenders, x.otReceivers)
+			x.triples32[triple_i] = triple32Stream(x.n, x.id, x.otSenders, x.otReceivers)
 		}
 	}
 	result := x.triples32[0]

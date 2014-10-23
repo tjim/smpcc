@@ -74,6 +74,11 @@ func NewStreamSender(receiver Receiver, to chan<- MessagePair, from <-chan []byt
 	return StreamSender{s, rstStream, to, from}
 }
 
+type PerBlockStreamChans struct {
+	S2R chan MessagePair `fatchan:"request"` // One per sender/receiver pair, sender->receiver
+	R2S chan []byte      `fatchan:"reply"`   // One per sender/receiver pair, receiver->sender
+}
+
 // Bitwise MUX of byte sequences a and b, according to byte sequence c.
 // Each bit of the result is the corresponding bit of a if the corresponding bit of c is 0,
 // or the corresponding bit of b if the corresponding bit of c is 1.
@@ -100,9 +105,9 @@ func XorBytes(a, b []byte) []byte {
 	return result
 }
 
-func spreadBytes(b byte, n int) []byte {
+func SpreadBytes(b byte, n int) []byte {
 	if n <= 0 {
-		panic("spreadBytes")
+		panic("SpreadBytes")
 	}
 	result := make([]byte, n)
 	switch b {
@@ -116,7 +121,7 @@ func spreadBytes(b byte, n int) []byte {
 			result[i] = 0xff
 		}
 	default:
-		panic("spreadBytes")
+		panic("SpreadBytes")
 	}
 	return result
 }
@@ -130,7 +135,7 @@ func (S StreamSender) SendBitwise(a, b []byte) {
 	if len(rc) != L {
 		panic("SendBitwise selector length")
 	}
-	spreadS := spreadBytes(S.s, L)
+	spreadS := SpreadBytes(S.s, L)
 	rst := bytesFrom(S.rstStream, L)
 	m0 := MuxBytes(rc,
 		XorBytes(a, rst),
@@ -197,7 +202,7 @@ func main() {
 	go func() {
 		S.SendBitwise(hello, world)
 	}()
-	c := spreadBytes(1, 5)
+	c := SpreadBytes(1, 5)
 	x := R.ReceiveBitwise(c)
 	fmt.Printf("%s\n", x)
 
@@ -208,7 +213,7 @@ func main() {
 	go func() {
 		S2.SendBitwise(hello, world)
 	}()
-	x = R2.ReceiveBitwise(spreadBytes(0, 5))
+	x = R2.ReceiveBitwise(SpreadBytes(0, 5))
 	fmt.Printf("%s\n", x)
 	//	// works out to about 64MB/1.23s
 	//	compute_start_time := time.Now()
