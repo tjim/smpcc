@@ -938,18 +938,41 @@ func combine(arr []byte) uint32 {
 	return result
 }
 
-func piMulRStream(val uint32, thisReceiver ot.StreamReceiver) uint32 {
-	return combine(thisReceiver.ReceiveBitwise(spread(val)))
+func piMulRStream(val []byte, thisReceiver ot.StreamReceiver) []byte {
+	return thisReceiver.ReceiveBitwise(val)
 }
 
-func piMulSStream(val uint32, thisSender ot.StreamSender) uint32 {
-	x0 := rand32()
-	x1 := x0 ^ val
-	thisSender.SendBitwise(spread(x0), spread(x1))
+func piMulSStream(val []byte, thisSender ot.StreamSender) []byte {
+	x0 := randomBytes(len(val))
+	x1 := ot.XorBytes(x0, val)
+	thisSender.SendBitwise(x0, x1)
 	return x0
 }
 
-func triple32Stream(n int, thisPartyId int, senders []ot.StreamSender, receivers []ot.StreamReceiver) Triple {
+func randomBytes(numBytes int) []byte {
+	result := make([]byte, numBytes)
+	_, err := rand.Read(result)
+	if err != nil {
+		panic("random number generation")
+	}
+	return result
+}
+
+func AndBytes(a, b []byte) []byte {
+	if len(a) != len(b) {
+		panic("AndBytes")
+	}
+	result := make([]byte, len(a))
+	for i, v := range a {
+		result[i] = v & b[i]
+	}
+	return result
+}
+
+func triple32Stream(thisPartyId int, senders []ot.StreamSender, receivers []ot.StreamReceiver) []Triple {
+	n := len(senders)
+	result := make([]Triple, NUM_TRIPLES)
+	numBytes := NUM_TRIPLES * 4
 	// Notation is from Figure 9 (p11) of
 	//
 	// "Multiparty Computation for Dishonest Majority: from Passive to Active Security at Low Cost"
@@ -962,12 +985,11 @@ func triple32Stream(n int, thisPartyId int, senders []ot.StreamSender, receivers
 	// Gilad Asharov and Yehuda Lindell and Thomas Schneider and Michael Zohner
 	// http://eprint.iacr.org/2013/552
 
-	var a, b uint32
-	a = rand32()
-	b = rand32()
+	a := randomBytes(numBytes)
+	b := randomBytes(numBytes)
 
-	d := make([]uint32, n)
-	e := make([]uint32, n)
+	d := make([][]byte, n)
+	e := make([][]byte, n)
 	//	fmt.Printf("triple32Secure: n=%d, thisPartyId=%d, a=%032b, b=%032b\nd=%v\ne=%v\n", n, thisPartyId, a, b, d, e)
 
 	for i := 0; i < n; i++ {
@@ -984,10 +1006,20 @@ func triple32Stream(n int, thisPartyId int, senders []ot.StreamSender, receivers
 		}
 	}
 
-	result := Triple{a, b, a & b}
-	//fmt.Printf("secure triple id=%v res=%+v\n", thisPartyId, result)
+	c := AndBytes(a,b)
 	for i := 0; i < n; i++ {
-		result.c ^= d[i] ^ e[i]
+		if i == thisPartyId {
+			continue
+		}
+		c = ot.XorBytes(c,
+			ot.XorBytes(d[i], e[i]))
+	}
+
+	for i := range result {
+		result[i] = Triple{combine(a[:4]), combine(b[:4]), combine(c[:4])}
+		a = a[4:]
+		b = b[4:]
+		c = c[4:]
 	}
 	//fmt.Printf("[%d] a = 0x%032b\n", thisPartyId, result.a)
 	//fmt.Printf("[%d] b = 0x%032b\n", thisPartyId, result.b)
@@ -1000,11 +1032,7 @@ func (x BlockIO) Triple32() (a, b, c uint32) {
 
 	if len(x.triples32) == 0 {
 		//		fmt.Printf("X.id=%d out of triples, making more\n", x.id)
-		x.triples32 = make([]Triple, NUM_TRIPLES)
-		for triple_i := 0; triple_i < NUM_TRIPLES; triple_i++ {
-			// fmt.Printf("triple_i=%d, len(triples32)=%d\n", triple_i, len(x.triples32))
-			x.triples32[triple_i] = triple32Stream(x.n, x.id, x.otSenders, x.otReceivers)
-		}
+		x.triples32 = triple32Stream(x.id, x.otSenders, x.otReceivers)
 	}
 	result := x.triples32[0]
 	x.triples32 = x.triples32[1:]
