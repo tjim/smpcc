@@ -89,10 +89,10 @@ func randomBits(numBits int) []byte {
 	if numBits%8 != 0 {
 		panic("randomBits: number of bits must be a multiple of 8")
 	}
-	return randomBytes(numBits / 8)
+	return RandomBytes(numBits / 8)
 }
 
-func randomBytes(numBytes int) []byte {
+func RandomBytes(numBytes int) []byte {
 	result := make([]byte, numBytes)
 	_, err := rand.Read(result)
 	if err != nil {
@@ -117,8 +117,8 @@ func NewStreamReceiver(sender Sender, to chan<- []byte, from <-chan MessagePair)
 	tStream := make([]cipher.Stream, k)
 	vStream := make([]cipher.Stream, k)
 	for i := range tStream {
-		tSeed := randomBytes(SeedBytes)
-		vSeed := randomBytes(SeedBytes)
+		tSeed := RandomBytes(SeedBytes)
+		vSeed := RandomBytes(SeedBytes)
 		sender.Send(tSeed, vSeed)
 		tStream[i] = sha3.NewCipher(tSeed, nil)
 		vStream[i] = sha3.NewCipher(vSeed, nil)
@@ -254,6 +254,76 @@ func (R StreamReceiver) ReceiveM(r []byte) [][]byte { // r is a packed vector of
 	return result
 }
 
+// Send m pairs of bits (1-bit messages) at once
+func (S StreamSender) SendMBits(a, b []byte) { // messages are packed in bytes
+	k := NumStreams
+	m := 8*len(a)
+	if 8*len(b) != m {
+		panic("SendMBits: must send pairs of messages")
+	}
+	u := &bit.Matrix8{k, m, <-S.from} // k rows, m columns
+	if len(u.Data) != k*(m/8) {
+		panic("SendMBits: wrong size matrix u")
+	}
+	q := bit.NewMatrix8(k, m) // k rows, m columns
+	for i := 0; i < k; i++ {
+		u_i := u.GetRow(i)
+		w_i := bytesFrom(S.wStream[i], m/8)
+		q_i := q.GetRow(i)
+		s_i_wide := S.sWide[i]
+		for j := range q_i {
+			q_i[j] = (u_i[j] & s_i_wide) ^ w_i[j]
+		}
+	}
+	q = q.Transpose() // m rows, k columns
+	m0 := make([]byte, m/8)
+	copy(m0, a)
+	m1 := make([]byte, m/8)
+	copy(m1, b)
+	for jByte := range m0 {
+		// instead of unpacking and repacking each message bit we just xor in place, using an appropriate bit of the hash
+		for jBit := 0; jBit < 8; jBit++ {
+			j := 8*jByte + jBit
+			q_j := q.GetRow(j)
+			mask := byte(0x80 >> uint(jBit))
+			m0[jByte] ^= mask & RO(q_j, 8)[0]
+			m1[jByte] ^= mask & RO(XorBytes(q_j, S.sPacked), 8)[0]
+		}
+	}
+	S.to <- MessagePair{m0, m1}
+}
+
+func (R StreamReceiver) ReceiveMBits(r []byte) []byte { // r is a packed vector of selections and result is packed as well
+	k := NumStreams
+	m := 8 * len(r)
+	t := bit.NewMatrix8(k, m) // k rows, m columns
+	u := bit.NewMatrix8(k, m) // k rows, m columns
+	for i := 0; i < k; i++ {
+		bytesFromTo(R.tStream[i], t.GetRow(i))
+		XorBytesTo(r, XorBytes(t.GetRow(i), bytesFrom(R.vStream[i], m/8)), u.GetRow(i))
+	}
+	R.to <- u.Data
+	t = t.Transpose() // m rows, k columns
+	result := make([]byte, m/8)
+	msgs := <-R.from
+	m0 := msgs.m0
+	m1 := msgs.m1
+	for jByte := range m0 {
+		// instead of unpacking and packing each message bit we just xor in place, using an appropriate bit of the hash
+		for jBit := 0; jBit < 8; jBit++ {
+			j := 8*jByte + jBit
+			t_j := t.GetRow(j)
+			mask := byte(0x80 >> uint(jBit))
+			if r[jByte] & mask == 0 {
+				result[jByte] |= mask & (m0[jByte] ^ RO(t_j, 8)[0])
+			} else {
+				result[jByte] |= mask & (m1[jByte] ^ RO(t_j, 8)[0])
+			}
+		}
+	}
+	return result
+}
+
 // Create a new StreamSender that can operate independently of the parent StreamSender (concurrent operation).
 // It must be paired (via to/from) with a StreamReceiver forked from the original StreamSender's StreamReceiver.
 func (S StreamSender) Fork(to chan<- MessagePair, from chan []byte) StreamSender {
@@ -286,6 +356,13 @@ func (R StreamReceiver) Fork(to chan []byte, from chan MessagePair) StreamReceiv
 func PrintBytes(r []byte) {
 	for _, b := range r {
 		fmt.Printf("%02x", b)
+	}
+	fmt.Println("")
+}
+
+func PrintBits(r []byte) {
+	for _, b := range r {
+		fmt.Printf("%08b", b)
 	}
 	fmt.Println("")
 }

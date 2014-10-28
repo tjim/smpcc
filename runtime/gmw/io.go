@@ -939,13 +939,13 @@ func combine(arr []byte) uint32 {
 }
 
 func piMulRStream(val []byte, thisReceiver ot.StreamReceiver) []byte {
-	return thisReceiver.ReceiveBitwise(val)
+	return thisReceiver.ReceiveMBits(val)
 }
 
 func piMulSStream(val []byte, thisSender ot.StreamSender) []byte {
 	x0 := randomBytes(len(val))
 	x1 := ot.XorBytes(x0, val)
-	thisSender.SendBitwise(x0, x1)
+	thisSender.SendMBits(x0, x1)
 	return x0
 }
 
