@@ -1,5 +1,62 @@
 package ot
 
+/*
+
+Notation: If t is a matrix, 
+    then t^i is the ith column of t,
+    and  t_j is the jth row of t,
+    and  t_j^i is the bit in the ith column and jth row of t.
+
+Setup phase:
+
+Let k be the security parameter.
+
+Receiver picks random matrices t and v with k columns.
+Let R be the matrix (t XOR v).
+Sender picks random bits s = s^1 ... s^k   (a matrix with one row and k columns)
+Receiver transfers t^i, v^i to Sender by OT according to s^i
+Result is that Sender has a matrix w.
+
+Note w = (R AND_by_row s) XOR t
+
+OT extension phase:
+
+Let r = r_1 ... be the Receiver's choices.  (A matrix with one column)
+Let u = r XOR_by_column R
+
+Receiver sends u to Sender
+Sender sets q = (u AND_by_row s) XOR w
+              = (u AND_by_row s) XOR (R AND_by_row s) XOR t
+              = ((u XOR R) AND_by_row s) XOR t
+              = (((r XOR_by_column R) XOR R) AND_by_row s) XOR t
+              = (r AND_cross s) XOR t
+
+Therefore we have
+
+        q_j^i = (r_j AND s^i) XOR t_j^i
+
+just as in the original OT extension paper.  So if the Sender wants to
+send a_j, b_j it sets
+
+        m0 = a_j ^ H(q_j)
+        m1 = a_j ^ H(q_j ^ s)
+
+and sends m0, m1 to the Receiver.
+
+If r_j = 0 the receiver calculates a_j = m0 ^ H(t_j)
+If r_j = 1 the receiver calculates b_j = m1 ^ H(t_j)
+
+
+Implementation notes:
+
+Most of the time in the implementation it is convenient to keep the
+matrices transposed in comparison to the notes above.  So, a "row" in
+the implementation might correspond to a "column" in the notes above.
+
+*/
+
+
+
 import (
 	"bitbucket.org/ede/sha3"
 	"crypto/cipher"
@@ -70,8 +127,8 @@ func NewStreamReceiver(sender Sender, to chan<- []byte, from <-chan MessagePair)
 }
 
 type StreamSender struct {
-	s       []byte
-	sWide   []byte
+	sPacked []byte // one byte per 8 bits of s
+	sWide   []byte // one byte per bit of s, either 0x00 or 0xff
 	wStream []cipher.Stream
 	to      chan<- MessagePair
 	from    <-chan []byte
@@ -79,10 +136,10 @@ type StreamSender struct {
 
 func NewStreamSender(receiver Receiver, to chan<- MessagePair, from <-chan []byte) StreamSender {
 	k := NumStreams
-	s := randomBits(k)
+	sPacked := randomBits(k)
 	sWide := make([]byte, k)
 	for i := range sWide {
-		if bit.GetBit(s, i) == 0 {
+		if bit.GetBit(sPacked, i) == 0 {
 			sWide[i] = 0x00
 		} else {
 			sWide[i] = 0xff
@@ -90,10 +147,10 @@ func NewStreamSender(receiver Receiver, to chan<- MessagePair, from <-chan []byt
 	}
 	wStream := make([]cipher.Stream, k)
 	for i := range wStream {
-		wSeed := receiver.Receive(Selector(bit.GetBit(s, i)))
+		wSeed := receiver.Receive(Selector(bit.GetBit(sPacked, i)))
 		wStream[i] = sha3.NewCipher(wSeed, nil)
 	}
-	return StreamSender{s, sWide, wStream, to, from}
+	return StreamSender{sPacked, sWide, wStream, to, from}
 }
 
 type PerBlockStreamChans struct {
@@ -163,7 +220,7 @@ func (S StreamSender) SendM(a, b [][]byte) {
 		}
 		m0 := XorBytes(a[j], RO(q.GetRow(j), l))
 		m1 := XorBytes(b[j],
-			RO(XorBytes(q.GetRow(j), S.s), l))
+			RO(XorBytes(q.GetRow(j), S.sPacked), l))
 		S.to <- MessagePair{m0, m1}
 	}
 }
@@ -200,14 +257,14 @@ func (R StreamReceiver) ReceiveM(r []byte) [][]byte { // r is a packed vector of
 // Create a new StreamSender that can operate independently of the parent StreamSender (concurrent operation).
 // It must be paired (via to/from) with a StreamReceiver forked from the original StreamSender's StreamReceiver.
 func (S StreamSender) Fork(to chan<- MessagePair, from chan []byte) StreamSender {
-	s := S.s
+	sPacked := S.sPacked
 	sWide := S.sWide
 	wStream := make([]cipher.Stream, len(S.wStream))
 	for i, v := range S.wStream {
 		wSeed := bytesFrom(v, SeedBytes)
 		wStream[i] = sha3.NewCipher(wSeed, nil)
 	}
-	return StreamSender{s, sWide, wStream, to, from}
+	return StreamSender{sPacked, sWide, wStream, to, from}
 }
 
 // Create a new StreamReceiver that can operate independently of the parent StreamReceiver (concurrent operation).
