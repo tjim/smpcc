@@ -133,3 +133,13 @@ func (self Matrix8) Equal(other *Matrix8) bool {
 	}
 	return true
 }
+
+func (self Matrix8) XorFrom(other *Matrix8) {
+	if self.NumRows != other.NumRows || self.NumCols != other.NumCols {
+		panic("Xor")
+	}
+	for i, v := range other.Data {
+		self.Data[i] ^= v
+	}
+}
+
