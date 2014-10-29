@@ -695,7 +695,7 @@ type BlockIO struct {
 
 type PeerIO struct {
 	*GlobalIO // The GlobalIO of the peer and all of its blocks must be the same
-	blocks    []BlockIO
+	blocks    []*BlockIO
 }
 
 /*
@@ -738,7 +738,7 @@ func (io PeerIO) connect(party int) chan<- PerNodePair {
 	return nu
 }
 
-func clientSideIOSetup(blocks []BlockIO, party int, nu chan<- PerNodePair) {
+func clientSideIOSetup(blocks []*BlockIO, party int, nu chan<- PerNodePair) {
 	numBlocks := len(blocks)
 
 	ParamChan := make(chan big.Int)
@@ -784,7 +784,7 @@ func (io PeerIO) listen(party int) <-chan PerNodePair {
 	return nu
 }
 
-func serverSideIOSetup(blocks []BlockIO, party int, nu <-chan PerNodePair) {
+func serverSideIOSetup(blocks []*BlockIO, party int, nu <-chan PerNodePair) {
 	numBlocks := len(blocks)
 
 	x := <-nu
@@ -809,13 +809,16 @@ func NewPeerIO(numBlocks int, numParties int, id int) PeerIO {
 	gio.id = id
 	var io PeerIO
 	io.GlobalIO = &gio
-	io.blocks = make([]BlockIO, numBlocks+1) // one extra BlockIO for main loop
+	io.blocks = make([]*BlockIO, numBlocks+1) // one extra BlockIO for main loop
 	for i := range io.blocks {
-		io.blocks[i].GlobalIO = io.GlobalIO
-		io.blocks[i].rchannels = make([]chan uint32, numParties)
-		io.blocks[i].wchannels = make([]chan uint32, numParties)
-		io.blocks[i].otSenders = make([]ot.StreamSender, numParties)
-		io.blocks[i].otReceivers = make([]ot.StreamReceiver, numParties)
+		io.blocks[i] = &BlockIO{
+			io.GlobalIO,
+			nil, nil, nil,
+			make([]chan uint32, numParties),
+			make([]chan uint32, numParties),
+			make([]ot.StreamSender, numParties),
+			make([]ot.StreamReceiver, numParties),
+		}
 	}
 	return io
 }
@@ -884,15 +887,15 @@ func Simulation(numParties int, numBlocks int, runPeer func(Io, []Io), peerDone 
 	}
 }
 
-func (x GlobalIO) N() int {
+func (x *GlobalIO) N() int {
 	return x.n
 }
 
-func (x GlobalIO) Id() int {
+func (x *GlobalIO) Id() int {
 	return x.id
 }
 
-func (x BlockIO) Triple1() (a, b, c bool) {
+func (x *BlockIO) Triple1() (a, b, c bool) {
 	if len(x.triples1) == 0 {
 		a32, b32, c32 := x.Triple32()
 		x.triples1 = make([]struct{ a, b, c bool }, 32)
@@ -906,7 +909,7 @@ func (x BlockIO) Triple1() (a, b, c bool) {
 	return result.a, result.b, result.c
 }
 
-func (x BlockIO) Triple8() (a, b, c uint8) {
+func (x *BlockIO) Triple8() (a, b, c uint8) {
 	if len(x.triples8) == 0 {
 		a32, b32, c32 := x.Triple32()
 		x.triples8 = []struct{ a, b, c uint8 }{{uint8(a32 >> 0), uint8(b32 >> 0), uint8(c32 >> 0)},
@@ -932,7 +935,7 @@ func combine(arr []byte) uint32 {
 		panic("combine")
 	}
 	result := uint32(0)
-	for i,v := range arr {
+	for i, v := range arr {
 		result |= uint32(v) << uint(i*8)
 	}
 	return result
@@ -1006,7 +1009,7 @@ func triple32Stream(thisPartyId int, senders []ot.StreamSender, receivers []ot.S
 		}
 	}
 
-	c := AndBytes(a,b)
+	c := AndBytes(a, b)
 	for i := 0; i < n; i++ {
 		if i == thisPartyId {
 			continue
@@ -1028,7 +1031,7 @@ func triple32Stream(thisPartyId int, senders []ot.StreamSender, receivers []ot.S
 	return result
 }
 
-func (x BlockIO) Triple32() (a, b, c uint32) {
+func (x *BlockIO) Triple32() (a, b, c uint32) {
 
 	if len(x.triples32) == 0 {
 		//		fmt.Printf("X.id=%d out of triples, making more\n", x.id)
@@ -1039,13 +1042,13 @@ func (x BlockIO) Triple32() (a, b, c uint32) {
 	return result.a, result.b, result.c
 }
 
-func (x BlockIO) Triple64() (a, b, c uint64) {
+func (x *BlockIO) Triple64() (a, b, c uint64) {
 	a0, b0, c0 := x.Triple32()
 	a1, b1, c1 := x.Triple32()
 	return (uint64(a0) << 32) | uint64(a1), (uint64(b0) << 32) | uint64(b1), (uint64(c0) << 32) | uint64(c1)
 }
 
-func (x BlockIO) Open1(s bool) bool {
+func (x *BlockIO) Open1(s bool) bool {
 	x.Broadcast1(s)
 	result := s
 	id := x.Id()
@@ -1058,7 +1061,7 @@ func (x BlockIO) Open1(s bool) bool {
 	return result
 }
 
-func (x BlockIO) Open8(s uint8) uint8 {
+func (x *BlockIO) Open8(s uint8) uint8 {
 	x.Broadcast8(s)
 	result := s
 	id := x.Id()
@@ -1071,7 +1074,7 @@ func (x BlockIO) Open8(s uint8) uint8 {
 	return result
 }
 
-func (x BlockIO) Open32(s uint32) uint32 {
+func (x *BlockIO) Open32(s uint32) uint32 {
 	x.Broadcast32(s)
 	result := s
 	id := x.Id()
@@ -1084,7 +1087,7 @@ func (x BlockIO) Open32(s uint32) uint32 {
 	return result
 }
 
-func (x BlockIO) Open64(s uint64) uint64 {
+func (x *BlockIO) Open64(s uint64) uint64 {
 	x.Broadcast64(s)
 	result := s
 	id := x.Id()
@@ -1097,7 +1100,7 @@ func (x BlockIO) Open64(s uint64) uint64 {
 	return result
 }
 
-func (x BlockIO) Broadcast1(n bool) {
+func (x *BlockIO) Broadcast1(n bool) {
 	var n32 uint32 = 0
 	if n {
 		n32 = 1
@@ -1118,7 +1121,7 @@ func (x BlockIO) Broadcast1(n bool) {
 	}
 }
 
-func (x BlockIO) Broadcast8(n uint8) {
+func (x *BlockIO) Broadcast8(n uint8) {
 	id := x.Id()
 	if log_communication {
 		fmt.Printf("%d: BROADCAST 0x%02x\n", id, n)
@@ -1135,7 +1138,7 @@ func (x BlockIO) Broadcast8(n uint8) {
 	}
 }
 
-func (x BlockIO) Broadcast32(n uint32) {
+func (x *BlockIO) Broadcast32(n uint32) {
 	id := x.Id()
 	if log_communication {
 		fmt.Printf("%d: BROADCAST 0x%08x\n", id, n)
@@ -1152,14 +1155,14 @@ func (x BlockIO) Broadcast32(n uint32) {
 	}
 }
 
-func (x BlockIO) Broadcast64(n uint64) {
+func (x *BlockIO) Broadcast64(n uint64) {
 	n0 := uint32(n >> 32)
 	n1 := uint32(n)
 	x.Broadcast32(n0)
 	x.Broadcast32(n1)
 }
 
-func (x BlockIO) Send1(party int, n bool) {
+func (x *BlockIO) Send1(party int, n bool) {
 	var n32 uint32 = 0
 	if n {
 		n32 = 1
@@ -1167,7 +1170,7 @@ func (x BlockIO) Send1(party int, n bool) {
 	x.Send32(party, n32)
 }
 
-func (x BlockIO) Send8(party int, n uint8) {
+func (x *BlockIO) Send8(party int, n uint8) {
 	var n32 uint32 = uint32(n)
 	id := x.Id()
 	if party == id {
@@ -1176,7 +1179,7 @@ func (x BlockIO) Send8(party int, n uint8) {
 	x.Send32(party, n32)
 }
 
-func (x BlockIO) Send32(party int, n32 uint32) {
+func (x *BlockIO) Send32(party int, n32 uint32) {
 	id := x.Id()
 	if party == id {
 		return
@@ -1188,24 +1191,24 @@ func (x BlockIO) Send32(party int, n32 uint32) {
 	}
 }
 
-func (x BlockIO) Send64(party int, n uint64) {
+func (x *BlockIO) Send64(party int, n uint64) {
 	n0 := uint32(n >> 32)
 	n1 := uint32(n)
 	x.Send32(party, n0)
 	x.Send32(party, n1)
 }
 
-func (x BlockIO) Receive1(party int) bool {
+func (x *BlockIO) Receive1(party int) bool {
 	result := x.Receive32(party)
 	return result > 0
 }
 
-func (x BlockIO) Receive8(party int) uint8 {
+func (x *BlockIO) Receive8(party int) uint8 {
 	result := x.Receive32(party)
 	return uint8(result)
 }
 
-func (x BlockIO) Receive32(party int) uint32 {
+func (x *BlockIO) Receive32(party int) uint32 {
 	id := x.Id()
 	if party == id {
 		return 0
@@ -1222,22 +1225,22 @@ func (x BlockIO) Receive32(party int) uint32 {
 	return result
 }
 
-func (x BlockIO) Receive64(party int) uint64 {
+func (x *BlockIO) Receive64(party int) uint64 {
 	n0 := x.Receive32(party)
 	n1 := x.Receive32(party)
 	return (uint64(n0) << 32) | uint64(n1)
 }
 
-func (x BlockIO) GetInput() uint32 {
+func (x *BlockIO) GetInput() uint32 {
 	result := x.inputs[0]
 	x.inputs = x.inputs[1:]
 	return result
 }
 
-func (x BlockIO) InitRam(contents []byte) {
+func (x *BlockIO) InitRam(contents []byte) {
 	x.ram = contents
 }
 
-func (x BlockIO) Ram() []byte {
+func (x *BlockIO) Ram() []byte {
 	return x.ram
 }
