@@ -247,3 +247,61 @@ func BenchmarkStreamBits(b *testing.B) {
 		<-done
 	}
 }
+
+// Stream OT with random 1-bit messages
+func senderBenchRandomBits(x StreamSender, resultChan chan []byte, b *testing.B) {
+	A, B := x.SendMRandomBits(ITERATIONS)
+	resultChan <- A
+	resultChan <- B
+	done <- true
+}
+
+func receiverBenchRandomBits(x StreamReceiver, resultChan chan []byte, b *testing.B) {
+	r := make([]byte, ITERATIONS/8)
+	for i := range r {
+		r[i] = 0xaa // 0b10101010
+	}
+	rslt := x.ReceiveMRandomBits(r)
+	A := <-resultChan
+	B := <-resultChan
+	expected := MuxBytes(r, A, B)
+	for i := range rslt {
+		if rslt[i] != expected[i] {
+			fmt.Printf("Error: expected 0x%02x, received 0x%02x\n", expected[i], rslt[i])
+			b.Fail()
+		}
+	}
+	done <- true
+}
+
+func pairRandomBits(b *testing.B, S StreamSender, R StreamReceiver) {
+	r2s := make(chan []byte)
+	s2r := make(chan MessagePair)
+	s := S.Fork(s2r, r2s)
+	r := R.Fork(r2s, s2r)
+	var resultChan chan []byte = make(chan []byte)
+	go senderBenchRandomBits(s, resultChan, b)
+	go receiverBenchRandomBits(r, resultChan, b)
+}
+
+func BenchmarkRandomBits(b *testing.B) {
+	// create sender and receiver
+	r2s := make(chan []byte)
+	s2r := make(chan MessagePair)
+	BaseS, BaseR := NewNP()
+	var S StreamSender
+	go func() {
+		S = NewStreamSender(BaseR, s2r, r2s)
+		done <- true
+	}()
+	R := NewStreamReceiver(BaseS, r2s, s2r)
+	<-done
+
+	for i := 0; i < PAIRS; i++ {
+		pairRandomBits(b, S, R)
+	}
+	for i := 0; i < PAIRS; i++ {
+		<-done
+		<-done
+	}
+}

@@ -334,6 +334,72 @@ func (R StreamReceiver) ReceiveMBits(r []byte) []byte { // r is a packed vector 
 	return result
 }
 
+// Send m pairs of random bits (1-bit messages) at once
+func (S StreamSender) SendMRandomBits(m int) ([]byte, []byte) { // resulting bits are packed in bytes
+	k := NumStreams
+	if m%8 != 0 {
+		panic("SendMRandomBits: number of messages must be a multiple of 8")
+	}
+	u := &bit.Matrix8{k, m, <-S.from} // k rows, m columns
+	if 8*len(u.Data) != k*m {
+		panic("SendMRandomBits: wrong size matrix u")
+	}
+	q := u // q starts off as u
+	for i := 0; i < k; i++ {
+		q_i := q.GetRow(i) // u_i
+		s_i_wide := S.sWide[i]
+		for jByte := range q_i {
+			q_i[jByte] &= s_i_wide // & s_i
+		}
+		S.wStream[i].XORKeyStream(q_i, q_i) // XOR w_i
+	}
+	q = q.Transpose() // m rows, k columns
+	a := make([]byte, m/8)
+	b := make([]byte, m/8)
+	for jByte := range a {
+		// instead of unpacking and repacking each message bit we just xor in place, using an appropriate bit of the hash
+		for jBit := 0; jBit < 8; jBit++ {
+			j := 8*jByte + jBit
+			q_j := q.GetRow(j)
+			mask := byte(0x80 >> uint(jBit))
+			a[jByte] ^= mask & RO(q_j, 8)[0]
+			b[jByte] ^= mask & RO(XorBytes(q_j, S.sPacked), 8)[0]
+		}
+	}
+	return a, b
+}
+
+func (R StreamReceiver) ReceiveMRandomBits(r []byte) []byte { // r is a packed vector of selections and result is packed as well
+	k := NumStreams
+	m := 8 * len(r)
+	t := bit.NewMatrix8(k, m) // k rows, m columns
+	for i := 0; i < k; i++ {
+		bytesFromTo(R.tStream[i], t.GetRow(i))
+	}
+	// save t in u
+	u := t
+	// transpose t for later use
+	t = t.Transpose() // m rows, k columns
+
+	// compute final value for u
+	for i := 0; i < k; i++ {
+		R.vStream[i].XORKeyStream(u.GetRow(i), u.GetRow(i)) // u = t XOR v
+		XorBytesTo(r, u.GetRow(i), u.GetRow(i))             // u = (t XOR v) XOR r
+	}
+	R.to <- u.Data
+	result := make([]byte, m/8)
+	for jByte := range result {
+		// instead of unpacking and packing each message bit we just xor in place, using an appropriate bit of the hash
+		for jBit := 0; jBit < 8; jBit++ {
+			j := 8*jByte + jBit
+			t_j := t.GetRow(j)
+			mask := byte(0x80 >> uint(jBit))
+			result[jByte] |= mask & RO(t_j, 8)[0]
+		}
+	}
+	return result
+}
+
 // Create a new StreamSender that can operate independently of the parent StreamSender (concurrent operation).
 // It must be paired (via to/from) with a StreamReceiver forked from the original StreamSender's StreamReceiver.
 func (S StreamSender) Fork(to chan<- MessagePair, from chan []byte) StreamSender {
