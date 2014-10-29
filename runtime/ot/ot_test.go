@@ -11,8 +11,10 @@ import "fmt"
 import "testing"
 
 const (
-	PAIRS      = 4
+	PAIRS = 4
+	//	PAIRS      = 20
 	ITERATIONS = 1024
+	//	ITERATIONS = 1032 // runs past the chunk size of extend.go
 )
 
 var done chan bool = make(chan bool)
@@ -133,7 +135,7 @@ func senderBenchStream(x StreamSender, b *testing.B) {
 
 func receiverBenchStream(x StreamReceiver, b *testing.B) {
 	for i := 0; i < ITERATIONS/8; i++ {
-		r := []byte{0xcc} // receive 8 messages, alternating hello and world, 0xc == 0b1010
+		r := []byte{0xaa} // receive 8 messages, alternating hello and world, 0xaa == 0b10101010
 		rslt := x.ReceiveM(r)
 		if len(rslt) != 8 {
 			fmt.Printf("Error: expected 8 messages, received %d\n", len(rslt))
@@ -181,6 +183,64 @@ func BenchmarkStream(b *testing.B) {
 
 	for i := 0; i < PAIRS; i++ {
 		pairStream(b, S, R)
+	}
+	for i := 0; i < PAIRS; i++ {
+		<-done
+		<-done
+	}
+}
+
+// Stream OT with 1-bit messages
+func senderBenchStreamBits(x StreamSender, b *testing.B) {
+	teeth0 := make([]byte, ITERATIONS/8)
+	teeth1 := make([]byte, ITERATIONS/8)
+	for i := range teeth0 {
+		teeth0[i] = 0xaa // 0b10101010
+		teeth1[i] = 0x55 // 0b01010101
+	}
+	x.SendMBits(teeth0, teeth1)
+	done <- true
+}
+
+func receiverBenchStreamBits(x StreamReceiver, b *testing.B) {
+	r := make([]byte, ITERATIONS/8)
+	for i := range r {
+		r[i] = 0xaa // 0b10101010
+	}
+	rslt := x.ReceiveMBits(r)
+	for i := range rslt {
+		if rslt[i] != 0x00 {
+			fmt.Printf("Error: expected 0x00, received 0x%02x\n", rslt[i])
+			b.Fail()
+		}
+	}
+	done <- true
+}
+
+func pairStreamBits(b *testing.B, S StreamSender, R StreamReceiver) {
+	r2s := make(chan []byte)
+	s2r := make(chan MessagePair)
+	s := S.Fork(s2r, r2s)
+	r := R.Fork(r2s, s2r)
+	go senderBenchStreamBits(s, b)
+	go receiverBenchStreamBits(r, b)
+}
+
+func BenchmarkStreamBits(b *testing.B) {
+	// create sender and receiver
+	r2s := make(chan []byte)
+	s2r := make(chan MessagePair)
+	BaseS, BaseR := NewNP()
+	var S StreamSender
+	go func() {
+		S = NewStreamSender(BaseR, s2r, r2s)
+		done <- true
+	}()
+	R := NewStreamReceiver(BaseS, r2s, s2r)
+	<-done
+
+	for i := 0; i < PAIRS; i++ {
+		pairStreamBits(b, S, R)
 	}
 	for i := 0; i < PAIRS; i++ {
 		<-done
