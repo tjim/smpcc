@@ -9,22 +9,17 @@
        clang vickrey.c -DTEST
        ./a.out
 */
-#define NUM_PARTIES 3
 #include <stdio.h>
-#ifdef TEST
-unsigned int foo = 4;
-unsigned int input(unsigned int p) { // returns 4, 5, 6 so bidder 2 should pay 5
-  return foo++;
-}
-#else
+
 extern unsigned int input(unsigned int);
-#endif
+extern unsigned int num_peers();
+
 int main() {
   unsigned int bidder = 0;
   unsigned int ultimate = input(0);
   unsigned int penultimate = 0;
 
-  for (unsigned int i = 1; i < NUM_PARTIES; i++) {
+  for (unsigned int i = 1; i < num_peers(); i++) {
     unsigned int bid = input(i);
     if (bid > ultimate) {
       bidder = i;

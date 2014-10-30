@@ -241,7 +241,7 @@ let bpr_gmw_block b blocks_fv bl =
         (fun a (_,i) ->
           a ||
           (match i with (* see bpr_gmw_instr, these are all cases using mask *)
-          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "input" | "num_peers"))),_,_,_)
+          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "input"))),_,_,_)
           | Load _
           | Store _ ->
               true
@@ -513,8 +513,7 @@ let print_function_circuit m f =
   bprintf b "\t\tpprof.StartCPUProfile(f)\n";
   bprintf b "\t\tdefer pprof.StopCPUProfile()\n";
   bprintf b "\t}\n";
-  let num_parties = 3 in (* hard coded for now *)
-  bprintf b "\tgmw.Simulation(%d, %d, blocks_main, _main_done)\n" num_parties (List.length f.fblocks);
+  bprintf b "\tgmw.Simulation(len(args), %d, blocks_main, _main_done)\n" (List.length f.fblocks);
   bprintf b "}\n";
   let main_go = Buffer.contents b in
   pr_output_file "_blocks.go" blocks_go;
