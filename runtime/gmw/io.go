@@ -114,12 +114,20 @@ type PeerIO struct {
 }
 
 /*
-Each peer runs a server, it accepts requests that set up Receiver and rchannel.
-Each peer connects to all other peers and establishes Sender and wchannel.
+Each distinct pair of peers has a leader and a follower.
+Each peer runs a server that accepts connections from its leaders.
+Each peer connects as a client to all of its followers.
 
-Port strategy:
-Each peer listens to n-1 ports: base port + n*id, plus next n-1 ports, ignoring own port.
-Each peer connects to n-1 ports: for i<n, base port + n*i + id
+A client establishes all of the communication channels between the
+client and server and runs the base OT as receiver.
+It then establishes stream OT as sender.
+It then establishes stream OT as receiver.
+The server side does the opposite.
+
+Port mapping:
+Each peer can listen to n-1 ports: base port + n*id, plus next n-1 ports, ignoring its own port.
+Each peer can connect to n-1 ports: for i<n, base port + n*i + id
+Peers only listen for leaders and only connect to followers.
 */
 
 // for establishing connections
@@ -258,7 +266,7 @@ func NewPeerIO(numBlocks int, numParties int, id int) *PeerIO {
 	gio.id = id
 	var io PeerIO
 	io.GlobalIO = &gio
-	io.blocks = make([]*BlockIO, numBlocks+1) // one extra BlockIO for main loop
+	io.blocks = make([]*BlockIO, numBlocks+1) // one extra BlockIO for the main loop
 	for i := range io.blocks {
 		io.blocks[i] = &BlockIO{
 			io.GlobalIO,
@@ -403,14 +411,6 @@ func (x *BlockIO) Triple8() (a, b, c uint8) {
 	return result.a, result.b, result.c
 }
 
-func spread(val uint32) []byte {
-	arr := make([]byte, 4)
-	for i := range arr {
-		arr[i] = byte(val >> uint(i*8))
-	}
-	return arr
-}
-
 func combine(arr []byte) uint32 {
 	if len(arr) != 4 {
 		panic("combine")
@@ -474,13 +474,11 @@ func triple32Stream(thisPartyId int, senders []*ot.StreamSender, receivers []*ot
 
 	d := make([][]byte, n)
 	e := make([][]byte, n)
-	//	fmt.Printf("triple32Secure: n=%d, thisPartyId=%d, a=%032b, b=%032b\nd=%v\ne=%v\n", n, thisPartyId, a, b, d, e)
 
 	for i := 0; i < n; i++ {
 		if i == thisPartyId {
 			continue
 		}
-		// fmt.Printf("secure triple this=%d, other=%d\n", thisPartyId, i)
 		if thisPartyId > i {
 			d[i] = piMulRStream(a, receivers[i])
 			e[i] = piMulSStream(b, senders[i])
@@ -498,24 +496,17 @@ func triple32Stream(thisPartyId int, senders []*ot.StreamSender, receivers []*ot
 		c = ot.XorBytes(c,
 			ot.XorBytes(d[i], e[i]))
 	}
-
 	for i := range result {
 		result[i] = Triple{combine(a[:4]), combine(b[:4]), combine(c[:4])}
 		a = a[4:]
 		b = b[4:]
 		c = c[4:]
 	}
-	//fmt.Printf("[%d] a = 0x%032b\n", thisPartyId, result.a)
-	//fmt.Printf("[%d] b = 0x%032b\n", thisPartyId, result.b)
-	//fmt.Printf("[%d] c = 0x%032b\n", thisPartyId, result.c)
-
 	return result
 }
 
 func (x *BlockIO) Triple32() (a, b, c uint32) {
-
 	if len(x.triples32) == 0 {
-		//		fmt.Printf("X.id=%d out of triples, making more\n", x.id)
 		x.triples32 = triple32Stream(x.id, x.otSenders, x.otReceivers)
 	}
 	result := x.triples32[0]
@@ -694,7 +685,6 @@ func (x *BlockIO) Receive32(party int) uint32 {
 	if party == id {
 		return 0
 	}
-	// fmt.Printf("Receive32: party=%d, len(rchannels)=%d\n", party, len(x.rchannels))
 	ch := x.rchannels[party]
 	result, ok := <-ch
 	if !ok {
