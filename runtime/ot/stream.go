@@ -186,6 +186,22 @@ func XorBytes(a, b []byte) []byte {
 	return result
 }
 
+// Inefficient, just for compatibility
+func (S StreamSender) Send(a, b Message) {
+	z := []byte{0x00}
+	A := [][]byte{a,z,z,z,z,z,z,z}
+	B := [][]byte{b,z,z,z,z,z,z,z}
+	S.SendM(A,B)
+}
+func (R StreamReceiver) Receive(s Selector) Message {
+	switch s {
+	case 0:
+		return R.ReceiveM([]byte{0x00})[0]
+	default:
+		return R.ReceiveM([]byte{0xff})[0]
+	}	
+}
+
 // Send m message pairs at once
 func (S StreamSender) SendM(a, b [][]byte) {
 	k := NumStreams
