@@ -479,16 +479,11 @@ let print_function_circuit m f =
   bprintf b "import \"fmt\"\n";
   bprintf b "import \"os\"\n";
   bprintf b "import \"runtime/pprof\"\n";
-  bprintf b "import \"time\"\n";
-  bprintf b "\n";
-  bprintf b "var log_stats bool = false\n";
   bprintf b "\n";
   bprintf b "var args []string\n";
-  bprintf b "var do_old bool\n";
   bprintf b "var do_pprof bool\n";
   bprintf b "\n";
   bprintf b "func init_args() {\n";
-  bprintf b "\tflag.BoolVar(&do_old, \"old\", false, \"use old simulation (default false/new simulation)\")\n";
   bprintf b "\tflag.BoolVar(&do_pprof, \"pprof\", false, \"run for profiling\")\n";
   bprintf b "\tflag.Parse()\n";
   bprintf b "\targs = flag.Args()\n";
@@ -506,10 +501,6 @@ let print_function_circuit m f =
   bprintf b "var %s_done = make(chan bool, 1)\n" (Gc.govar f.fname);
   bprintf b "\n";
   bprintf b "func main() {\n";
-  bprintf b "\tstart_time := time.Now()\n";
-  bprintf b "\tif log_stats {\n";
-  bprintf b "\t\tfmt.Printf(\"Starting triple generation\\n\")\n";
-  bprintf b "\t}\n";
   bprintf b "\tinit_args()\n";
   bprintf b "\tif do_pprof {\n";
   bprintf b "\t\tfile := \"cpu.pprof\"\n";
@@ -521,46 +512,7 @@ let print_function_circuit m f =
   bprintf b "\t\tdefer pprof.StopCPUProfile()\n";
   bprintf b "\t}\n";
   let num_parties = 3 in (* hard coded for now *)
-  bprintf b "\tios := make([][]gmw.Io, %d)\n" num_parties;
-  bprintf b "\tfor i := range ios {\n";
-  bprintf b "\t\tios[i] = make([]gmw.Io, %d)\n" (List.length f.fblocks);
-  bprintf b "\t}\n";
-  bprintf b "\tfor i := 0; i < %d; i++ {\n" (List.length f.fblocks);
-  bprintf b "\t\te := gmw.Example(%d)\n" num_parties;
-  bprintf b "\t\tfor j := 0; j < %d; j++ {\n" num_parties;
-  bprintf b "\t\t\tios[j][i] = e[j]\n";
-  bprintf b "\t\t}\n";
-  bprintf b "\t}\n";
-  bprintf b "\tio := gmw.Example(%d)\n" num_parties;
-  bprintf b "\tcompute_start_time := time.Now()\n";
-  bprintf b "\tif log_stats {\n";
-  bprintf b "\t	fmt.Printf(\"Triple generation completed (%%s), starting computation\\n\", time.Since(start_time).String())\n";
-  bprintf b "\t}\n";
-  bprintf b "\tif do_old {\n";
-  for i = 0 to num_parties-1 do
-    bprintf b "\t\tgo blocks_main(io[%d], ios[%d])\n" i i;
-  done;
-  for i = 0 to num_parties-1 do
-    bprintf b "\t\t<-%s_done\n" (Gc.govar f.fname);
-  done;
-  bprintf b "\t} else {\n";
-  bprintf b "\t\tgmw.Simulation(%d, %d, blocks_main, _main_done)\n" num_parties (List.length f.fblocks);
-  bprintf b "\t}\n";
-  bprintf b "\tfmt.Println(\"Done\")\n";
-  bprintf b "\tif log_stats {\n";
-  bprintf b "\t\tfmt.Printf(\"Computation took %%s\\n\", time.Since(compute_start_time).String())\n";
-  bprintf b "\t\tfmt.Printf(\"Total time %%s\\n\", time.Since(start_time).String())\n";
-  bprintf b "\t\tused_triples := 0\n";
-  bprintf b "\t\tfmt.Printf(\"Main block used %%5d 32-bit triples\\n\", gmw.UsedTriples32(io[0]))\n";
-  bprintf b "\t\tused_triples += gmw.UsedTriples32(io[0])\n";
-  bprintf b "\t\tfor i, io_block := range ios[0] {\n";
-  bprintf b "\t\t\tused := gmw.UsedTriples32(io_block.(*gmw.X))\n";
-  bprintf b "\t\t\tfmt.Printf(\"Block %%2d used %%5d 32-bit triples\\n\", i, used)\n";
-  bprintf b "\t\t\tused_triples += used\n";
-  bprintf b "\t\t}\n";
-  bprintf b "\t\tfmt.Printf(\"Total 32-bit triples: %%d\\n\", used_triples)\n";
-  bprintf b "\t\tfmt.Printf(\"Total AND-gates: %%d (+-64)\\n\", used_triples*32)\n";
-  bprintf b "\t}\n";
+  bprintf b "\tgmw.Simulation(%d, %d, blocks_main, _main_done)\n" num_parties (List.length f.fblocks);
   bprintf b "}\n";
   let main_go = Buffer.contents b in
   pr_output_file "_blocks.go" blocks_go;
