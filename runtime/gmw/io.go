@@ -689,8 +689,8 @@ type BlockIO struct {
 	triples1    []struct{ a, b, c bool }
 	rchannels   []chan uint32
 	wchannels   []chan uint32
-	otSenders   []ot.StreamSender
-	otReceivers []ot.StreamReceiver
+	otSenders   []*ot.StreamSender
+	otReceivers []*ot.StreamReceiver
 }
 
 type PeerIO struct {
@@ -709,8 +709,8 @@ Each peer connects to n-1 ports: for i<n, base port + n*i + id
 
 // for establishing connections
 type PerBlock struct {
-	ot.PerBlockStreamChans
-	rchannel chan uint32
+	stchannel []ot.PerBlockStreamChans
+	rwchannel []chan uint32
 }
 
 type PerNodePair struct {
@@ -738,7 +738,10 @@ func (io PeerIO) connect(party int) chan<- PerNodePair {
 	return nu
 }
 
-func clientSideIOSetup(blocks []*BlockIO, party int, nu chan<- PerNodePair) {
+var done chan struct{} = make(chan struct{})
+
+func clientSideIOSetup(peer *PeerIO, party int, nu chan<- PerNodePair) {
+	blocks := peer.blocks
 	numBlocks := len(blocks)
 
 	ParamChan := make(chan big.Int)
@@ -746,24 +749,41 @@ func clientSideIOSetup(blocks []*BlockIO, party int, nu chan<- PerNodePair) {
 	NpSendEncs := make(chan ot.HashedElGamalCiph)
 	x := PerNodePair{ot.NPChans{ParamChan, NpRecvPk, NpSendEncs}, make([]PerBlock, numBlocks)}
 
-	baseReceiver := ot.NewNPReceiver(ParamChan, NpRecvPk, NpSendEncs)
-
 	for i := 0; i < numBlocks; i++ {
-		S2R := make(chan ot.MessagePair)
-		R2S := make(chan []byte)
 		rchannel := make(chan uint32)
-		x.BlockChans[i] = PerBlock{ot.PerBlockStreamChans{S2R, R2S}, rchannel}
-		blocks[i].rchannels[party] = rchannel
+		wchannel := make(chan uint32)
+		x.BlockChans[i] = PerBlock{
+			[]ot.PerBlockStreamChans{
+				ot.PerBlockStreamChans{make(chan ot.MessagePair), make(chan []byte)},
+				ot.PerBlockStreamChans{make(chan ot.MessagePair), make(chan []byte)}},
+			[]chan uint32{rchannel, wchannel}}
 		//		fmt.Printf("blocks[%d].rchannels[%d] = %v\n", i, party, rchannel)
 	}
 	nu <- x
-	sender0 := ot.NewStreamSender(baseReceiver, nil, nil)
-	for i := 0; i < numBlocks; i++ {
-		blocks[i].otSenders[party] = sender0.Fork(x.BlockChans[i].S2R, x.BlockChans[i].R2S)
-	}
-}
 
-var done chan struct{} = make(chan struct{})
+	for i := 0; i < numBlocks; i++ {
+		blocks[i].rchannels[party] = x.BlockChans[i].rwchannel[0]
+		blocks[i].wchannels[party] = x.BlockChans[i].rwchannel[1]
+	}
+
+	baseReceiver := ot.NewNPReceiver(ParamChan, NpRecvPk, NpSendEncs)
+	sender0 := ot.NewStreamSender(baseReceiver, x.BlockChans[0].stchannel[0].S2R, x.BlockChans[0].stchannel[0].R2S)
+	blocks[0].otSenders[party] = sender0
+	for i := 1; i < numBlocks; i++ {
+		sender := sender0.Fork(x.BlockChans[i].stchannel[0].S2R, x.BlockChans[i].stchannel[0].R2S)
+		blocks[i].otSenders[party] = sender
+	}
+
+	receiver0 := ot.NewStreamReceiver(sender0, x.BlockChans[0].stchannel[1].R2S, x.BlockChans[0].stchannel[1].S2R)
+	blocks[0].otReceivers[party] = receiver0
+
+	for i := 1; i < numBlocks; i++ {
+		receiver := receiver0.Fork(x.BlockChans[i].stchannel[1].R2S, x.BlockChans[i].stchannel[1].S2R)
+		blocks[i].otReceivers[party] = receiver
+	}
+
+	done <- struct{}{}
+}
 
 func (io PeerIO) listen(party int) <-chan PerNodePair {
 	if io.id == party {
@@ -784,26 +804,40 @@ func (io PeerIO) listen(party int) <-chan PerNodePair {
 	return nu
 }
 
-func serverSideIOSetup(blocks []*BlockIO, party int, nu <-chan PerNodePair) {
+func serverSideIOSetup(peer *PeerIO, party int, nu <-chan PerNodePair) {
+	blocks := peer.blocks
 	numBlocks := len(blocks)
 
 	x := <-nu
 	if numBlocks != len(x.BlockChans) {
 		panic("Block mismatch")
 	}
-	baseSender := ot.NewNPSender(x.NPChans.ParamChan, x.NPChans.NpRecvPk, x.NPChans.NpSendEncs)
-	receiver0 := ot.NewStreamReceiver(baseSender, nil, nil)
 
-	for i, v := range x.BlockChans {
-		receiver := receiver0.Fork(v.PerBlockStreamChans.R2S, v.PerBlockStreamChans.S2R)
-		blocks[i].otReceivers[party] = receiver
-		blocks[i].wchannels[party] = v.rchannel
-		//		fmt.Printf("blocks[%d].wchannels[%d] = %v\n", i, party, v.rchannel)
+	for i := 0; i < numBlocks; i++ {
+		blocks[i].wchannels[party] = x.BlockChans[i].rwchannel[0]
+		blocks[i].rchannels[party] = x.BlockChans[i].rwchannel[1]
 	}
+
+	baseSender := ot.NewNPSender(x.NPChans.ParamChan, x.NPChans.NpRecvPk, x.NPChans.NpSendEncs)
+	receiver0 := ot.NewStreamReceiver(baseSender, x.BlockChans[0].stchannel[0].R2S, x.BlockChans[0].stchannel[0].S2R)
+	blocks[0].otReceivers[party] = receiver0
+	for i := 1; i < numBlocks; i++ {
+		receiver := receiver0.Fork(x.BlockChans[i].stchannel[0].R2S, x.BlockChans[i].stchannel[0].S2R)
+		blocks[i].otReceivers[party] = receiver
+	}
+
+	sender0 := ot.NewStreamSender(receiver0, x.BlockChans[0].stchannel[1].S2R, x.BlockChans[0].stchannel[1].R2S)
+	blocks[0].otSenders[party] = sender0
+
+	for i := 1; i < numBlocks; i++ {
+		sender := sender0.Fork(x.BlockChans[i].stchannel[1].S2R, x.BlockChans[i].stchannel[1].R2S)
+		blocks[i].otSenders[party] = sender
+	}
+
 	done <- struct{}{}
 }
 
-func NewPeerIO(numBlocks int, numParties int, id int) PeerIO {
+func NewPeerIO(numBlocks int, numParties int, id int) *PeerIO {
 	var gio GlobalIO
 	gio.n = numParties
 	gio.id = id
@@ -816,23 +850,22 @@ func NewPeerIO(numBlocks int, numParties int, id int) PeerIO {
 			nil, nil, nil,
 			make([]chan uint32, numParties),
 			make([]chan uint32, numParties),
-			make([]ot.StreamSender, numParties),
-			make([]ot.StreamReceiver, numParties),
+			make([]*ot.StreamSender, numParties),
+			make([]*ot.StreamReceiver, numParties),
 		}
 	}
-	return io
+	return &io
 }
 
 func SetupPeer(numBlocks int, numParties int, id int) {
 	io := NewPeerIO(numBlocks, numParties, id)
 	for i := 0; i < numParties; i++ {
 		if io.id != i {
-			go serverSideIOSetup(io.blocks, i, io.listen(i))
-		}
-	}
-	for i := 0; i < numParties; i++ {
-		if io.id != i {
-			clientSideIOSetup(io.blocks, i, io.connect(i))
+			if io.Leads(i) {
+				go clientSideIOSetup(io, i, io.connect(i))
+			} else {
+				go serverSideIOSetup(io, i, io.listen(i))
+			}
 		}
 	}
 	for i := 0; i < numParties; i++ {
@@ -844,32 +877,32 @@ func SetupPeer(numBlocks int, numParties int, id int) {
 }
 
 func Simulation(numParties int, numBlocks int, runPeer func(Io, []Io), peerDone <-chan bool) {
-	ios := make([]PeerIO, numParties)
+	ios := make([]*PeerIO, numParties)
 	for i := 0; i < numParties; i++ {
 		ios[i] = NewPeerIO(numBlocks, numParties, i)
 	}
 	nus := make([]chan PerNodePair, numParties*numParties)
 	for i := 0; i < numParties; i++ {
 		for j := 0; j < numParties; j++ {
-			if i != j {
+			if i != j && !ios[i].Leads(j) {
 				nu := make(chan PerNodePair)
-				nus[i*numParties+j] = nu                   // server i talking to client j
-				go serverSideIOSetup(ios[i].blocks, j, nu) // i's setup server for party j
+				nus[i*numParties+j] = nu            // server i talking to client j
+				go serverSideIOSetup(ios[i], j, nu) // i's setup server for party j
+			}
+		}
+	}
+	for i := 0; i < numParties; i++ {
+		for j := 0; j < numParties; j++ {
+			if i != j && ios[i].Leads(j) {
+				nu := nus[j*numParties+i]           // client i talking to server j
+				go clientSideIOSetup(ios[i], j, nu) // i's setup client for party j
 			}
 		}
 	}
 	for i := 0; i < numParties; i++ {
 		for j := 0; j < numParties; j++ {
 			if i != j {
-				nu := nus[j*numParties+i]               // client i talking to server j
-				clientSideIOSetup(ios[i].blocks, j, nu) // i's setup client for party j
-			}
-		}
-	}
-	for i := 0; i < numParties; i++ {
-		for j := 0; j < numParties; j++ {
-			if i != j {
-				<-done // wait for a setup server to finish
+				<-done // wait for a setup to finish
 			}
 		}
 	}
@@ -889,6 +922,39 @@ func Simulation(numParties int, numBlocks int, runPeer func(Io, []Io), peerDone 
 
 func (x *GlobalIO) N() int {
 	return x.n
+}
+
+func (x *GlobalIO) Leads(y int) bool {
+	// Leader calculation
+	// We have N parties 0...N-1
+	// Two parties A!=B want to determine a leader.
+	// Think of the parties arranged in a circle.
+	// Each party "follows" the other in the circle by a certain distance, or, equivalently, "leads" the other by a distance.
+	// The lead of A over B is the smallest number x>=0 such that B+x mod N = A.
+	// The leader of A and B is A if the lead of A is **less** than the lead of B.  (B is following closer.)
+	// E.g., if we have 0 .. B A .. N then A leads B by 1 and B leads A by N-1.
+	// Sometimes if N is even we will need to break a tie.  If so we choose the smaller of A and B as the leader.
+	//
+	// How to calculate the lead of A over B:
+	//  if A>B then it is A-B
+	//  if A<B then it is (N-B)+A = (A-B)+N
+	//  if A=B then it is 0 (degenerate case)
+	leadOfX := x.id - y
+	if leadOfX < 0 {
+		leadOfX += x.n
+	}
+	leadOfY := y - x.id
+	if leadOfY < 0 {
+		leadOfY += x.n
+	}
+	switch {
+	case leadOfX < leadOfY:
+		return true
+	case leadOfX > leadOfY:
+		return false
+	default:
+		return x.id < y
+	}
 }
 
 func (x *GlobalIO) Id() int {
@@ -941,11 +1007,11 @@ func combine(arr []byte) uint32 {
 	return result
 }
 
-func piMulRStream(val []byte, thisReceiver ot.StreamReceiver) []byte {
+func piMulRStream(val []byte, thisReceiver *ot.StreamReceiver) []byte {
 	return thisReceiver.ReceiveMBits(val)
 }
 
-func piMulSStream(val []byte, thisSender ot.StreamSender) []byte {
+func piMulSStream(val []byte, thisSender *ot.StreamSender) []byte {
 	x0 := randomBytes(len(val))
 	x1 := ot.XorBytes(x0, val)
 	thisSender.SendMBits(x0, x1)
@@ -972,7 +1038,7 @@ func AndBytes(a, b []byte) []byte {
 	return result
 }
 
-func triple32Stream(thisPartyId int, senders []ot.StreamSender, receivers []ot.StreamReceiver) []Triple {
+func triple32Stream(thisPartyId int, senders []*ot.StreamSender, receivers []*ot.StreamReceiver) []Triple {
 	n := len(senders)
 	result := make([]Triple, NUM_TRIPLES)
 	numBytes := NUM_TRIPLES * 4

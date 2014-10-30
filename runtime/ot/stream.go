@@ -110,7 +110,7 @@ type StreamReceiver struct {
 	from    <-chan MessagePair
 }
 
-func NewStreamReceiver(sender Sender, to chan<- []byte, from <-chan MessagePair) StreamReceiver {
+func NewStreamReceiver(sender Sender, to chan<- []byte, from <-chan MessagePair) *StreamReceiver {
 	k := NumStreams
 	tStream := make([]cipher.Stream, k)
 	vStream := make([]cipher.Stream, k)
@@ -121,7 +121,7 @@ func NewStreamReceiver(sender Sender, to chan<- []byte, from <-chan MessagePair)
 		tStream[i] = sha3.NewCipher(tSeed, nil)
 		vStream[i] = sha3.NewCipher(vSeed, nil)
 	}
-	return StreamReceiver{tStream, vStream, to, from}
+	return &StreamReceiver{tStream, vStream, to, from}
 }
 
 type StreamSender struct {
@@ -132,7 +132,7 @@ type StreamSender struct {
 	from    <-chan []byte
 }
 
-func NewStreamSender(receiver Receiver, to chan<- MessagePair, from <-chan []byte) StreamSender {
+func NewStreamSender(receiver Receiver, to chan<- MessagePair, from <-chan []byte) *StreamSender {
 	k := NumStreams
 	sPacked := randomBits(k)
 	sWide := make([]byte, k)
@@ -148,7 +148,7 @@ func NewStreamSender(receiver Receiver, to chan<- MessagePair, from <-chan []byt
 		wSeed := receiver.Receive(Selector(bit.GetBit(sPacked, i)))
 		wStream[i] = sha3.NewCipher(wSeed, nil)
 	}
-	return StreamSender{sPacked, sWide, wStream, to, from}
+	return &StreamSender{sPacked, sWide, wStream, to, from}
 }
 
 type PerBlockStreamChans struct {
@@ -187,23 +187,23 @@ func XorBytes(a, b []byte) []byte {
 }
 
 // Inefficient, just for compatibility
-func (S StreamSender) Send(a, b Message) {
+func (S *StreamSender) Send(a, b Message) {
 	z := []byte{0x00}
-	A := [][]byte{a,z,z,z,z,z,z,z}
-	B := [][]byte{b,z,z,z,z,z,z,z}
-	S.SendM(A,B)
+	A := [][]byte{a, z, z, z, z, z, z, z}
+	B := [][]byte{b, z, z, z, z, z, z, z}
+	S.SendM(A, B)
 }
-func (R StreamReceiver) Receive(s Selector) Message {
+func (R *StreamReceiver) Receive(s Selector) Message {
 	switch s {
 	case 0:
 		return R.ReceiveM([]byte{0x00})[0]
 	default:
 		return R.ReceiveM([]byte{0xff})[0]
-	}	
+	}
 }
 
 // Send m message pairs at once
-func (S StreamSender) SendM(a, b [][]byte) {
+func (S *StreamSender) SendM(a, b [][]byte) {
 	k := NumStreams
 	m := len(a)
 	if m%8 != 0 {
@@ -238,7 +238,7 @@ func (S StreamSender) SendM(a, b [][]byte) {
 	}
 }
 
-func (R StreamReceiver) ReceiveM(r []byte) [][]byte { // r is a packed vector of selections
+func (R *StreamReceiver) ReceiveM(r []byte) [][]byte { // r is a packed vector of selections
 	k := NumStreams
 	m := 8 * len(r)
 	t := bit.NewMatrix8(k, m) // k rows, m columns
@@ -275,7 +275,7 @@ func (R StreamReceiver) ReceiveM(r []byte) [][]byte { // r is a packed vector of
 }
 
 // Send m pairs of bits (1-bit messages) at once
-func (S StreamSender) SendMBits(a, b []byte) { // messages are packed in bytes
+func (S *StreamSender) SendMBits(a, b []byte) { // messages are packed in bytes
 	k := NumStreams
 	m := 8 * len(a)
 	if 8*len(b) != m {
@@ -312,7 +312,7 @@ func (S StreamSender) SendMBits(a, b []byte) { // messages are packed in bytes
 	S.to <- MessagePair{m0, m1}
 }
 
-func (R StreamReceiver) ReceiveMBits(r []byte) []byte { // r is a packed vector of selections and result is packed as well
+func (R *StreamReceiver) ReceiveMBits(r []byte) []byte { // r is a packed vector of selections and result is packed as well
 	k := NumStreams
 	m := 8 * len(r)
 	t := bit.NewMatrix8(k, m) // k rows, m columns
@@ -351,7 +351,7 @@ func (R StreamReceiver) ReceiveMBits(r []byte) []byte { // r is a packed vector 
 }
 
 // Send m pairs of random bits (1-bit messages) at once
-func (S StreamSender) SendMRandomBits(m int) ([]byte, []byte) { // resulting bits are packed in bytes
+func (S *StreamSender) SendMRandomBits(m int) ([]byte, []byte) { // resulting bits are packed in bytes
 	k := NumStreams
 	if m%8 != 0 {
 		panic("SendMRandomBits: number of messages must be a multiple of 8")
@@ -385,7 +385,7 @@ func (S StreamSender) SendMRandomBits(m int) ([]byte, []byte) { // resulting bit
 	return a, b
 }
 
-func (R StreamReceiver) ReceiveMRandomBits(r []byte) []byte { // r is a packed vector of selections and result is packed as well
+func (R *StreamReceiver) ReceiveMRandomBits(r []byte) []byte { // r is a packed vector of selections and result is packed as well
 	k := NumStreams
 	m := 8 * len(r)
 	t := bit.NewMatrix8(k, m) // k rows, m columns
@@ -418,7 +418,7 @@ func (R StreamReceiver) ReceiveMRandomBits(r []byte) []byte { // r is a packed v
 
 // Create a new StreamSender that can operate independently of the parent StreamSender (concurrent operation).
 // It must be paired (via to/from) with a StreamReceiver forked from the original StreamSender's StreamReceiver.
-func (S StreamSender) Fork(to chan<- MessagePair, from chan []byte) StreamSender {
+func (S *StreamSender) Fork(to chan<- MessagePair, from chan []byte) *StreamSender {
 	sPacked := S.sPacked
 	sWide := S.sWide
 	wStream := make([]cipher.Stream, len(S.wStream))
@@ -426,12 +426,12 @@ func (S StreamSender) Fork(to chan<- MessagePair, from chan []byte) StreamSender
 		wSeed := bytesFrom(v, SeedBytes)
 		wStream[i] = sha3.NewCipher(wSeed, nil)
 	}
-	return StreamSender{sPacked, sWide, wStream, to, from}
+	return &StreamSender{sPacked, sWide, wStream, to, from}
 }
 
 // Create a new StreamReceiver that can operate independently of the parent StreamReceiver (concurrent operation).
 // It must be paired (via to/from) with a StreamSender forked from the original StreamReceiver's StreamSender.
-func (R StreamReceiver) Fork(to chan []byte, from chan MessagePair) StreamReceiver {
+func (R *StreamReceiver) Fork(to chan []byte, from chan MessagePair) *StreamReceiver {
 	tStream := make([]cipher.Stream, len(R.tStream))
 	vStream := make([]cipher.Stream, len(R.vStream))
 	for i, v := range R.tStream {
@@ -442,7 +442,7 @@ func (R StreamReceiver) Fork(to chan []byte, from chan MessagePair) StreamReceiv
 		vSeed := bytesFrom(v, SeedBytes)
 		vStream[i] = sha3.NewCipher(vSeed, nil)
 	}
-	return StreamReceiver{tStream, vStream, to, from}
+	return &StreamReceiver{tStream, vStream, to, from}
 }
 
 func PrintBytes(r []byte) {
