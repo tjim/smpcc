@@ -576,6 +576,10 @@ func Mask64(io Io, s bool, a uint64) uint64 {
 	return Select64(io, s, a, Uint64(io, 0))
 }
 
+func NumPeers32(io Io) uint32 {
+	return Uint32(io, uint32(io.N()))
+}
+
 func Input32(io Io, mask bool, party uint32, next_arg func() uint32) uint32 {
 	if !io.Open1(mask) {
 		return 0

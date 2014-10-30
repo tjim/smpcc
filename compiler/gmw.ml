@@ -102,6 +102,8 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
       bprintf b "Printf(io, mask, \"\\x%02x\")\n" (Big_int.int_of_big_int x)
   | Call(_,_,_,_,Var(Name(true, "input")),[typ,_,value],_,_) ->
       bprintf b "Input32(io, mask, %a, next_arg)\n" bpr_gmw_value (typ, value)
+  | Call(_,_,_,_,Var(Name(true, "num_peers")),_,_,_) ->
+      bprintf b "NumPeers32(io)\n"
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.start")),_,_,_) ->
       ()
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.end")),_,_,_) ->
@@ -239,7 +241,7 @@ let bpr_gmw_block b blocks_fv bl =
         (fun a (_,i) ->
           a ||
           (match i with (* see bpr_gmw_instr, these are all cases using mask *)
-          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "input"))),_,_,_)
+          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "input" | "num_peers"))),_,_,_)
           | Load _
           | Store _ ->
               true

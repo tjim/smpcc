@@ -138,4 +138,6 @@ Within the c file you can read an input by declaring
 
     extern unsigned int input(unsigned int);
 
-Then you read from party n with input(n).
+Then you read from party n with input(n).  Obtain the number of parties with
+
+    extern unsigned int num_peers();
