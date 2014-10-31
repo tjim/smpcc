@@ -14,10 +14,14 @@ type Selector byte
 
 type Sender interface {
 	Send(Message, Message)
+	SendM(a, b []Message)
+	SendMBits(a, b []byte)
 }
 
 type Receiver interface {
 	Receive(Selector) Message
+	ReceiveM(r []byte) []Message
+	ReceiveMBits(r []byte) []byte
 }
 
 // PublicKey represents an ElGamal public key.

@@ -189,8 +189,8 @@ func XorBytes(a, b []byte) []byte {
 // Inefficient, just for compatibility
 func (S *StreamSender) Send(a, b Message) {
 	z := []byte{0x00}
-	A := [][]byte{a, z, z, z, z, z, z, z}
-	B := [][]byte{b, z, z, z, z, z, z, z}
+	A := []Message{a, z, z, z, z, z, z, z}
+	B := []Message{b, z, z, z, z, z, z, z}
 	S.SendM(A, B)
 }
 func (R *StreamReceiver) Receive(s Selector) Message {
@@ -203,7 +203,7 @@ func (R *StreamReceiver) Receive(s Selector) Message {
 }
 
 // Send m message pairs at once
-func (S *StreamSender) SendM(a, b [][]byte) {
+func (S *StreamSender) SendM(a, b []Message) {
 	k := NumStreams
 	m := len(a)
 	if m%8 != 0 {
@@ -238,7 +238,7 @@ func (S *StreamSender) SendM(a, b [][]byte) {
 	}
 }
 
-func (R *StreamReceiver) ReceiveM(r []byte) [][]byte { // r is a packed vector of selections
+func (R *StreamReceiver) ReceiveM(r []byte) []Message { // r is a packed vector of selections
 	k := NumStreams
 	m := 8 * len(r)
 	t := bit.NewMatrix8(k, m) // k rows, m columns
@@ -256,7 +256,7 @@ func (R *StreamReceiver) ReceiveM(r []byte) [][]byte { // r is a packed vector o
 		XorBytesTo(r, u.GetRow(i), u.GetRow(i))             // u = (t XOR v) XOR r
 	}
 	R.to <- u.Data
-	result := make([][]byte, m)
+	result := make([]Message, m)
 	for j := 0; j < m; j++ {
 		msgs := <-R.from
 		m0 := msgs.m0

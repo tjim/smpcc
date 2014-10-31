@@ -142,6 +142,55 @@ func (self *NPReceiver) Receive(s Selector) Message {
 	return res
 }
 
+// Send m message pairs in one call
+func (S *NPSender) SendM(a, b []Message) {
+	m := len(a)
+	if m%8 != 0 {
+		panic("SendM: must send a multiple of 8 messages at a time") // force compatibility with stream OT
+	}
+	if len(b) != m {
+		panic("SendM: must send pairs of messages")
+	}
+	for i := range a {
+		S.Send(a[i], b[i])
+	}
+}
+func (R *NPReceiver) ReceiveM(r []byte) []Message { // r is a packed vector of selections
+	result := make([]Message, 8*len(r))
+	for i := range r {
+		for bit := 0; bit < 8; bit++ {
+			selector := Selector((r[i] >> uint(7 - bit)) & 1)
+			result[i+bit] = R.Receive(selector)
+		}
+	}
+	return result
+}
+
+// Send m pairs of bits (1-bit messages) in one call
+func (S *NPSender) SendMBits(a, b []byte) { // messages are packed in bytes
+	m := 8 * len(a)
+	if 8*len(b) != m {
+		panic("SendMBits: must send pairs of messages")
+	}
+	for i := range a {
+		for bit := 0; bit < 8; bit++ {
+			mask := byte(0x80 >> uint(bit))
+			S.Send([]byte{a[i]&mask}, []byte{b[i]&mask})
+		}
+	}
+}
+func (R *NPReceiver) ReceiveMBits(r []byte) []byte { // r is a packed vector of selections and result is packed as well
+	result := make([]byte, len(r))
+	for i := range r {
+		for bit := 0; bit < 8; bit++ {
+			mask := byte(0x80 >> uint(bit))
+			selector := Selector((r[i] >> uint(7 - bit)) & 1)
+			result[i] |= mask & R.Receive(selector)[0]
+		}
+	}
+	return result
+}
+
 func xorBytes(a, b, c []byte) {
 	if len(a) != len(b) || len(b) != len(c) {
 		panic("xorBytes: length mismatch")
