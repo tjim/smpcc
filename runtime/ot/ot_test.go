@@ -69,6 +69,22 @@ func BenchmarkNaorPinkas(b *testing.B) {
 	}
 }
 
+func pairNaorPinkasM(b *testing.B) {
+	s, r := NewNP()
+	go senderBenchM(s, b)
+	go receiverBenchM(r, b)
+}
+
+func BenchmarkNaorPinkasM(b *testing.B) {
+	for i := 0; i < PAIRS; i++ {
+		pairNaorPinkasM(b)
+	}
+	for i := 0; i < PAIRS; i++ {
+		<-done
+		<-done
+	}
+}
+
 // OT extension
 func pairExtend(b *testing.B) {
 	k := 80
@@ -123,17 +139,17 @@ func BenchmarkMplex(b *testing.B) {
 }
 
 // Stream OT
-var hello8 [][]byte = [][]byte{hello, hello, hello, hello, hello, hello, hello, hello}
-var world8 [][]byte = [][]byte{world, world, world, world, world, world, world, world}
+var hello8 []Message = []Message{hello, hello, hello, hello, hello, hello, hello, hello}
+var world8 []Message = []Message{world, world, world, world, world, world, world, world}
 
-func senderBenchStream(x StreamSender, b *testing.B) {
+func senderBenchM(x Sender, b *testing.B) {
 	for i := 0; i < ITERATIONS/8; i++ {
 		x.SendM(hello8, world8)
 	}
 	done <- true
 }
 
-func receiverBenchStream(x StreamReceiver, b *testing.B) {
+func receiverBenchM(x Receiver, b *testing.B) {
 	for i := 0; i < ITERATIONS/8; i++ {
 		r := []byte{0xaa} // receive 8 messages, alternating hello and world, 0xaa == 0b10101010
 		rslt := x.ReceiveM(r)
@@ -159,13 +175,13 @@ func receiverBenchStream(x StreamReceiver, b *testing.B) {
 	done <- true
 }
 
-func pairStream(b *testing.B, S StreamSender, R StreamReceiver) {
+func pairStream(b *testing.B, S *StreamSender, R *StreamReceiver) {
 	r2s := make(chan []byte)
 	s2r := make(chan MessagePair)
 	s := S.Fork(s2r, r2s)
 	r := R.Fork(r2s, s2r)
-	go senderBenchStream(s, b)
-	go receiverBenchStream(r, b)
+	go senderBenchM(s, b)
+	go receiverBenchM(r, b)
 }
 
 func BenchmarkStream(b *testing.B) {
@@ -173,7 +189,7 @@ func BenchmarkStream(b *testing.B) {
 	r2s := make(chan []byte)
 	s2r := make(chan MessagePair)
 	BaseS, BaseR := NewNP()
-	var S StreamSender
+	var S *StreamSender
 	go func() {
 		S = NewStreamSender(BaseR, s2r, r2s)
 		done <- true
@@ -191,7 +207,7 @@ func BenchmarkStream(b *testing.B) {
 }
 
 // Stream OT with 1-bit messages
-func senderBenchStreamBits(x StreamSender, b *testing.B) {
+func senderBenchMBits(x Sender, b *testing.B) {
 	teeth0 := make([]byte, ITERATIONS/8)
 	teeth1 := make([]byte, ITERATIONS/8)
 	for i := range teeth0 {
@@ -202,7 +218,7 @@ func senderBenchStreamBits(x StreamSender, b *testing.B) {
 	done <- true
 }
 
-func receiverBenchStreamBits(x StreamReceiver, b *testing.B) {
+func receiverBenchMBits(x Receiver, b *testing.B) {
 	r := make([]byte, ITERATIONS/8)
 	for i := range r {
 		r[i] = 0xaa // 0b10101010
@@ -217,13 +233,13 @@ func receiverBenchStreamBits(x StreamReceiver, b *testing.B) {
 	done <- true
 }
 
-func pairStreamBits(b *testing.B, S StreamSender, R StreamReceiver) {
+func pairStreamBits(b *testing.B, S *StreamSender, R *StreamReceiver) {
 	r2s := make(chan []byte)
 	s2r := make(chan MessagePair)
 	s := S.Fork(s2r, r2s)
 	r := R.Fork(r2s, s2r)
-	go senderBenchStreamBits(s, b)
-	go receiverBenchStreamBits(r, b)
+	go senderBenchMBits(s, b)
+	go receiverBenchMBits(r, b)
 }
 
 func BenchmarkStreamBits(b *testing.B) {
@@ -231,7 +247,7 @@ func BenchmarkStreamBits(b *testing.B) {
 	r2s := make(chan []byte)
 	s2r := make(chan MessagePair)
 	BaseS, BaseR := NewNP()
-	var S StreamSender
+	var S *StreamSender
 	go func() {
 		S = NewStreamSender(BaseR, s2r, r2s)
 		done <- true
@@ -249,14 +265,14 @@ func BenchmarkStreamBits(b *testing.B) {
 }
 
 // Stream OT with random 1-bit messages
-func senderBenchRandomBits(x StreamSender, resultChan chan []byte, b *testing.B) {
+func senderBenchRandomBits(x *StreamSender, resultChan chan []byte, b *testing.B) {
 	A, B := x.SendMRandomBits(ITERATIONS)
 	resultChan <- A
 	resultChan <- B
 	done <- true
 }
 
-func receiverBenchRandomBits(x StreamReceiver, resultChan chan []byte, b *testing.B) {
+func receiverBenchRandomBits(x *StreamReceiver, resultChan chan []byte, b *testing.B) {
 	r := make([]byte, ITERATIONS/8)
 	for i := range r {
 		r[i] = 0xaa // 0b10101010
@@ -274,7 +290,7 @@ func receiverBenchRandomBits(x StreamReceiver, resultChan chan []byte, b *testin
 	done <- true
 }
 
-func pairRandomBits(b *testing.B, S StreamSender, R StreamReceiver) {
+func pairRandomBits(b *testing.B, S *StreamSender, R *StreamReceiver) {
 	r2s := make(chan []byte)
 	s2r := make(chan MessagePair)
 	s := S.Fork(s2r, r2s)
@@ -289,7 +305,7 @@ func BenchmarkRandomBits(b *testing.B) {
 	r2s := make(chan []byte)
 	s2r := make(chan MessagePair)
 	BaseS, BaseR := NewNP()
-	var S StreamSender
+	var S *StreamSender
 	go func() {
 		S = NewStreamSender(BaseR, s2r, r2s)
 		done <- true
