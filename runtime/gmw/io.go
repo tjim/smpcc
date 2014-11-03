@@ -299,10 +299,13 @@ func SetupPeer(numBlocks int, numParties int, id int) {
 	// May need to sleep here to avoid fatchan deadlock
 }
 
-func Simulation(numParties int, numBlocks int, runPeer func(Io, []Io), peerDone <-chan bool) {
+func Simulation(inputs []uint32, numBlocks int, runPeer func(Io, []Io), peerDone <-chan bool) {
+	numParties := len(inputs)
 	ios := make([]*PeerIO, numParties)
 	for i := 0; i < numParties; i++ {
-		ios[i] = NewPeerIO(numBlocks, numParties, i)
+		peer := NewPeerIO(numBlocks, numParties, i)
+		peer.inputs = inputs[i : i+1]
+		ios[i] = peer
 	}
 	nus := make([]chan PerNodePair, numParties*numParties)
 	for i := 0; i < numParties; i++ {
@@ -686,10 +689,14 @@ func (x *BlockIO) Receive32(party int) uint32 {
 		return 0
 	}
 	switch { // temporary debugging measure
-	case x == nil: fmt.Printf("x == nil, party == %d\n", party)
-	case x.rchannels == nil: fmt.Printf("x.rchannels == nil, party == %d\n", party)
-	case party < 0: fmt.Printf("party == %d\n", party)
-	case party >= len(x.rchannels): fmt.Printf("len(x.rchannels) == %d, party == %d\n", len(x.rchannels), party)
+	case x == nil:
+		fmt.Printf("x == nil, party == %d\n", party)
+	case x.rchannels == nil:
+		fmt.Printf("x.rchannels == nil, party == %d\n", party)
+	case party < 0:
+		fmt.Printf("party == %d\n", party)
+	case party >= len(x.rchannels):
+		fmt.Printf("len(x.rchannels) == %d, party == %d\n", len(x.rchannels), party)
 	}
 	ch := x.rchannels[party]
 	result, ok := <-ch
