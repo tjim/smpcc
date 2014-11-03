@@ -685,6 +685,12 @@ func (x *BlockIO) Receive32(party int) uint32 {
 	if party == id {
 		return 0
 	}
+	switch { // temporary debugging measure
+	case x == nil: fmt.Printf("x == nil, party == %d\n", party)
+	case x.rchannels == nil: fmt.Printf("x.rchannels == nil, party == %d\n", party)
+	case party < 0: fmt.Printf("party == %d\n", party)
+	case party >= len(x.rchannels): fmt.Printf("len(x.rchannels) == %d, party == %d\n", len(x.rchannels), party)
+	}
 	ch := x.rchannels[party]
 	result, ok := <-ch
 	if !ok {
