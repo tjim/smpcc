@@ -11,8 +11,21 @@ import "time"
 
 var log_mem bool = true
 var log_results bool = false
+var log_triples bool = false // true => print triple stats for simulation mode
 var log_communication bool = false
 var check_split = false
+
+var stats_triple_chan chan bool = make(chan bool)
+var stats_triple_num int = 0
+func log_triple_goroutine() {
+	for {
+		<- stats_triple_chan
+		stats_triple_num++
+	}
+}
+func log_triple_output() {
+	fmt.Printf("Generated %d triples\n", stats_triple_num * NUM_TRIPLES * 32)
+}
 
 const (
 	NUM_TRIPLES = 10
@@ -309,6 +322,9 @@ func SetupPeer(inputs []uint32, numBlocks int, numParties int, id int, runPeer f
 }
 
 func Simulation(inputs []uint32, numBlocks int, runPeer func(Io, []Io), peerDone <-chan bool) {
+	if log_triples {
+		go log_triple_goroutine()
+	}
 	numParties := len(inputs)
 	ios := make([]*PeerIO, numParties)
 	for i := 0; i < numParties; i++ {
@@ -352,6 +368,9 @@ func Simulation(inputs []uint32, numBlocks int, runPeer func(Io, []Io), peerDone
 	}
 	for i := 0; i < numParties; i++ {
 		<-peerDone // wait for all peers to complete
+	}
+	if log_triples {
+		log_triple_output()
 	}
 }
 
@@ -520,6 +539,9 @@ func triple32Stream(thisPartyId int, senders []*ot.StreamSender, receivers []*ot
 func (x *BlockIO) Triple32() (a, b, c uint32) {
 	if len(x.triples32) == 0 {
 		x.triples32 = triple32Stream(x.id, x.otSenders, x.otReceivers)
+		if log_triples && x.Id() == 0 {
+			stats_triple_chan <- true
+		}
 	}
 	result := x.triples32[0]
 	x.triples32 = x.triples32[1:]
