@@ -524,55 +524,67 @@ func (x *BlockIO) Triple64() (a, b, c uint64) {
 }
 
 func (x *BlockIO) Open1(s bool) bool {
-	x.Broadcast1(s)
-	result := s
-	id := x.Id()
-	for i := range x.rchannels {
-		if i == id {
-			continue
+	if x.Id() == 0 {
+		result := s
+		for i := 1; i < x.N(); i++ {
+			result = xor(result, x.Receive1(i))
 		}
-		result = xor(result, x.Receive1(i))
+		for i := 1; i < x.N(); i++ {
+			x.Send1(i, result)
+		}
+		return result
+	} else {
+		x.Send1(0, s)
+		return x.Receive1(0)
 	}
-	return result
 }
 
 func (x *BlockIO) Open8(s uint8) uint8 {
-	x.Broadcast8(s)
-	result := s
-	id := x.Id()
-	for i := range x.rchannels {
-		if i == id {
-			continue
+	if x.Id() == 0 {
+		result := s
+		for i := 1; i < x.N(); i++ {
+			result ^= x.Receive8(i)
 		}
-		result ^= x.Receive8(i)
+		for i := 1; i < x.N(); i++ {
+			x.Send8(i, result)
+		}
+		return result
+	} else {
+		x.Send8(0, s)
+		return x.Receive8(0)
 	}
-	return result
 }
 
 func (x *BlockIO) Open32(s uint32) uint32 {
-	x.Broadcast32(s)
-	result := s
-	id := x.Id()
-	for i := range x.rchannels {
-		if i == id {
-			continue
+	if x.Id() == 0 {
+		result := s
+		for i := 1; i < x.N(); i++ {
+			result ^= x.Receive32(i)
 		}
-		result ^= x.Receive32(i)
+		for i := 1; i < x.N(); i++ {
+			x.Send32(i, result)
+		}
+		return result
+	} else {
+		x.Send32(0, s)
+		return x.Receive32(0)
 	}
-	return result
 }
 
 func (x *BlockIO) Open64(s uint64) uint64 {
-	x.Broadcast64(s)
-	result := s
-	id := x.Id()
-	for i := range x.rchannels {
-		if i == id {
-			continue
+	if x.Id() == 0 {
+		result := s
+		for i := 1; i < x.N(); i++ {
+			result ^= x.Receive64(i)
 		}
-		result ^= x.Receive64(i)
+		for i := 1; i < x.N(); i++ {
+			x.Send64(i, result)
+		}
+		return result
+	} else {
+		x.Send64(0, s)
+		return x.Receive64(0)
 	}
-	return result
 }
 
 func (x *BlockIO) Broadcast1(n bool) {
@@ -589,7 +601,8 @@ func (x *BlockIO) Broadcast1(n bool) {
 			continue
 		}
 		// goroutine to avoid deadlock, all nodes broadcast then receive simultaneously
-		go func(ch chan uint32) { ch <- n32 }(ch)
+//		go func(ch chan uint32) { ch <- n32 }(ch)
+		ch <- n32
 		if log_communication {
 			fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
 		}
@@ -606,7 +619,8 @@ func (x *BlockIO) Broadcast8(n uint8) {
 			continue
 		}
 		// goroutine to avoid deadlock, all nodes broadcast then receive simultaneously
-		go func(ch chan uint32) { ch <- uint32(n) }(ch)
+//		go func(ch chan uint32) { ch <- uint32(n) }(ch)
+		ch <- uint32(n)
 		if log_communication {
 			fmt.Printf("%d -- 0x%02x -> %d\n", id, n, i)
 		}
@@ -623,7 +637,8 @@ func (x *BlockIO) Broadcast32(n uint32) {
 			continue
 		}
 		// goroutine to avoid deadlock, all nodes broadcast then receive simultaneously
-		go func(ch chan uint32) { ch <- n }(ch)
+//		go func(ch chan uint32) { ch <- n }(ch)
+		ch <- n
 		if log_communication {
 			fmt.Printf("%d -- 0x%08x -> %d\n", id, n, i)
 		}
