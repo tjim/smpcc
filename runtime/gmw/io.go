@@ -27,11 +27,6 @@ type Io interface {
 	Open32(uint32) uint32
 	Open64(uint64) uint64
 
-	Broadcast1(bool)
-	Broadcast8(uint8)
-	Broadcast32(uint32)
-	Broadcast64(uint64)
-
 	Send1(party int, x bool)
 	Send8(party int, x uint8)
 	Send32(party int, x uint32)
@@ -585,71 +580,6 @@ func (x *BlockIO) Open64(s uint64) uint64 {
 		x.Send64(0, s)
 		return x.Receive64(0)
 	}
-}
-
-func (x *BlockIO) Broadcast1(n bool) {
-	var n32 uint32 = 0
-	if n {
-		n32 = 1
-	}
-	id := x.Id()
-	if log_communication {
-		fmt.Printf("%d: BROADCAST 0x%1x\n", id, n32)
-	}
-	for i, ch := range x.wchannels {
-		if i == id {
-			continue
-		}
-		// goroutine to avoid deadlock, all nodes broadcast then receive simultaneously
-//		go func(ch chan uint32) { ch <- n32 }(ch)
-		ch <- n32
-		if log_communication {
-			fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, i)
-		}
-	}
-}
-
-func (x *BlockIO) Broadcast8(n uint8) {
-	id := x.Id()
-	if log_communication {
-		fmt.Printf("%d: BROADCAST 0x%02x\n", id, n)
-	}
-	for i, ch := range x.wchannels {
-		if i == id {
-			continue
-		}
-		// goroutine to avoid deadlock, all nodes broadcast then receive simultaneously
-//		go func(ch chan uint32) { ch <- uint32(n) }(ch)
-		ch <- uint32(n)
-		if log_communication {
-			fmt.Printf("%d -- 0x%02x -> %d\n", id, n, i)
-		}
-	}
-}
-
-func (x *BlockIO) Broadcast32(n uint32) {
-	id := x.Id()
-	if log_communication {
-		fmt.Printf("%d: BROADCAST 0x%08x\n", id, n)
-	}
-	for i, ch := range x.wchannels {
-		if i == id {
-			continue
-		}
-		// goroutine to avoid deadlock, all nodes broadcast then receive simultaneously
-//		go func(ch chan uint32) { ch <- n }(ch)
-		ch <- n
-		if log_communication {
-			fmt.Printf("%d -- 0x%08x -> %d\n", id, n, i)
-		}
-	}
-}
-
-func (x *BlockIO) Broadcast64(n uint64) {
-	n0 := uint32(n >> 32)
-	n1 := uint32(n)
-	x.Broadcast32(n0)
-	x.Broadcast32(n1)
 }
 
 func (x *BlockIO) Send1(party int, n bool) {
