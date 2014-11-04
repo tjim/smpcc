@@ -484,9 +484,13 @@ let print_function_circuit m f =
   bprintf b "\n";
   bprintf b "var args []string\n";
   bprintf b "var do_pprof bool\n";
+  bprintf b "var id int\n";
+  bprintf b "var parties int\n";
   bprintf b "\n";
   bprintf b "func init_args() {\n";
   bprintf b "\tflag.BoolVar(&do_pprof, \"pprof\", false, \"run for profiling\")\n";
+  bprintf b "\tflag.IntVar(&id, \"id\", 0, \"id of this party\")\n";
+  bprintf b "\tflag.IntVar(&parties, \"parties\", 0, \"number of parties\")\n";
   bprintf b "\tflag.Parse()\n";
   bprintf b "\targs = flag.Args()\n";
   bprintf b "}\n";
@@ -510,7 +514,11 @@ let print_function_circuit m f =
   bprintf b "\t	fmt.Sscanf(v, \"%%d\", &input)\n";
   bprintf b "\t	inputs[i] = uint32(input)\n";
   bprintf b "\t}\n";
-  bprintf b "\tgmw.Simulation(inputs, %d, blocks_main, _main_done)\n" (List.length f.fblocks);
+  bprintf b "\tif parties == 0 {\n";
+  bprintf b "\t\tgmw.Simulation(inputs, 11, blocks_main, _main_done)\n";
+  bprintf b "\t} else {\n";
+  bprintf b "\t\tgmw.SetupPeer(inputs, 11, parties, id, blocks_main, _main_done)\n";
+  bprintf b "\t}\n";
   bprintf b "}\n";
   let main_go = Buffer.contents b in
   pr_output_file "_blocks.go" blocks_go;

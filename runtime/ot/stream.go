@@ -100,7 +100,7 @@ func RandomBytes(numBytes int) []byte {
 }
 
 type MessagePair struct {
-	m0, m1 []byte
+	M0, M1 []byte
 }
 
 type StreamReceiver struct {
@@ -259,8 +259,8 @@ func (R *StreamReceiver) ReceiveM(r []byte) []Message { // r is a packed vector 
 	result := make([]Message, m)
 	for j := 0; j < m; j++ {
 		msgs := <-R.from
-		m0 := msgs.m0
-		m1 := msgs.m1
+		m0 := msgs.M0
+		m1 := msgs.M1
 		l := 8 * len(m0)
 		if l != 8*len(m1) {
 			panic("ReceiveM: pairs must have the same length")
@@ -332,8 +332,8 @@ func (R *StreamReceiver) ReceiveMBits(r []byte) []byte { // r is a packed vector
 	R.to <- u.Data
 	result := make([]byte, m/8)
 	msgs := <-R.from
-	m0 := msgs.m0
-	m1 := msgs.m1
+	m0 := msgs.M0
+	m1 := msgs.M1
 	for jByte := range m0 {
 		// instead of unpacking and packing each message bit we just xor in place, using an appropriate bit of the hash
 		for jBit := 0; jBit < 8; jBit++ {
