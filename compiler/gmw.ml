@@ -470,56 +470,10 @@ let print_function_circuit m f =
   let blocks_fv = List.fold_left VSet.union VSet.empty (* TODO: eliminate duplicate code *)
       (List.map free_of_block f.fblocks) in
   List.iter (bpr_gmw_block b blocks_fv) f.fblocks;
-  let blocks_go = Buffer.contents b in
-
-  let b = Buffer.create 11 in
-  (* main function *)
-  bprintf b "package main\n";
-  bprintf b "\n";
-  bprintf b "import \"%sgmw\"\n" package_prefix;
-  bprintf b "import \"flag\"\n";
-  bprintf b "import \"fmt\"\n";
-  bprintf b "import \"os\"\n";
-  bprintf b "import \"runtime/pprof\"\n";
-  bprintf b "\n";
-  bprintf b "var args []string\n";
-  bprintf b "var do_pprof bool\n";
-  bprintf b "var id int\n";
-  bprintf b "var parties int\n";
-  bprintf b "\n";
-  bprintf b "func init_args() {\n";
-  bprintf b "\tflag.BoolVar(&do_pprof, \"pprof\", false, \"run for profiling\")\n";
-  bprintf b "\tflag.IntVar(&id, \"id\", 0, \"id of this party\")\n";
-  bprintf b "\tflag.IntVar(&parties, \"parties\", 0, \"number of parties\")\n";
-  bprintf b "\tflag.Parse()\n";
-  bprintf b "\targs = flag.Args()\n";
-  bprintf b "}\n";
   bprintf b "\n";
   bprintf b "var %s_done = make(chan bool, 1)\n" (Gc.govar f.fname);
   bprintf b "\n";
   bprintf b "func main() {\n";
-  bprintf b "\tinit_args()\n";
-  bprintf b "\tif do_pprof {\n";
-  bprintf b "\t\tfile := \"cpu.pprof\"\n";
-  bprintf b "\t\tf, err := os.Create(file)\n";
-  bprintf b "\t\tif err != nil {\n";
-  bprintf b "\t\t\tfmt.Println(\"Error: \", err)\n";
-  bprintf b "\t\t}\n";
-  bprintf b "\t\tpprof.StartCPUProfile(f)\n";
-  bprintf b "\t\tdefer pprof.StopCPUProfile()\n";
-  bprintf b "\t}\n";
-  bprintf b "\tinputs := make([]uint32, len(args))\n";
-  bprintf b "\tfor i, v := range args {\n";
-  bprintf b "\t	input := 0\n";
-  bprintf b "\t	fmt.Sscanf(v, \"%%d\", &input)\n";
-  bprintf b "\t	inputs[i] = uint32(input)\n";
-  bprintf b "\t}\n";
-  bprintf b "\tif parties == 0 {\n";
-  bprintf b "\t\tgmw.Simulation(inputs, 11, blocks_main, _main_done)\n";
-  bprintf b "\t} else {\n";
-  bprintf b "\t\tgmw.SetupPeer(inputs, 11, parties, id, blocks_main, _main_done)\n";
-  bprintf b "\t}\n";
+  bprintf b "\tRun(11, blocks_main, _main_done)\n";
   bprintf b "}\n";
-  let main_go = Buffer.contents b in
-  pr_output_file "_blocks.go" blocks_go;
-  pr_output_file "_main.go" main_go
+  pr_output_file ".go" (Buffer.contents b)
