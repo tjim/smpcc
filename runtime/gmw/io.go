@@ -17,14 +17,15 @@ var check_split = false
 
 var stats_triple_chan chan bool = make(chan bool)
 var stats_triple_num int = 0
+
 func log_triple_goroutine() {
 	for {
-		<- stats_triple_chan
+		<-stats_triple_chan
 		stats_triple_num++
 	}
 }
 func log_triple_output() {
-	fmt.Printf("Generated %d triples\n", stats_triple_num * NUM_TRIPLES * 32)
+	fmt.Printf("Generated %d triples\n", stats_triple_num*NUM_TRIPLES*32)
 }
 
 const (
@@ -140,11 +141,20 @@ Peers only listen for leaders and only connect to followers.
 */
 
 // for establishing connections
-type PerBlock struct {
-	Stchannel []ot.PerBlockStreamChans
-	Rwchannel []chan uint32
+type ClientAsSender struct {
+	S2R       chan ot.MessagePair `fatchan:"request"` // One per sender/receiver pair, sender->receiver
+	R2S       chan []byte         `fatchan:"reply"`   // One per sender/receiver pair, receiver->sender
+	Rwchannel chan uint32         `fatchan:"request"`
 }
-
+type ServerAsSender struct {
+	S2R       chan ot.MessagePair `fatchan:"reply"`   // One per sender/receiver pair, sender->receiver
+	R2S       chan []byte         `fatchan:"request"` // One per sender/receiver pair, receiver->sender
+	Rwchannel chan uint32         `fatchan:"reply"`
+}
+type PerBlock struct {
+	CAS ClientAsSender
+	SAS ServerAsSender
+}
 type PerNodePair struct {
 	ot.NPChans
 	BlockChans []PerBlock
@@ -182,37 +192,33 @@ func clientSideIOSetup(peer *PeerIO, party int, nu chan<- PerNodePair, wait bool
 	x := PerNodePair{ot.NPChans{ParamChan, NpRecvPk, NpSendEncs}, make([]PerBlock, numBlocks)}
 
 	for i := 0; i < numBlocks; i++ {
-		rchannel := make(chan uint32)
-		wchannel := make(chan uint32)
 		x.BlockChans[i] = PerBlock{
-			[]ot.PerBlockStreamChans{
-				ot.PerBlockStreamChans{make(chan ot.MessagePair), make(chan []byte)},
-				ot.PerBlockStreamChans{make(chan ot.MessagePair), make(chan []byte)}},
-			[]chan uint32{rchannel, wchannel}}
-		//		fmt.Printf("blocks[%d].rchannels[%d] = %v\n", i, party, rchannel)
+			ClientAsSender{make(chan ot.MessagePair), make(chan []byte), make(chan uint32)},
+			ServerAsSender{make(chan ot.MessagePair), make(chan []byte), make(chan uint32)},
+		}
 	}
 	nu <- x
 	if wait {
-		time.Sleep(time.Second) // wait for fatchan channel setup at server to complete
+		time.Sleep(3 * time.Second) // wait for fatchan channel setup at server to complete
 	}
 	for i := 0; i < numBlocks; i++ {
-		blocks[i].rchannels[party] = x.BlockChans[i].Rwchannel[0]
-		blocks[i].wchannels[party] = x.BlockChans[i].Rwchannel[1]
+		blocks[i].rchannels[party] = x.BlockChans[i].SAS.Rwchannel
+		blocks[i].wchannels[party] = x.BlockChans[i].CAS.Rwchannel
 	}
 
 	baseReceiver := ot.NewNPReceiver(ParamChan, NpRecvPk, NpSendEncs)
-	sender0 := ot.NewStreamSender(baseReceiver, x.BlockChans[0].Stchannel[0].S2R, x.BlockChans[0].Stchannel[0].R2S)
+	sender0 := ot.NewStreamSender(baseReceiver, x.BlockChans[0].CAS.S2R, x.BlockChans[0].CAS.R2S)
 	blocks[0].otSenders[party] = sender0
 	for i := 1; i < numBlocks; i++ {
-		sender := sender0.Fork(x.BlockChans[i].Stchannel[0].S2R, x.BlockChans[i].Stchannel[0].R2S)
+		sender := sender0.Fork(x.BlockChans[i].CAS.S2R, x.BlockChans[i].CAS.R2S)
 		blocks[i].otSenders[party] = sender
 	}
 
-	receiver0 := ot.NewStreamReceiver(sender0, x.BlockChans[0].Stchannel[1].R2S, x.BlockChans[0].Stchannel[1].S2R)
+	receiver0 := ot.NewStreamReceiver(sender0, x.BlockChans[0].SAS.R2S, x.BlockChans[0].SAS.S2R)
 	blocks[0].otReceivers[party] = receiver0
 
 	for i := 1; i < numBlocks; i++ {
-		receiver := receiver0.Fork(x.BlockChans[i].Stchannel[1].R2S, x.BlockChans[i].Stchannel[1].S2R)
+		receiver := receiver0.Fork(x.BlockChans[i].SAS.R2S, x.BlockChans[i].SAS.S2R)
 		blocks[i].otReceivers[party] = receiver
 	}
 
@@ -248,23 +254,23 @@ func serverSideIOSetup(peer *PeerIO, party int, nu <-chan PerNodePair) {
 	}
 
 	for i := 0; i < numBlocks; i++ {
-		blocks[i].wchannels[party] = x.BlockChans[i].Rwchannel[0]
-		blocks[i].rchannels[party] = x.BlockChans[i].Rwchannel[1]
+		blocks[i].wchannels[party] = x.BlockChans[i].SAS.Rwchannel
+		blocks[i].rchannels[party] = x.BlockChans[i].CAS.Rwchannel
 	}
 
 	baseSender := ot.NewNPSender(x.NPChans.ParamChan, x.NPChans.NpRecvPk, x.NPChans.NpSendEncs)
-	receiver0 := ot.NewStreamReceiver(baseSender, x.BlockChans[0].Stchannel[0].R2S, x.BlockChans[0].Stchannel[0].S2R)
+	receiver0 := ot.NewStreamReceiver(baseSender, x.BlockChans[0].CAS.R2S, x.BlockChans[0].CAS.S2R)
 	blocks[0].otReceivers[party] = receiver0
 	for i := 1; i < numBlocks; i++ {
-		receiver := receiver0.Fork(x.BlockChans[i].Stchannel[0].R2S, x.BlockChans[i].Stchannel[0].S2R)
+		receiver := receiver0.Fork(x.BlockChans[i].CAS.R2S, x.BlockChans[i].CAS.S2R)
 		blocks[i].otReceivers[party] = receiver
 	}
 
-	sender0 := ot.NewStreamSender(receiver0, x.BlockChans[0].Stchannel[1].S2R, x.BlockChans[0].Stchannel[1].R2S)
+	sender0 := ot.NewStreamSender(receiver0, x.BlockChans[0].SAS.S2R, x.BlockChans[0].SAS.R2S)
 	blocks[0].otSenders[party] = sender0
 
 	for i := 1; i < numBlocks; i++ {
-		sender := sender0.Fork(x.BlockChans[i].Stchannel[1].S2R, x.BlockChans[i].Stchannel[1].R2S)
+		sender := sender0.Fork(x.BlockChans[i].SAS.S2R, x.BlockChans[i].SAS.R2S)
 		blocks[i].otSenders[party] = sender
 	}
 
@@ -300,7 +306,7 @@ func SetupPeer(inputs []uint32, numBlocks int, numParties int, id int, runPeer f
 			go io.listen(i)
 		}
 	}
-	time.Sleep(time.Second) // wait for servers of other parties to start listening
+	time.Sleep(2 * time.Second) // wait for servers of other parties to start listening
 	// start connecting to servers of other parties
 	for i := 0; i < numParties; i++ {
 		if io.id != i && io.Leads(i) {

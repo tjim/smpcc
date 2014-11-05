@@ -151,11 +151,6 @@ func NewStreamSender(receiver Receiver, to chan<- MessagePair, from <-chan []byt
 	return &StreamSender{sPacked, sWide, wStream, to, from}
 }
 
-type PerBlockStreamChans struct {
-	S2R chan MessagePair `fatchan:"request"` // One per sender/receiver pair, sender->receiver
-	R2S chan []byte      `fatchan:"reply"`   // One per sender/receiver pair, receiver->sender
-}
-
 // Bitwise MUX of byte sequences a and b, according to byte sequence c.
 // Each bit of the result is the corresponding bit of a if the corresponding bit of c is 0,
 // or the corresponding bit of b if the corresponding bit of c is 1.
