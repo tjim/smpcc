@@ -71,31 +71,33 @@ func Client2(addr string, main func([]VM), numBlocks int, newVM func(io IO, id C
 
 	defer close(nu)
 
-	k := 80
-	m := 1024
-
 	ParamChan := make(chan big.Int)
 	NpRecvPk := make(chan big.Int)
 	NpSendEncs := make(chan ot.HashedElGamalCiph)
-	RefreshCh := make(chan int)
-	x := PerNodePair{ot.NPChans{ParamChan, NpRecvPk, NpSendEncs}, ot.PerNodePairMplexChans{RefreshCh}, make([]PerBlock, numBlocks)}
+	x := PerNodePair{ot.NPChans{ParamChan, NpRecvPk, NpSendEncs}, make([]PerBlock, numBlocks)}
 
 	baseReceiver := ot.NewNPReceiver(ParamChan, NpRecvPk, NpSendEncs)
 
-	chS := ot.PrimarySender(baseReceiver, RefreshCh, k, m) // chS for getrequests
-
 	ios := make([]IO, len(x.BlockChans))
 	for i := 0; i < numBlocks; i++ {
-		reqCh := make(chan ot.SendRequest)
-		repCh := make(chan []byte)
-		sender := ot.NewMplexSender(repCh, reqCh, chS)
+		S2R := make(chan ot.MessagePair)
+		R2S := make(chan []byte)
 		Tchan := make(chan GarbledTable)
 		Kchan := make(chan Key)
 		Kchan2 := make(chan Key)
-		x.BlockChans[i] = PerBlock{ot.PerBlockMplexChans{repCh, reqCh}, CircuitChans{Tchan, Kchan, Kchan2}}
-		ios[i] = IOX{CircuitChans{Tchan, Kchan, Kchan2}, sender}
+		x.BlockChans[i] = PerBlock{ClientAsSender{S2R, R2S}, CircuitChans{Tchan, Kchan, Kchan2}}
 	}
 	nu <- x
+	sender0 := ot.NewStreamSender(baseReceiver, x.BlockChans[0].CAS.S2R, x.BlockChans[0].CAS.R2S)
+	for i := 0; i < numBlocks; i++ {
+		var sender ot.Sender
+		if i == 0 {
+			sender = sender0
+		} else {
+			sender = sender0.Fork(x.BlockChans[i].CAS.S2R, x.BlockChans[i].CAS.R2S)
+		}
+		ios[i] = IOX{x.BlockChans[i].CircuitChans, sender}
+	}
 
 	vms := make([]VM, numBlocks)
 	for i := range vms {

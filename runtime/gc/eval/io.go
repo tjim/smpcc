@@ -64,23 +64,23 @@ func Server2(addr string, main func([]VM), numBlocks int, newVM func(io IO, id C
 	nu := make(chan PerNodePair)
 	xport.ToChan(nu)
 
-	k := 80
-	m := 1024
-
 	x := <-nu
 	if numBlocks != len(x.BlockChans) {
 		panic("Block mismatch")
 	}
 
 	baseSender := ot.NewNPSender(x.NPChans.ParamChan, x.NPChans.NpRecvPk, x.NPChans.NpSendEncs)
-	chR := ot.PrimaryReceiver(baseSender, x.PerNodePairMplexChans.RefreshCh, k, m)
+	receiver0 := ot.NewStreamReceiver(baseSender, x.BlockChans[0].CAS.R2S, x.BlockChans[0].CAS.S2R)
 	ios := make([]IO, numBlocks)
-	for i, v := range x.BlockChans {
-		receiver := ot.NewMplexReceiver(v.PerBlockMplexChans.RepCh, v.PerBlockMplexChans.ReqCh, chR)
-		tchan := v.Tchan
-		kchan := v.Kchan
-		kchan2 := v.Kchan2
-		ios[i] = IOX{CircuitChans{tchan, kchan, kchan2}, receiver}
+	for i := 0; i < numBlocks; i++ {
+		tchan := x.BlockChans[i].Tchan
+		kchan := x.BlockChans[i].Kchan
+		kchan2 := x.BlockChans[i].Kchan2
+		if i == 0 {
+			ios[i] = IOX{CircuitChans{tchan, kchan, kchan2}, receiver0}
+		} else {
+			ios[i] = IOX{CircuitChans{tchan, kchan, kchan2}, receiver0.Fork(x.BlockChans[i].CAS.R2S, x.BlockChans[i].CAS.S2R)}
+		}
 	}
 
 	vms := make([]VM, numBlocks)

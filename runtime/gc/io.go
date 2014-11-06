@@ -64,14 +64,18 @@ func NewChanio() (io *Chanio) {
 	return io
 }
 
-// MPlex OT version
+// Stream OT version
+type ClientAsSender struct {
+	S2R chan ot.MessagePair `fatchan:"request"` // One per sender/receiver pair, sender->receiver
+	R2S chan []byte         `fatchan:"reply"`   // One per sender/receiver pair, receiver->sender
+}
+
 type PerBlock struct {
-	ot.PerBlockMplexChans
+	CAS ClientAsSender
 	CircuitChans
 }
 
 type PerNodePair struct {
 	ot.NPChans
-	ot.PerNodePairMplexChans
 	BlockChans []PerBlock
 }
