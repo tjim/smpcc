@@ -168,7 +168,7 @@ func (io *PeerIO) connect(party int) {
 	if io.id == party {
 		panic("connect0")
 	}
-	addr := fmt.Sprintf("127.0.0.1:%d", base_port+(io.n*party)+io.id)
+	addr := fmt.Sprintf("%s:%d", Hosts[io.id], Ports[party]+io.id)
 	server, err := net.Dial("tcp", addr)
 	if err != nil {
 		log.Fatalf("dial(%q): %s", addr, err)
@@ -229,7 +229,7 @@ func (io *PeerIO) listen(party int) {
 	if io.id == party {
 		panic("listen0")
 	}
-	addr := fmt.Sprintf("127.0.0.1:%d", base_port+(io.n*io.id)+party)
+	addr := fmt.Sprintf("%s:%d", Hosts[io.id], Ports[io.id]+party)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("listen(%q): %s", addr, err)
