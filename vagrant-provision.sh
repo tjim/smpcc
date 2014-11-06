@@ -7,7 +7,7 @@ pacman -S --noconfirm archlinux-keyring
 echo "pacman -Su --noconfirm"
 pacman -Su --noconfirm
 echo "pacman -S --needed --noconfirm base-devel git llvm-ocaml ocaml-findlib clang go colordiff mercurial"
-pacman -S --needed --noconfirm base-devel git llvm-ocaml ocaml-findlib clang go colordiff mercurial
+pacman -S --needed --noconfirm base-devel git llvm-ocaml ocaml-findlib clang go colordiff mercurial net-tools
 # FINDLIB IS OUT OF DATE SO HERE IS A WAY TO CREATE IT
 (mkdir -p ocaml-findlib; cd ocaml-findlib; curl -o PKGBUILD https://projects.archlinux.org/svntogit/community.git/plain/trunk/PKGBUILD?h=packages/ocaml-findlib; makepkg -i --asroot)
 echo "git clone https://github.com/kerneis/cil; cd cil; ./configure; make; make install"
