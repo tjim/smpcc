@@ -10,18 +10,19 @@ Usage:
 
     smpcc foo.c
 
-This produces files
+This produces a file
 
-    foo.cil.c, foo.go
+    foo.go
 
-The file foo.cil.c is the flattener output, it is useful for debugging.
-
-The go file implements the circuit, by default using Yao garbled circuits.
+The go file implements the circuit using (by default) Yao's garbled
+circuits.
 
 You can run the go program with
 
-    go run foo.go -id 1 # server, running in one process
-    go run foo.go -id 0 # client, running in another
+    go run foo.go -id 1 32 # server, running in one process
+    go run foo.go -id 0 7 # client, running in another
+
+where 32 and 7 are the respective inputs of the parties.
 
 * Print (block) free variables
 
@@ -46,3 +47,7 @@ You can run the go program with
 * See the delta between compiler stages:
 
     smpcc -branch foo.c -delta  ### shows the changes introduced by branch elimination
+
+* Save the output of CIL:
+
+    smpcc -keep-cil foo.c

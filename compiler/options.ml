@@ -3,6 +3,7 @@ type options = {
     mutable debug_blocks: bool;
     mutable debug_load_store: bool;
     mutable cil: bool;
+    mutable keep_cil: bool;
     mutable delta: bool;
     mutable circuitlib: string option;
     mutable fname: string option;
@@ -26,6 +27,7 @@ let options = {
   debug_blocks = false;
   debug_load_store = false;
   cil = true;
+  keep_cil = true;
   delta = false;
   circuitlib = None;
   fname = None;

@@ -633,21 +633,20 @@ let file2cu cil_extra_args file =
     (close_in ch; cu)
   else if Filename.check_suffix file ".c" then
     (* TODO: clean up temp files in case of error *)
-    let src_file =
+    let src_file, temp_dir =
       if not options.cil then
-        file
+        file, None
       else
         (* Run cilly *)
         let cil_basename =
           (* ex: foo/bar.c --> bar.cil.c *)
           Filename.chop_suffix (Filename.basename file) ".c" ^ ".cil.c" in
-        let cil_file =
-          (*               --> foo/bar.cil.c *)
-          Filename.concat (Filename.dirname file) cil_basename in
         let temp_dir =
           Filename.temp_file "smpcc" ".cil" in (* this creates a temp FILE not directory... *)
         Unix.unlink temp_dir;                  (* ... so delete FILE *)
         Unix.mkdir temp_dir 0o700;             (* ... and create DIR with same name *)
+        let cil_file =
+          Filename.concat temp_dir cil_basename in
         let abs_file =
           if String.length file > 0 && (String.get file 0 = '/' || String.get file 0 = '~')
           then file
@@ -664,16 +663,7 @@ let file2cu cil_extra_args file =
           Sys.command cmd in
         if ret <> 0 then
           failwith(sprintf "Error: cilly failed with exit code %d" ret);
-        (* The cilly command creates a bunch of files, move the one we need to cil_file *)
-        let ret =
-          (* Use mv instead of Unix.rename because rename fails on cross-device move *)
-          Sys.command(sprintf "mv %s %s" (Filename.quote (Filename.concat temp_dir cil_basename)) (Filename.quote cil_file)) in
-        if ret <> 0 then
-          failwith(sprintf "Error: mv failure %s -> %s" (Filename.quote (Filename.concat temp_dir cil_basename)) (Filename.quote cil_file));
-        let ret = Sys.command(sprintf "rm -r %s" (Filename.quote temp_dir)) in
-        if ret <> 0 then
-          failwith(sprintf "Error: failed to remove temporary directory %s, exit code %d" (Filename.quote temp_dir) ret);
-        cil_file in
+        cil_file, Some temp_dir in
     (* Run clang *)
     let ll_file = Filename.temp_file "smpcc" ".ll" in
     let cmd =
@@ -694,6 +684,18 @@ let file2cu cil_extra_args file =
         raise e in
     close_in ch;
     Sys.remove ll_file;
+    (match temp_dir with None -> ()
+    | Some temp_dir ->
+        if options.keep_cil then begin
+          let ret =
+            (* Use mv instead of Unix.rename because rename fails on cross-device move *)
+            Sys.command(sprintf "mv %s %s" (Filename.quote src_file) (Filename.quote (Filename.basename src_file))) in
+          if ret <> 0 then
+            failwith(sprintf "Error: mv failure %s -> %s" (Filename.quote src_file) (Filename.quote (Filename.basename src_file)))
+        end;
+        let ret = Sys.command(sprintf "rm -r %s" (Filename.quote temp_dir)) in
+        if ret <> 0 then
+          failwith(sprintf "Error: failed to remove temporary directory %s, exit code %d" (Filename.quote temp_dir) ret));
     cu
   else
     failwith(sprintf "Error: unrecognized file extension (%s)" file)
@@ -723,6 +725,7 @@ begin
   let (x,args) = getopt "-debug-blocks" args     in options.debug_blocks <- x;
   let (x,args) = getopt "-debug-load-store" args in options.debug_load_store <- x;
   let (x,args) = getopt "-no-cil" args           in options.cil <- not x;
+  let (x,args) = getopt "-keep-cil" args         in options.keep_cil <- x;
   let (x,args) = getopt "-delta" args            in options.delta <- x;
   let (x,args) = getopt1 "-circuitlib" args      in options.circuitlib <- x;
   let (x,args) = getopt1 "-fname" args           in options.fname <- x;
