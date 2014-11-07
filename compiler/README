@@ -12,17 +12,16 @@ Usage:
 
 This produces files
 
-    foo.cil.c, foo_eval.go, foo_gen.go, foo_main.go
+    foo.cil.c, foo.go
 
 The file foo.cil.c is the flattener output, it is useful for debugging.
 
-The go files implement the circuit, using channel io (everything runs
-in one process by default; distributed runs are possible but harder to
-debug during compiler development).
+The go file implements the circuit, by default using Yao garbled circuits.
 
 You can run the go program with
 
-    go run foo_*.go
+    go run foo.go -id 1 # server, running in one process
+    go run foo.go -id 0 # client, running in another
 
 * Print (block) free variables
 

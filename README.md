@@ -71,8 +71,8 @@ following in foo.c:
 
 Then you can compile and run the program as follows:
 
-    $ smpcc foo.c
-    $ go run *.go
+    $ smpcc foo.c -sim
+    $ go run foo.go
     eval: 5
     gen: 5
     Done
@@ -100,8 +100,8 @@ should be between 0 and n-1.
 
 Then you can do
 
-    $ smpcc foo.c
-    $ go run *.go 9 2
+    $ smpcc foo.c -sim
+    $ go run foo.go 9 2
     eval: 20
     gen: 20
     Done
@@ -129,8 +129,8 @@ The default is yao.  To compile for another back end, use the
 
 ## GMW
 
-We have a simulated (non-networked) implementation of GMW using boolean circuits.
-To use compile like this:
+We have an implementation of GMW using boolean circuits.
+To use, compile like this:
 
     $ smpcc foo.c -circuitlib gmw
 

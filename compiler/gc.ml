@@ -426,40 +426,37 @@ let bpr_globals b m is_gen =
 
 let print_function_circuit m f =
   let b = Buffer.create 11 in
-  (* gen side *)
+  (* prelude *)
   bprintf b "package main\n";
   bprintf b "\n";
-  bprintf b "import \"%sgc/%s\"\n" package_prefix (gen_or_eval true);
+  bprintf b "import \"%sgc/gen\"\n" package_prefix;
+  bprintf b "import \"%sgc/eval\"\n" package_prefix;
   bprintf b "import \"%sgc\"\n" package_prefix;
   bprintf b "import \"fmt\"\n";
+  (* the main() imports *)
+  if options.sim then begin
+    bprintf b "import \"%sgc/%s/sim\"\n" package_prefix (match options.circuitlib with None -> "yao" | Some x -> x);
+    bprintf b "import \"os\"\n";
+    bprintf b "import \"runtime/pprof\"\n";
+  end else begin
+    bprintf b "import vmeval \"github.com/tjim/smpcc/runtime/gc/%s/eval\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
+    bprintf b "import vmgen \"github.com/tjim/smpcc/runtime/gc/%s/gen\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
+    bprintf b "import \"flag\"\n";
+  end;
   bprintf b "\n";
+  (* gen side *)
   bpr_globals b m true;
   bpr_main b f true;
   let blocks_fv = List.fold_left VSet.union VSet.empty (* TODO: eliminate duplicate code *)
       (List.map free_of_block f.fblocks) in
   List.iter (bpr_go_block b blocks_fv true) f.fblocks;
-  let gen_go = Buffer.contents b in
-  let b = Buffer.create 11 in
+  bprintf b "\n";
   (* eval side *)
-  bprintf b "package main\n";
-  bprintf b "\n";
-  bprintf b "import \"%sgc/%s\"\n" package_prefix (gen_or_eval false);
-  bprintf b "import \"%sgc\"\n" package_prefix;
-  bprintf b "import \"fmt\"\n";
-  bprintf b "\n";
   bpr_main b f false;
   List.iter (bpr_go_block b blocks_fv false) f.fblocks;
-  let eval_go = Buffer.contents b in
-  let b = Buffer.create 11 in
+  bprintf b "\n";
   (* main function *)
   if options.sim then begin
-    bprintf b "package main\n";
-    bprintf b "\n";
-    bprintf b "import \"%sgc/%s/sim\"\n" package_prefix (match options.circuitlib with None -> "yao" | Some x -> x);
-    bprintf b "import \"fmt\"\n";
-    bprintf b "import \"os\"\n";
-    bprintf b "import \"runtime/pprof\"\n";
-    bprintf b "\n";
     bprintf b "var args []string\n";
     bprintf b "func init_args() {\n";
     bprintf b "	args = os.Args[1:]\n";
@@ -494,15 +491,6 @@ let print_function_circuit m f =
     bprintf b "\tfmt.Println(\"Done\")\n";
     bprintf b "}\n";
   end else begin
-    bprintf b "package main\n";
-    bprintf b "\n";
-    bprintf b "import \"github.com/tjim/smpcc/runtime/gc/%s/eval\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
-    bprintf b "import \"github.com/tjim/smpcc/runtime/gc/%s/gen\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
-    bprintf b "import baseeval \"github.com/tjim/smpcc/runtime/gc/eval\"\n";
-    bprintf b "import basegen \"github.com/tjim/smpcc/runtime/gc/gen\"\n";
-    bprintf b "import \"fmt\"\n";
-    bprintf b "import \"flag\"\n";
-    bprintf b "\n";
     bprintf b "var id int\n";
     bprintf b "var addr string\n";
     bprintf b "var args []string\n";
@@ -528,17 +516,14 @@ let print_function_circuit m f =
     bprintf b "func main() {\n";
     bprintf b "\tinit_args()\n";
     bprintf b "\tif id == 0 && do_old {\n";
-    bprintf b "\t\tbasegen.Client(addr, gen_main, %d, gen.NewVM)\n" (List.length f.fblocks + 1);
+    bprintf b "\t\tgen.Client(addr, gen_main, %d, vmgen.NewVM)\n" (List.length f.fblocks + 1);
     bprintf b "\t} else if id == 0 {\n";
-    bprintf b "\t\tbasegen.Client2(addr, gen_main, %d, gen.NewVM)\n" (List.length f.fblocks + 1);
+    bprintf b "\t\tgen.Client2(addr, gen_main, %d, vmgen.NewVM)\n" (List.length f.fblocks + 1);
     bprintf b "\t} else if do_old {\n";
-    bprintf b "\t\tbaseeval.Server(addr, eval_main, %d, eval.NewVM)\n" (List.length f.fblocks + 1);
+    bprintf b "\t\teval.Server(addr, eval_main, %d, vmeval.NewVM)\n" (List.length f.fblocks + 1);
     bprintf b "\t} else {\n";
-    bprintf b "\t\tbaseeval.Server2(addr, eval_main, %d, eval.NewVM)\n" (List.length f.fblocks + 1);
+    bprintf b "\t\teval.Server2(addr, eval_main, %d, vmeval.NewVM)\n" (List.length f.fblocks + 1);
     bprintf b "\t}\n";
     bprintf b "}\n";
   end;
-  let main_go = Buffer.contents b in
-  pr_output_file "_gen.go" gen_go;
-  pr_output_file "_eval.go" eval_go;
-  pr_output_file "_main.go" main_go
+  pr_output_file ".go" (Buffer.contents b)
