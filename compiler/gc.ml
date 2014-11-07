@@ -11,36 +11,39 @@ let string_constants = Hashtbl.create 10
 let govar v =
   Str.global_replace (Str.regexp "[%@.]") "_" (State.v_map v)
 
-let rec bpr_go_value b (typ, value) =
+let rec bpr_go_value b is_gen (typ, value) =
+  let pkg = if is_gen then "gen." else "eval." in
   match value with
   | Var v ->
       let is_a_global = (match v with Name(x,_) -> x | Id(x,_) -> x) in
       if is_a_global then
         (try
           let loc = Hashtbl.find State.global_locations v in
-          bprintf b "Uint(vm, %d, 64)" loc
+          bprintf b "%sUint(vm, %d, 64)" pkg loc
         with Not_found ->
           eprintf "global not there %s\n" (govar v);
           bprintf b "%s" (govar v))
       else
         bprintf b "%s" (govar v)
   | Basicblock bl ->
-      bprintf b "Uint(vm, %d, %d)" (State.bl_num bl) (State.get_bl_bits())
+      bprintf b "%sUint(vm, %d, %d)" pkg (State.bl_num bl) (State.get_bl_bits())
   | Int x ->
-      bprintf b "Int(vm, %s, %d)" (Big_int.string_of_big_int x) (State.bitwidth typ)
+      bprintf b "%sInt(vm, %s, %d)" pkg (Big_int.string_of_big_int x) (State.bitwidth typ)
   | Zero ->
-      bprintf b "Uint(vm, 0, %d) /* CAUTION: zero */" (State.bitwidth typ)
+      bprintf b "%sUint(vm, 0, %d) /* CAUTION: zero */" pkg (State.bitwidth typ)
   | Null ->
-      bprintf b "Uint(vm, 0, %d) /* CAUTION: null */" (State.bitwidth typ)
+      bprintf b "%sUint(vm, 0, %d) /* CAUTION: null */" pkg (State.bitwidth typ)
   | Undef ->
-      bprintf b "Uint(vm, 0, %d) /* CAUTION: undef */" (State.bitwidth typ)
+      bprintf b "%sUint(vm, 0, %d) /* CAUTION: undef */" pkg (State.bitwidth typ)
   | Inttoptr(x, y) ->
       bprintf b "/* CAUTION: inttoptr */ ";
-      bpr_go_value b x
+      bpr_go_value b is_gen x
   | op ->
       bpr_value b op
 
 let bpr_go_instr b is_gen declared_vars (nopt,i) =
+  let pkg = if is_gen then "gen." else "eval." in
+  let bpr_go_value = (fun b -> bpr_go_value b is_gen) in
   (* Look for a special case: clang declares a variable for the result of a printf that is not subsequently used.
      Go has a stricter check on this.
    *)
@@ -76,35 +79,35 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
       (try
         let s = String.escaped(Hashtbl.find string_constants (Big_int.int_of_big_int x)) in
         if ops = [] then
-          bprintf b "Printf(vm, mask, \"%s\")\n" s
+          bprintf b "%sPrintf(vm, mask, \"%s\")\n" pkg s
         else
-          bprintf b "Printf(vm, mask, \"%s\", %a)\n" s (between ", " bpr_go_value) (List.map (fun (a,b,c) -> (a,c)) ops)
+          bprintf b "%sPrintf(vm, mask, \"%s\", %a)\n" pkg s (between ", " bpr_go_value) (List.map (fun (a,b,c) -> (a,c)) ops)
       with _ ->
         failwith "Error: first argument of printf must be a string constant")
   | Call(_,_,_,_,Var(Name(true, "puts")),[_,_,Int x],_,_) ->
       (try
         let s = String.escaped(Hashtbl.find string_constants  (Big_int.int_of_big_int x)) in
-        bprintf b "Printf(vm, mask, \"%s\\n\")\n" s (* puts adds a newline *)
+        bprintf b "%sPrintf(vm, mask, \"%s\\n\")\n" pkg s (* puts adds a newline *)
       with _ ->
         failwith "Error: argument of puts must be a string constant")
   | Call(_,_,_,_,Var(Name(true, "putchar")),[typ,_,value],_,_) ->
-               bprintf b "Printf(vm, mask, \"%%c\", %a)\n" bpr_go_value (typ, value)
+               bprintf b "%sPrintf(vm, mask, \"%%c\", %a)\n" pkg bpr_go_value (typ, value)
   | Call(_,_,_,_,Var(Name(true, "input")),[typ,_,value],_,_) ->
-      bprintf b "Input32(vm, mask, %a, next_arg)\n" bpr_go_value (typ, value)
+      bprintf b "%sInput32(vm, mask, %a, next_arg)\n" pkg bpr_go_value (typ, value)
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.start")),_,_,_) ->
       ()
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.end")),_,_,_) ->
       ()
   | Load(_,_,(Pointer(ety,_),_ as x),_,_,_) -> (* in case we are debugging loads *)
-      bprintf b "LoadDebug(vm, mask, %a, Uint(vm, %d, 32))\n" bpr_go_value x (State.bytewidth ety)
+      bprintf b "%sLoadDebug(vm, mask, %a, Uint(vm, %d, 32))\n" pkg bpr_go_value x (State.bytewidth ety)
   | Store(_,_,x,addr,_,_,_) -> (* in case we are debugging stores*)
-      bprintf b "StoreDebug(vm, mask, %a, Uint(vm, %d, 32), %a)\n" bpr_go_value addr (State.bytewidth (fst x)) bpr_go_value x
+      bprintf b "%sStoreDebug(vm, mask, %a, Uint(vm, %d, 32), %a)\n" pkg bpr_go_value addr (State.bytewidth (fst x)) bpr_go_value x
   | Bitcast(x,_,_) ->
       bprintf b "%a\n" bpr_go_value x
   | Sext(tv,t,_) ->
-      bprintf b "Sext(vm, %a, %d)\n" bpr_go_value tv (State.bitwidth t)
+      bprintf b "%sSext(vm, %a, %d)\n" pkg bpr_go_value tv (State.bitwidth t)
   | Zext(tv,t,_) ->
-      bprintf b "Zext(vm, %a, %d)\n" bpr_go_value tv (State.bitwidth t)
+      bprintf b "%sZext(vm, %a, %d)\n" pkg bpr_go_value tv (State.bitwidth t)
   | Mul(_,_,tv,Int y,_) ->
       (* It would be better to do this strength reduction in LLVM *)
       let shift_bits =
@@ -119,30 +122,30 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         | 128 -> 7
         | 256 -> 8
         | _   -> failwith "the go back end does not support Mul" in
-      bprintf b "Shl(vm, %a, %d)\n" bpr_go_value tv shift_bits
+      bprintf b "%sShl(vm, %a, %d)\n" pkg bpr_go_value tv shift_bits
   | Mul(_,_,(typ,x),y,_) ->
-      bprintf b "Mul(vm, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
+      bprintf b "%sMul(vm, %a, %a)\n" pkg bpr_go_value (typ,x) bpr_go_value (typ,y)
   | Lshr(_,tv,Int y,_) ->
       let shift_bits = Big_int.int_of_big_int y in
-      bprintf b "Lshr(vm, %a, %d)\n" bpr_go_value tv shift_bits
+      bprintf b "%sLshr(vm, %a, %d)\n" pkg bpr_go_value tv shift_bits
   | Ashr(_,tv,Int y,_) ->
       let shift_bits = Big_int.int_of_big_int y in
-      bprintf b "Ashr(vm, %a, %d)\n" bpr_go_value tv shift_bits
+      bprintf b "%sAshr(vm, %a, %d)\n" pkg bpr_go_value tv shift_bits
   | Shl(_,_,tv,Int y,_) ->
       let shift_bits = Big_int.int_of_big_int y in
-      bprintf b "Shl(vm, %a, %d)\n" bpr_go_value tv shift_bits
+      bprintf b "%sShl(vm, %a, %d)\n" pkg bpr_go_value tv shift_bits
   | Add(_,_,(typ,x),y,_) ->
-      bprintf b "Add(vm, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
+      bprintf b "%sAdd(vm, %a, %a)\n" pkg bpr_go_value (typ,x) bpr_go_value (typ,y)
   | Sub(_,_,(typ,x),y,_) ->
-      bprintf b "Sub(vm, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
+      bprintf b "%sSub(vm, %a, %a)\n" pkg bpr_go_value (typ,x) bpr_go_value (typ,y)
   | And((typ,x),y,_) ->
-      bprintf b "And(vm, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
+      bprintf b "%sAnd(vm, %a, %a)\n" pkg bpr_go_value (typ,x) bpr_go_value (typ,y)
   | Or((typ,x),y,_) ->
-      bprintf b "Or(vm, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
+      bprintf b "%sOr(vm, %a, %a)\n" pkg bpr_go_value (typ,x) bpr_go_value (typ,y)
   | Xor((typ,x),y,_) ->
-      bprintf b "Xor(vm, %a, %a)\n" bpr_go_value (typ,x) bpr_go_value (typ,y)
+      bprintf b "%sXor(vm, %a, %a)\n" pkg bpr_go_value (typ,x) bpr_go_value (typ,y)
   | Icmp(pred,(typ,x),y,_) ->
-      bprintf b "Icmp_%a(vm, %a, %a)\n"
+      bprintf b "%sIcmp_%a(vm, %a, %a)\n" pkg
         bpr_icmp pred
         bpr_go_value (typ,x) bpr_go_value (typ,y)
 (*  | AssignInst(result_ty, [(ty,op)]) (* special instruction inserted by our compiler *) *)
@@ -153,11 +156,11 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
         bprintf b "%a\n" bpr_go_value (ty,op)
       else if bits_result > bits_op then
         (* NB our oTypes do not have signed/unsigned versions so we zextend for now *)
-        bprintf b "Zext(vm, %a, %d)\n" bpr_go_value (ty,op) bits_result
+        bprintf b "%sZext(vm, %a, %d)\n" pkg bpr_go_value (ty,op) bits_result
       else (* bits_result < bits_op *)
         bprintf b "%a[:%d]\n" bpr_go_value (ty,op) bits_result;
   | Select([x;y;z],_) -> (* TODO: maybe enforce 3 args in datatype? *)
-      bprintf b "Select(vm, %a, %a, %a)\n" bpr_go_value x bpr_go_value y bpr_go_value z
+      bprintf b "%sSelect(vm, %a, %a, %a)\n" pkg bpr_go_value x bpr_go_value y bpr_go_value z
   | Switch(op0,op1,ops,_) ->
       (* op0 is the value to switch on.
          op1 is the default target.
@@ -166,7 +169,7 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
          NB: We assume that the cases are 0, 1, ... in order!
        *)
       let cases = List.map snd ops in (* throw away the 0, 1, ... part of the pairs *)
-      bprintf b "Switch(vm, %a, %a, %a)\n" bpr_go_value op0 bpr_go_value op1
+      bprintf b "%sSwitch(vm, %a, %a, %a)\n" pkg bpr_go_value op0 bpr_go_value op1
         (between ", " bpr_go_value) cases
   | Trunc(x, ty,_) ->
       bprintf b "%a[:%d]\n" bpr_go_value x (State.bitwidth ty)
@@ -202,14 +205,17 @@ let assigned_of_blocks blocks =
 
 
 let bpr_go_block b blocks_fv is_gen bl =
+  let pkg = if is_gen then "gen." else "eval." in
+  let bpr_go_value = (fun b -> bpr_go_value b is_gen) in
   let name =
     match bl.bname with
     | Id(_,n) -> string_of_int n
     | Name(_,n) -> n in
   bprintf b "\n// <label>:%s\n" name;
-  bprintf b "func %s%d(vm VM, ch chan []%s, block_num%a []%s) {\n"
+  bprintf b "func %s%d(vm %sVM, ch chan []%s, block_num%a []%s) {\n"
     (gen_or_eval is_gen)
     (State.bl_num bl.bname)
+    pkg
     (bit_type is_gen)
     bpr_go_block_args bl
     (bit_type is_gen);
@@ -230,7 +236,7 @@ let bpr_go_block b blocks_fv is_gen bl =
         false
         bl.binstrs) in
   if block_requires_mask then
-    bprintf b "\tmask := Icmp_eq(vm, block_num, Uint(vm, %d, 32))\n" (State.bl_num bl.bname);
+    bprintf b "\tmask := %sIcmp_eq(vm, block_num, %sUint(vm, %d, 32))\n" pkg pkg (State.bl_num bl.bname);
   if options.debug_blocks then
     bprintf b "\tPrintf(vm, mask, \"Block %d\\n\")\n" (State.bl_num bl.bname);
   ignore(List.fold_left (bpr_go_instr b is_gen) (free_of_block bl) bl.binstrs);
@@ -240,16 +246,17 @@ let bpr_go_block b blocks_fv is_gen bl =
     VSet.iter
       (fun var ->
         let value = Var var in
-        bprintf b "\tch <- Mask(vm, mask, %a)\n" bpr_go_value (State.typ_of_var var, value))
+        bprintf b "\tch <- %sMask(vm, mask, %a)\n" pkg bpr_go_value (State.typ_of_var var, value))
       outputs
   end;
   bprintf b "}\n"
 
 let bpr_main b f is_gen =
+  let pkg = if is_gen then "gen." else "eval." in
   let blocks = f.fblocks in
   let blocks_fv = List.fold_left VSet.union VSet.empty
       (List.map free_of_block blocks) in
-  bprintf b "func %s_main(vms []VM) {\n" (gen_or_eval is_gen);
+  bprintf b "func %s_main(vms []%sVM) {\n" (gen_or_eval is_gen) pkg;
   bprintf b "\n";
   if is_gen then
     bprintf b "\tinitialize_ram(vms[0])\n\n";
@@ -264,7 +271,7 @@ let bpr_main b f is_gen =
   bprintf b "\t/* special variables */\n";
   VSet.iter
     (fun var ->
-      bprintf b "\t%s := Uint(vms[0], 0, %d)\n" (govar var) (State.bitwidth (State.typ_of_var var));
+      bprintf b "\t%s := %sUint(vms[0], 0, %d)\n" (govar var) pkg (State.bitwidth (State.typ_of_var var));
     )
     (VSet.add (State.V.attsrcStateO()) (* if there is only one block this is used but not assigned *)
        (VSet.inter State.V.special (assigned_of_blocks blocks)));
@@ -272,7 +279,7 @@ let bpr_main b f is_gen =
   bprintf b "\t/* block free variables */\n";
   VSet.iter
     (fun var ->
-      bprintf b "\t%s := Uint(vms[0], 0, %d)\n" (govar var) (State.bitwidth (State.typ_of_var var));
+      bprintf b "\t%s := %sUint(vms[0], 0, %d)\n" (govar var) pkg (State.bitwidth (State.typ_of_var var));
     )
     blocks_fv;
   bprintf b "\n";
@@ -309,14 +316,18 @@ let bpr_main b f is_gen =
       let sources = List.filter (fun bl -> VSet.mem var (outputs_of_block blocks_fv bl)) blocks in
       if VSet.mem var State.V.special then
         (* specials are assigned 0 unless the active block assigned them *)
-        bprintf b "\t\t%s = TreeXor(vms[0], %s)\n"
+        bprintf b "\t\t%s = %sTreeXor(vms[0], %s)\n"
           (govar var)
+          pkg
           (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (govar var) (State.bl_num bl.bname)) sources))
       else
         (* non-specials keep their value from before the blocks unless the active block assigned them *)
-        bprintf b "\t\t%s = Select(vms[0], TreeXor(vms[0], %s), TreeXor(vms[0], %s), %s)\n"
+        bprintf b "\t\t%s = %sSelect(vms[0], %sTreeXor(vms[0], %s), %sTreeXor(vms[0], %s), %s)\n"
           (govar var)
+          pkg
+          pkg
           (String.concat ", " (List.map (fun bl -> sprintf "mask_%d" (State.bl_num bl.bname)) sources))
+          pkg
           (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (govar var) (State.bl_num bl.bname)) sources))
           (govar var))
     (outputs_of_blocks blocks);
@@ -324,23 +335,23 @@ let bpr_main b f is_gen =
     (* We need to load from memory iff some block uses attsrcMemRes *)
     bprintf b "\n";
     bprintf b "\t\t/* load from memory if necessary */\n";
-    bprintf b "\t\tif Reveal(vms[0], Icmp_eq(vms[0], _attsrcMemAct, Uint(vms[0], 1, 2)))[0] {\n";
-    bprintf b "\t\t\t_attsrcMemRes = Load(vms[0], _attsrcMemLoc, _attsrcMemSize)\n";
+    bprintf b "\t\tif %sReveal(vms[0], %sIcmp_eq(vms[0], _attsrcMemAct, %sUint(vms[0], 1, 2)))[0] {\n" pkg pkg pkg;
+    bprintf b "\t\t\t_attsrcMemRes = %sLoad(vms[0], _attsrcMemLoc, _attsrcMemSize)\n" pkg;
     bprintf b "\t\t}\n";
   end;
   if VSet.mem State.V.attsrcMemVal (outputs_of_blocks blocks) then begin
     (* We need to store to memory iff some block assigns attsrcMemVal *)
     bprintf b "\n";
     bprintf b "\t\t/* store to memory if necessary */\n";
-    bprintf b "\t\tif Reveal(vms[0], Icmp_eq(vms[0], _attsrcMemAct, Uint(vms[0], 2, 2)))[0] {\n";
-    bprintf b "\t\t\tStore(vms[0], _attsrcMemLoc, _attsrcMemSize, _attsrcMemVal)\n";
+    bprintf b "\t\tif %sReveal(vms[0], %sIcmp_eq(vms[0], _attsrcMemAct, %sUint(vms[0], 2, 2)))[0] {\n" pkg pkg pkg;
+    bprintf b "\t\t\t%sStore(vms[0], _attsrcMemLoc, _attsrcMemSize, _attsrcMemVal)\n" pkg;
     bprintf b "\t\t}\n";
   end;
   bprintf b "\n";
   bprintf b "\t\t/* are we done? */\n";
-  bprintf b "\t\tdone = Reveal(vms[0], _attsrcIsDone)[0]\n";
+  bprintf b "\t\tdone = %sReveal(vms[0], _attsrcIsDone)[0]\n" pkg;
   bprintf b "\t}\n";
-  bprintf b "\tanswer := RevealInt32(vms[0], _attsrcAnswer)\n";
+  bprintf b "\tanswer := %sRevealInt32(vms[0], _attsrcAnswer)\n" pkg;
   bprintf b "\tfmt.Printf(\"%s: %%v\\n\", answer)\n" (gen_or_eval is_gen);
   bprintf b "}\n"
 
@@ -373,7 +384,8 @@ let rec bytes_of_value b bytes = function
   | _ ->
       failwith "bytes_of_value"
 
-let bpr_globals b m =
+let bpr_globals b m is_gen =
+  let pkg = if is_gen then "gen." else "eval." in (* NB is_gen is always true in bpr_globals for now *)
   Hashtbl.reset string_constants;
   let b1 = Buffer.create 11 in
   let pr_global = function
@@ -403,11 +415,11 @@ let bpr_globals b m =
               Hashtbl.add string_constants loc s
         | _ -> ()) in
   List.iter pr_global m.cglobals;
-  bprintf b "func initialize_ram(vm VM) {\n";
+  bprintf b "func initialize_ram(vm %sVM) {\n" pkg;
   if !State.loc <> 0 then begin
     bprintf b "\tram := make([]byte, 0x%x)\n" !State.loc;
     Buffer.add_buffer b b1;
-    bprintf b "\tInitRam(ram)\n";
+    bprintf b "\t%sInitRam(ram)\n" pkg;
   end;
   bprintf b "}\n";
   bprintf b "\n"
@@ -417,11 +429,11 @@ let print_function_circuit m f =
   (* gen side *)
   bprintf b "package main\n";
   bprintf b "\n";
-  bprintf b "import . \"%sgc/%s\"\n" package_prefix (gen_or_eval true);
+  bprintf b "import \"%sgc/%s\"\n" package_prefix (gen_or_eval true);
   bprintf b "import \"%sgc\"\n" package_prefix;
   bprintf b "import \"fmt\"\n";
   bprintf b "\n";
-  bpr_globals b m;
+  bpr_globals b m true;
   bpr_main b f true;
   let blocks_fv = List.fold_left VSet.union VSet.empty (* TODO: eliminate duplicate code *)
       (List.map free_of_block f.fblocks) in
@@ -431,7 +443,7 @@ let print_function_circuit m f =
   (* eval side *)
   bprintf b "package main\n";
   bprintf b "\n";
-  bprintf b "import . \"%sgc/%s\"\n" package_prefix (gen_or_eval false);
+  bprintf b "import \"%sgc/%s\"\n" package_prefix (gen_or_eval false);
   bprintf b "import \"%sgc\"\n" package_prefix;
   bprintf b "import \"fmt\"\n";
   bprintf b "\n";
