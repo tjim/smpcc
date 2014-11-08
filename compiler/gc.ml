@@ -238,7 +238,7 @@ let bpr_go_block b blocks_fv is_gen bl =
   if block_requires_mask then
     bprintf b "\tmask := %sIcmp_eq(vm, block_num, %sUint(vm, %d, 32))\n" pkg pkg (State.bl_num bl.bname);
   if options.debug_blocks then
-    bprintf b "\tPrintf(vm, mask, \"Block %d\\n\")\n" (State.bl_num bl.bname);
+    bprintf b "\t%sPrintf(vm, mask, \"Block %d\\n\")\n" pkg (State.bl_num bl.bname);
   ignore(List.fold_left (bpr_go_instr b is_gen) (free_of_block bl) bl.binstrs);
   if not(VSet.is_empty outputs) then begin
     if not(VSet.is_empty (VSet.diff outputs State.V.special)) then
