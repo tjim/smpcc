@@ -17,8 +17,8 @@ module V = State.V
   blocks are executed.  One block will be the designated "current"
   block, and the result of a step of execution will be the results of
   the current block; results of all other blocks are discarded.  The
-  input variable "attsrcState" will indicate the current block, and
-  the output variable "attsrcStateO" will indicate the current block
+  input variable "vState" will indicate the current block, and
+  the output variable "vStateO" will indicate the current block
   for the next step.
 
   The compiler has the following phases.
@@ -70,9 +70,9 @@ module V = State.V
 
   into
 
-      %attsrcMemAct = i2 0                                        // do not access memory
-      %attsrcIsDone = i1 false                                    // ... and evaluation should continue
-      %attsrcStateO = select i1 %1, label %split13, label %.lr.ph // ... in this next state
+      %vMemAct = i2 0                                        // do not access memory
+      %vIsDone = i1 false                                    // ... and evaluation should continue
+      %vStateO = select i1 %1, label %split13, label %.lr.ph // ... in this next state
 
   There is a similar transformation for switch instructions.
 
@@ -82,7 +82,7 @@ module V = State.V
   LOAD/STORE ELIMINATION
 
   For each llvm block, split any block that has a memory access into two blocks.
-  The second block should expect the result of the memory access in attsrcMemRes.
+  The second block should expect the result of the memory access in vMemRes.
   So for example
 
       %1 = load %2
@@ -90,16 +90,16 @@ module V = State.V
 
   becomes
 
-      attsrcMemAct = 2  // load
-      attsrcMemSize = 4 // ... of 4 bytes
-      attsrcMemLoc = %2 // ... from memory at location %2
-      attsrcIsDone = 1  // ... and continue after the load
-      attsrcStateO %9   // ... at label %9
+      vMemAct = 2  // load
+      vMemSize = 4 // ... of 4 bytes
+      vMemLoc = %2 // ... from memory at location %2
+      vIsDone = 1  // ... and continue after the load
+      vStateO %9   // ... at label %9
       // end of old block
 
       // new block
       %9:
-      %1 = attsrcMemRes
+      %1 = vMemRes
       ...
 
   We modify the load/store instruction to refer to the new block to branch to,
@@ -494,7 +494,7 @@ let gep_elimination ctyps f =
 let big d = Int(Big_int.big_int_of_int d)
 
 (* If a block contains a load or store, we split the block into two.  The second block should
-   expect the result of the load/store in attsrcMemRes. *)
+   expect the result of the load/store in vMemRes. *)
 let load_store_elimination f =
   let split_memory_accesses =
     let split_block bl =
@@ -505,21 +505,21 @@ let load_store_elimination f =
             (* TODO: alignment *)
             let bname = State.fresh_label() in
             let binstrs, bl_list = split tl in
-            let binstrs = (assign_instr nopt result_ty (Integer 64) (Var V.attsrcMemRes))::binstrs in
-            [ assign_instr V.attsrcMemAct (Integer 2) (Integer 2) (big 1);
-              assign_instr V.attsrcMemSize (Integer 32) (Integer 32) (big (State.bytewidth result_ty));
-              assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) addr;
-              assign_instr (V.attsrcStateO()) Label Label (Basicblock bname) ],
+            let binstrs = (assign_instr nopt result_ty (Integer 64) (Var V.vMemRes))::binstrs in
+            [ assign_instr V.vMemAct (Integer 2) (Integer 2) (big 1);
+              assign_instr V.vMemSize (Integer 32) (Integer 32) (big (State.bytewidth result_ty));
+              assign_instr V.vMemLoc (Integer 64) (Integer 64) addr;
+              assign_instr (V.vStateO()) Label Label (Basicblock bname) ],
             {bname;binstrs}::bl_list
         | (None, Store(_,_,(typ,x),(_,addr),_,_,_))::tl ->
             (* TODO: alignment *)
             let bname = State.fresh_label() in
             let binstrs, bl_list = split tl in
-            [ assign_instr V.attsrcMemAct (Integer 2) (Integer 2) (big 2);
-              assign_instr V.attsrcMemSize (Integer 32) (Integer 32) (big (State.bytewidth typ));
-              assign_instr V.attsrcMemLoc (Integer 64) (Integer 64) addr;
-              assign_instr V.attsrcMemVal (Integer 32) typ x; (* TODO: memval should be 64 bits *)
-              assign_instr (V.attsrcStateO()) Label Label (Basicblock bname) ],
+            [ assign_instr V.vMemAct (Integer 2) (Integer 2) (big 2);
+              assign_instr V.vMemSize (Integer 32) (Integer 32) (big (State.bytewidth typ));
+              assign_instr V.vMemLoc (Integer 64) (Integer 64) addr;
+              assign_instr V.vMemVal (Integer 32) typ x; (* TODO: memval should be 64 bits *)
+              assign_instr (V.vStateO()) Label Label (Basicblock bname) ],
             {bname;binstrs}::bl_list
         | hd::tl ->
             let binstrs, bl_list = split tl in
@@ -584,19 +584,19 @@ let branch_elimination f =
         match instr with
         | Switch _ ->
             (* Ought to deal with switch better here but see gc.ml instead *)
-            [(Some(V.attsrcStateO()), instr)]
+            [(Some(V.vStateO()), instr)]
         | Br((ty,op), None, _) ->
-            [assign_instr (V.attsrcStateO()) ty ty op]
+            [assign_instr (V.vStateO()) ty ty op]
         | Br(x, Some(y,z), _) ->
-            [Some(V.attsrcStateO()), Select([x;y;z],[])] (* NB do NOT swap order of y,z *)
+            [Some(V.vStateO()), Select([x;y;z],[])] (* NB do NOT swap order of y,z *)
         | Indirectbr _ ->
             failwith "branch elimination: indirectbr is unsupported"
         | Return(None,_) ->
-            [(assign_instr V.attsrcIsDone (Integer 1) (Integer 1) (big 1))]
+            [(assign_instr V.vIsDone (Integer 1) (Integer 1) (big 1))]
         | Return(Some(ty, v), _) ->
             [
-             (assign_instr V.attsrcAnswer (Integer 32) ty v);
-             (assign_instr V.attsrcIsDone (Integer 1) (Integer 1) (big 1))
+             (assign_instr V.vAnswer (Integer 32) ty v);
+             (assign_instr V.vIsDone (Integer 1) (Integer 1) (big 1))
            ]
         | i -> [(nopt,i)] in
       bl.binstrs <- List.concat(List.map elim bl.binstrs))

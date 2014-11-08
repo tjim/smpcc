@@ -78,19 +78,19 @@ let dump_vartyps() =
   Printf.printf "%s" (Buffer.contents b)
 
 module V = struct
-let attsrcIsDone =  add_vartyp (Util.Name(false,"attsrcIsDone"))  (Util.Integer 1)
-let attsrcMemAct =  add_vartyp (Util.Name(false,"attsrcMemAct"))  (Util.Integer 2)
-let attsrcMemLoc =  add_vartyp (Util.Name(false,"attsrcMemLoc"))  (Util.Integer 64)
-let attsrcMemVal =  add_vartyp (Util.Name(false,"attsrcMemVal"))  (Util.Integer 32)
-let attsrcMemRes =  add_vartyp (Util.Name(false,"attsrcMemRes"))  (Util.Integer 64)
-let attsrcMemSize = add_vartyp (Util.Name(false,"attsrcMemSize")) (Util.Integer 32)
-let attsrcAnswer =  add_vartyp (Util.Name(false,"attsrcAnswer"))  (Util.Integer 32)
-let attsrcStateO() = Util.Name(false,"attsrcStateO")
+let vIsDone =  add_vartyp (Util.Name(false,"vIsDone"))  (Util.Integer 1)
+let vMemAct =  add_vartyp (Util.Name(false,"vMemAct"))  (Util.Integer 2)
+let vMemLoc =  add_vartyp (Util.Name(false,"vMemLoc"))  (Util.Integer 64)
+let vMemVal =  add_vartyp (Util.Name(false,"vMemVal"))  (Util.Integer 32)
+let vMemRes =  add_vartyp (Util.Name(false,"vMemRes"))  (Util.Integer 64)
+let vMemSize = add_vartyp (Util.Name(false,"vMemSize")) (Util.Integer 32)
+let vAnswer =  add_vartyp (Util.Name(false,"vAnswer"))  (Util.Integer 32)
+let vStateO() = Util.Name(false,"vStateO")
 let special = (* NB: Works now because we have hard-coded bl_bits to 32 *)
-  ignore(add_vartyp (Util.Name(false,"attsrcStateO")) (Util.Integer(get_bl_bits())));
+  ignore(add_vartyp (Util.Name(false,"vStateO")) (Util.Integer(get_bl_bits())));
   List.fold_right Util.VSet.add
-    [attsrcIsDone; attsrcMemAct; attsrcMemLoc; attsrcMemVal; attsrcMemSize; attsrcAnswer;
-     attsrcStateO();]
+    [vIsDone; vMemAct; vMemLoc; vMemVal; vMemSize; vAnswer;
+     vStateO();]
     Util.VSet.empty
 end
 

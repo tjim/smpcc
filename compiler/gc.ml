@@ -273,7 +273,7 @@ let bpr_main b f is_gen =
     (fun var ->
       bprintf b "\t%s := %sUint(vms[0], 0, %d)\n" (govar var) pkg (State.bitwidth (State.typ_of_var var));
     )
-    (VSet.add (State.V.attsrcStateO()) (* if there is only one block this is used but not assigned *)
+    (VSet.add (State.V.vStateO()) (* if there is only one block this is used but not assigned *)
        (VSet.inter State.V.special (assigned_of_blocks blocks)));
   bprintf b "\n";
   bprintf b "\t/* block free variables */\n";
@@ -289,7 +289,7 @@ let bpr_main b f is_gen =
   bprintf b "\t\t/* one goroutine invocation per block */\n";
   List.iter
     (fun bl ->
-      bprintf b "\t\tgo %s%d(vms[%d], ch%d, _attsrcStateO%a)\n"
+      bprintf b "\t\tgo %s%d(vms[%d], ch%d, _vStateO%a)\n"
         (gen_or_eval is_gen)
         (State.bl_num bl.bname)
         (State.bl_num bl.bname + 1)
@@ -331,27 +331,27 @@ let bpr_main b f is_gen =
           (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (govar var) (State.bl_num bl.bname)) sources))
           (govar var))
     (outputs_of_blocks blocks);
-  if VSet.mem State.V.attsrcMemRes blocks_fv then begin
-    (* We need to load from memory iff some block uses attsrcMemRes *)
+  if VSet.mem State.V.vMemRes blocks_fv then begin
+    (* We need to load from memory iff some block uses vMemRes *)
     bprintf b "\n";
     bprintf b "\t\t/* load from memory if necessary */\n";
-    bprintf b "\t\tif %sReveal(vms[0], %sIcmp_eq(vms[0], _attsrcMemAct, %sUint(vms[0], 1, 2)))[0] {\n" pkg pkg pkg;
-    bprintf b "\t\t\t_attsrcMemRes = %sLoad(vms[0], _attsrcMemLoc, _attsrcMemSize)\n" pkg;
+    bprintf b "\t\tif %sReveal(vms[0], %sIcmp_eq(vms[0], _vMemAct, %sUint(vms[0], 1, 2)))[0] {\n" pkg pkg pkg;
+    bprintf b "\t\t\t_vMemRes = %sLoad(vms[0], _vMemLoc, _vMemSize)\n" pkg;
     bprintf b "\t\t}\n";
   end;
-  if VSet.mem State.V.attsrcMemVal (outputs_of_blocks blocks) then begin
-    (* We need to store to memory iff some block assigns attsrcMemVal *)
+  if VSet.mem State.V.vMemVal (outputs_of_blocks blocks) then begin
+    (* We need to store to memory iff some block assigns vMemVal *)
     bprintf b "\n";
     bprintf b "\t\t/* store to memory if necessary */\n";
-    bprintf b "\t\tif %sReveal(vms[0], %sIcmp_eq(vms[0], _attsrcMemAct, %sUint(vms[0], 2, 2)))[0] {\n" pkg pkg pkg;
-    bprintf b "\t\t\t%sStore(vms[0], _attsrcMemLoc, _attsrcMemSize, _attsrcMemVal)\n" pkg;
+    bprintf b "\t\tif %sReveal(vms[0], %sIcmp_eq(vms[0], _vMemAct, %sUint(vms[0], 2, 2)))[0] {\n" pkg pkg pkg;
+    bprintf b "\t\t\t%sStore(vms[0], _vMemLoc, _vMemSize, _vMemVal)\n" pkg;
     bprintf b "\t\t}\n";
   end;
   bprintf b "\n";
   bprintf b "\t\t/* are we done? */\n";
-  bprintf b "\t\tdone = %sReveal(vms[0], _attsrcIsDone)[0]\n" pkg;
+  bprintf b "\t\tdone = %sReveal(vms[0], _vIsDone)[0]\n" pkg;
   bprintf b "\t}\n";
-  bprintf b "\tanswer := %sRevealInt32(vms[0], _attsrcAnswer)\n" pkg;
+  bprintf b "\tanswer := %sRevealInt32(vms[0], _vAnswer)\n" pkg;
   bprintf b "\tfmt.Printf(\"%s: %%v\\n\", answer)\n" (gen_or_eval is_gen);
   bprintf b "}\n"
 
@@ -458,6 +458,7 @@ let print_function_circuit m f =
   (* main function *)
   if options.sim then begin
     bprintf b "var args []string\n";
+    bprintf b "\n";
     bprintf b "func init_args() {\n";
     bprintf b "	args = os.Args[1:]\n";
     bprintf b "	if len(args) > 0 && args[0] == \"-pprof\" {\n";
@@ -480,7 +481,6 @@ let print_function_circuit m f =
     bprintf b "\targs = args[1:]\n";
     bprintf b "\treturn uint64(arg)\n";
     bprintf b "}\n";
-    bprintf b "\n";
     bprintf b "\n";
     bprintf b "func main() {\n";
     bprintf b "\tinit_args()\n";

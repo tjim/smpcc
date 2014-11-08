@@ -299,7 +299,7 @@ let bpr_main b f =
     (fun var ->
       bprintf b "\t%s := Uint%d(io, 0)\n" (Gc.govar var) (roundup_bitwidth (State.typ_of_var var));
     )
-    (VSet.add (State.V.attsrcStateO()) (* if there is only one block this is used but not assigned *)
+    (VSet.add (State.V.vStateO()) (* if there is only one block this is used but not assigned *)
        (VSet.inter State.V.special (assigned_of_blocks blocks)));
   bprintf b "\n";
   bprintf b "\t/* block free variables */\n";
@@ -315,7 +315,7 @@ let bpr_main b f =
   bprintf b "\t\t/* one goroutine invocation per block */\n";
   List.iter
     (fun bl ->
-      bprintf b "\t\tgo block%d(ios[%d], ch%d, _attsrcStateO%a)\n"
+      bprintf b "\t\tgo block%d(ios[%d], ch%d, _vStateO%a)\n"
         (State.bl_num bl.bname)
         (State.bl_num bl.bname)
         (State.bl_num bl.bname)
@@ -363,27 +363,27 @@ let bpr_main b f =
           (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (Gc.govar var) (State.bl_num bl.bname)) sources))
           (Gc.govar var))
     (outputs_of_blocks blocks);
-  if VSet.mem State.V.attsrcMemRes blocks_fv then begin
-    (* We need to load from memory iff some block uses attsrcMemRes *)
+  if VSet.mem State.V.vMemRes blocks_fv then begin
+    (* We need to load from memory iff some block uses vMemRes *)
     bprintf b "\n";
     bprintf b "\t\t/* load from memory if necessary */\n";
-    bprintf b "\t\tif Reveal1(io, Icmp_eq8(io, _attsrcMemAct, Uint8(io, 1))) {\n";
-    bprintf b "\t\t\t_attsrcMemRes = Load(io, _attsrcMemLoc, _attsrcMemSize)\n";
+    bprintf b "\t\tif Reveal1(io, Icmp_eq8(io, _vMemAct, Uint8(io, 1))) {\n";
+    bprintf b "\t\t\t_vMemRes = Load(io, _vMemLoc, _vMemSize)\n";
     bprintf b "\t\t}\n";
   end;
-  if VSet.mem State.V.attsrcMemVal (outputs_of_blocks blocks) then begin
-    (* We need to store to memory iff some block assigns attsrcMemVal *)
+  if VSet.mem State.V.vMemVal (outputs_of_blocks blocks) then begin
+    (* We need to store to memory iff some block assigns vMemVal *)
     bprintf b "\n";
     bprintf b "\t\t/* store to memory if necessary */\n";
-    bprintf b "\t\tif Reveal1(io, Icmp_eq8(io, _attsrcMemAct, Uint8(io, 2))) {\n";
-    bprintf b "\t\t\tStore(io, _attsrcMemLoc, _attsrcMemSize, _attsrcMemVal)\n";
+    bprintf b "\t\tif Reveal1(io, Icmp_eq8(io, _vMemAct, Uint8(io, 2))) {\n";
+    bprintf b "\t\t\tStore(io, _vMemLoc, _vMemSize, _vMemVal)\n";
     bprintf b "\t\t}\n";
   end;
   bprintf b "\n";
   bprintf b "\t\t/* are we done? */\n";
-  bprintf b "\t\tdone = Reveal1(io, _attsrcIsDone)\n";
+  bprintf b "\t\tdone = Reveal1(io, _vIsDone)\n";
   bprintf b "\t}\n";
-  bprintf b "\tanswer := Reveal32(io, _attsrcAnswer)\n";
+  bprintf b "\tanswer := Reveal32(io, _vAnswer)\n";
   bprintf b "\tfmt.Printf(\"%%d: %%v\\n\", io.Id(), answer)\n";
   bprintf b "\t%s_done <- true\n" (Gc.govar f.fname);
   bprintf b "}\n";
@@ -470,7 +470,6 @@ let print_function_circuit m f =
   let blocks_fv = List.fold_left VSet.union VSet.empty (* TODO: eliminate duplicate code *)
       (List.map free_of_block f.fblocks) in
   List.iter (bpr_gmw_block b blocks_fv) f.fblocks;
-  bprintf b "\n";
   bprintf b "var %s_done = make(chan bool, 1)\n" (Gc.govar f.fname);
   bprintf b "\n";
   bprintf b "func main() {\n";
