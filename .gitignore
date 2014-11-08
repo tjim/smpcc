@@ -1,2 +1,4 @@
 /tmp
 /.vagrant
+/cilext/_build
+/compiler/parse
