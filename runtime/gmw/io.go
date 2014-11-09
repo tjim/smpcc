@@ -332,10 +332,15 @@ func Simulation(inputs []uint32, numBlocks int, runPeer func(Io, []Io), peerDone
 		go log_triple_goroutine()
 	}
 	numParties := len(inputs)
+	if numParties == 0 { // for some test cases we may have no inputs
+		numParties = 2
+	}
 	ios := make([]*PeerIO, numParties)
 	for i := 0; i < numParties; i++ {
 		peer := NewPeerIO(numBlocks, numParties, i)
-		peer.inputs = inputs[i : i+1]
+		if len(inputs) > i {
+			peer.inputs = inputs[i : i+1]
+		}
 		ios[i] = peer
 	}
 	nus := make([]chan PerNodePair, numParties*numParties)
