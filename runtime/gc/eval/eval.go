@@ -134,10 +134,13 @@ func Zext(io VM, a []base.Key, b int) []base.Key {
 	if len(a) >= b {
 		panic("zext must extend operand")
 	}
-	if b == len(a)+1 {
-		return append(a, False(io)...)
+	result := make([]base.Key, b)
+	copy(result, a)
+	newbit := False(io)[0]
+	for i := len(a); i < b; i++ {
+		result[i] = newbit
 	}
-	return Sext(io, append(a, False(io)...), b)
+	return result
 }
 
 func Sext(io VM, a []base.Key, b int) []base.Key {
@@ -147,11 +150,13 @@ func Sext(io VM, a []base.Key, b int) []base.Key {
 	if len(a) == 0 {
 		panic("sext on zero-length operand")
 	}
-	newbits := make([]base.Key, b-len(a))
-	for i := 0; i < len(newbits); i++ {
-		newbits[i] = a[len(a)-1]
+	result := make([]base.Key, b)
+	copy(result, a)
+	newbit := a[len(a)-1]
+	for i := len(a); i < b; i++ {
+		result[i] = newbit
 	}
-	return append(a, newbits...)
+	return result
 }
 
 func Icmp_eq(io VM, a, b []base.Key) []base.Key {

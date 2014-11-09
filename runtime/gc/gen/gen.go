@@ -134,10 +134,13 @@ func Zext(io VM, a []base.Wire, b int) []base.Wire {
 	if len(a) >= b {
 		panic("zext must extend operand")
 	}
-	if b == len(a)+1 {
-		return append(a, False(io)...)
+	result := make([]base.Wire, b)
+	copy(result, a)
+	newbit := False(io)[0]
+	for i := len(a); i < b; i++ {
+		result[i] = newbit
 	}
-	return Sext(io, append(a, False(io)...), b)
+	return result
 }
 
 func Sext(io VM, a []base.Wire, b int) []base.Wire {
@@ -147,11 +150,13 @@ func Sext(io VM, a []base.Wire, b int) []base.Wire {
 	if len(a) == 0 {
 		panic("sext on zero-length operand")
 	}
-	newbits := make([]base.Wire, b-len(a))
-	for i := 0; i < len(newbits); i++ {
-		newbits[i] = a[len(a)-1]
+	result := make([]base.Wire, b)
+	copy(result, a)
+	newbit := a[len(a)-1]
+	for i := len(a); i < b; i++ {
+		result[i] = newbit
 	}
-	return append(a, newbits...)
+	return result
 }
 
 func Icmp_eq(io VM, a, b []base.Wire) []base.Wire {
@@ -536,9 +541,9 @@ func InitRam(contents []byte) {
 
 /* Gen-side load */
 func Load(io VM, loc, eltsize []base.Wire) []base.Wire {
-	fmt.Printf("Ram[0x")
+	fmt.Printf("Loading Ram[0x")
 	address := int(Reveal0Uint64(io, loc))
-	fmt.Printf("%x]", address)
+	fmt.Printf("%08x]", address)
 	bytes := int(Reveal0Uint32(io, eltsize))
 	fmt.Printf("<%d> = ", bytes)
 	switch bytes {
@@ -565,7 +570,7 @@ func Store(io VM, loc, eltsize, val []base.Wire) {
 	case 1, 2, 4, 8:
 	}
 	x := Reveal0Uint32(io, val)
-	fmt.Printf("Ram[0x%x]<%d> := 0x%x\n", address, bytes, x)
+	fmt.Printf("Storing Ram[0x%08x]<%d> = 0x%x\n", address, bytes, x)
 	for j := 0; j < bytes; j++ {
 		byte_j := byte(x>>uint(j*8)) & 0xff
 		Ram[address+j] = byte_j
