@@ -473,6 +473,6 @@ let print_function_circuit m f =
   bprintf b "var %s_done = make(chan bool, 1)\n" (Gc.govar f.fname);
   bprintf b "\n";
   bprintf b "func main() {\n";
-  bprintf b "\tRun(11, blocks_main, _main_done)\n";
+  bprintf b "\tRun(%d, blocks_main, _main_done)\n" (List.length f.fblocks);
   bprintf b "}\n";
   pr_output_file ".go" (Buffer.contents b)
