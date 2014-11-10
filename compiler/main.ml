@@ -70,14 +70,21 @@ module V = State.V
 
   into
 
-      %vMemAct = i2 0                                        // do not access memory
-      %vIsDone = i1 false                                    // ... and evaluation should continue
       %vStateO = select i1 %1, label %split13, label %.lr.ph // ... in this next state
 
   There is a similar transformation for switch instructions.
 
   We don't support indirectbr for the moment (it computes a label and
   branches to it).
+
+  We transform
+
+      return i32 0
+
+  into
+
+      %vAnswer = i32 0
+      %vIsDone = i1 1
 
   LOAD/STORE ELIMINATION
 
@@ -90,16 +97,15 @@ module V = State.V
 
   becomes
 
-      vMemAct = 2  // load
-      vMemSize = 4 // ... of 4 bytes
-      vMemLoc = %2 // ... from memory at location %2
-      vIsDone = 1  // ... and continue after the load
-      vStateO %9   // ... at label %9
+      %vMemAct = 2  // load
+      %vMemSize = 4 // ... of 4 bytes
+      %vMemLoc = %2 // ... from memory at location %2
+      %vStateO = %9 // ... at label %9
       // end of old block
 
       // new block
       %9:
-      %1 = vMemRes
+      %1 = %vMemRes
       ...
 
   We modify the load/store instruction to refer to the new block to branch to,
