@@ -112,17 +112,21 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
       (* It would be better to do this strength reduction in LLVM *)
       let shift_bits =
         match Big_int.int_of_big_int y with
-        |   1 -> 0
-        |   2 -> 1
-        |   4 -> 2
-        |   8 -> 3
-        |  16 -> 4
-        |  32 -> 5
-        |  64 -> 6
-        | 128 -> 7
-        | 256 -> 8
-        | _   -> failwith "the go back end does not support Mul" in
-      bprintf b "%sShl(vm, %a, %d)\n" pkg bpr_go_value tv shift_bits
+        |   1 -> Some 0
+        |   2 -> Some 1
+        |   4 -> Some 2
+        |   8 -> Some 3
+        |  16 -> Some 4
+        |  32 -> Some 5
+        |  64 -> Some 6
+        | 128 -> Some 7
+        | 256 -> Some 8
+        | _   -> None in
+      (match shift_bits with
+      | None ->
+          bprintf b "%sMul(vm, %a, %a)\n" pkg bpr_go_value tv bpr_go_value (fst tv,Int y)
+      | Some shift_bits ->
+          bprintf b "%sShl(vm, %a, %d)\n" pkg bpr_go_value tv shift_bits)
   | Mul(_,_,(typ,x),y,_) ->
       bprintf b "%sMul(vm, %a, %a)\n" pkg bpr_go_value (typ,x) bpr_go_value (typ,y)
   | Lshr(_,tv,Int y,_) ->
