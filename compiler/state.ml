@@ -65,7 +65,7 @@ let add_vartyp var typ =
   var
 
 let fresh_label() =
-  let x = sprintf "attsrcLabel%d" !x_count in
+  let x = sprintf "vLabel%d" !x_count in
   x_count := !x_count + 1;
   add_vartyp (Util.Name(false,x)) Util.Label
 
@@ -182,7 +182,7 @@ let assign_vartyps_instr ctyps (nopt, i) =
                       | _ -> failwith "getelementptr: non-int selector for struct field")
                   | Util.Vartyp v ->
                       let ety' =
-                        try 
+                        try
                           match List.assoc v ctyps with
                           | None -> failwith ("getelementptr: opaque type "^(Util.string_of_var v))
                           | Some typ -> typ
