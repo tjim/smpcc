@@ -1,6 +1,10 @@
 package gmw
 
-import "fmt"
+import (
+	"crypto/rand"
+	"fmt"
+	"math/big"
+)
 
 func xor(x, y bool) bool {
 	return (x && !y) || (y && !x)
@@ -578,6 +582,40 @@ func Mask64(io Io, s bool, a uint64) uint64 {
 
 func NumPeers32(io Io) uint32 {
 	return Uint32(io, uint32(io.N()))
+}
+
+func rand32() uint32 {
+	max := big.NewInt(1 << 32)
+	x, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		panic("Error: random number generation")
+	}
+	return uint32(x.Int64())
+}
+
+/* return a slice of n random uint32 values that ^ to x */
+func split_uint32(x uint32, n int) []uint32 {
+	x0 := x
+	if n <= 0 {
+		panic("Error: split")
+	}
+	result := make([]uint32, n)
+	for i := 1; i < n; i++ {
+		xi := rand32()
+		x ^= xi
+		result[i] = xi
+	}
+	result[0] = x
+	if check_split {
+		var y uint32 = 0
+		for _, s := range result {
+			y ^= s
+		}
+		if y != x0 {
+			panic("NOT EQUAL")
+		}
+	}
+	return result
 }
 
 func Input32(io Io, mask bool, party uint32) uint32 {

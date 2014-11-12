@@ -1,13 +1,15 @@
 package gmw
 
-import "fmt"
-import "math/big"
-import "crypto/rand"
-import "github.com/tjim/smpcc/runtime/ot"
-import "net"
-import "log"
-import "github.com/tjim/fatchan"
-import "time"
+import (
+	"crypto/rand"
+	"fmt"
+	"github.com/tjim/fatchan"
+	"github.com/tjim/smpcc/runtime/ot"
+	"log"
+	"math/big"
+	"net"
+	"time"
+)
 
 var log_mem bool = true
 var log_results bool = false
@@ -24,6 +26,7 @@ func log_triple_goroutine() {
 		stats_triple_num++
 	}
 }
+
 func log_triple_output() {
 	fmt.Printf("Generated %d triples\n", stats_triple_num*NUM_TRIPLES*32)
 }
@@ -64,40 +67,6 @@ type Io interface {
 /* Share of a multiplication triple */
 type Triple struct {
 	a, b, c uint32
-}
-
-func rand32() uint32 {
-	max := big.NewInt(1 << 32)
-	x, err := rand.Int(rand.Reader, max)
-	if err != nil {
-		panic("Error: random number generation")
-	}
-	return uint32(x.Int64())
-}
-
-/* return a slice of n random uint32 values that ^ to x */
-func split_uint32(x uint32, n int) []uint32 {
-	x0 := x
-	if n <= 0 {
-		panic("Error: split")
-	}
-	result := make([]uint32, n)
-	for i := 1; i < n; i++ {
-		xi := rand32()
-		x ^= xi
-		result[i] = xi
-	}
-	result[0] = x
-	if check_split {
-		var y uint32 = 0
-		for _, s := range result {
-			y ^= s
-		}
-		if y != x0 {
-			panic("NOT EQUAL")
-		}
-	}
-	return result
 }
 
 type GlobalIO struct {
@@ -464,11 +433,11 @@ func combine(arr []byte) uint32 {
 	return result
 }
 
-func piMulRStream(val []byte, thisReceiver *ot.StreamReceiver) []byte {
+func piMulR(val []byte, thisReceiver *ot.StreamReceiver) []byte {
 	return thisReceiver.ReceiveMBits(val)
 }
 
-func piMulSStream(val []byte, thisSender *ot.StreamSender) []byte {
+func piMulS(val []byte, thisSender *ot.StreamSender) []byte {
 	x0 := randomBytes(len(val))
 	x1 := ot.XorBytes(x0, val)
 	thisSender.SendMBits(x0, x1)
@@ -484,18 +453,7 @@ func randomBytes(numBytes int) []byte {
 	return result
 }
 
-func AndBytes(a, b []byte) []byte {
-	if len(a) != len(b) {
-		panic("AndBytes")
-	}
-	result := make([]byte, len(a))
-	for i, v := range a {
-		result[i] = v & b[i]
-	}
-	return result
-}
-
-func triple32Stream(thisPartyId int, senders []*ot.StreamSender, receivers []*ot.StreamReceiver) []Triple {
+func triple32(thisPartyId int, senders []*ot.StreamSender, receivers []*ot.StreamReceiver) []Triple {
 	n := len(senders)
 	result := make([]Triple, NUM_TRIPLES)
 	numBytes := NUM_TRIPLES * 4
@@ -522,11 +480,11 @@ func triple32Stream(thisPartyId int, senders []*ot.StreamSender, receivers []*ot
 			continue
 		}
 		if thisPartyId > i {
-			d[i] = piMulRStream(a, receivers[i])
-			e[i] = piMulSStream(b, senders[i])
+			d[i] = piMulR(a, receivers[i])
+			e[i] = piMulS(b, senders[i])
 		} else {
-			e[i] = piMulSStream(b, senders[i])
-			d[i] = piMulRStream(a, receivers[i])
+			e[i] = piMulS(b, senders[i])
+			d[i] = piMulR(a, receivers[i])
 		}
 	}
 
@@ -547,9 +505,20 @@ func triple32Stream(thisPartyId int, senders []*ot.StreamSender, receivers []*ot
 	return result
 }
 
+func AndBytes(a, b []byte) []byte {
+	if len(a) != len(b) {
+		panic("AndBytes")
+	}
+	result := make([]byte, len(a))
+	for i, v := range a {
+		result[i] = v & b[i]
+	}
+	return result
+}
+
 func (x *BlockIO) Triple32() (a, b, c uint32) {
 	if len(x.triples32) == 0 {
-		x.triples32 = triple32Stream(x.id, x.otSenders, x.otReceivers)
+		x.triples32 = triple32(x.id, x.otSenders, x.otReceivers)
 		if log_triples && x.Id() == 0 {
 			stats_triple_chan <- true
 		}
