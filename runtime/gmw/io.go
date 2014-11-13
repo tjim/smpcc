@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net"
 	"time"
+	"github.com/tjim/smpcc/runtime/bit"
 )
 
 var log_mem bool = true
@@ -60,6 +61,8 @@ type Io interface {
 	Triple32() (a, b, c uint32)
 	Triple64() (a, b, c uint64)
 
+	MaskTriple32() (a byte, b, c uint32)
+
 	InitRam([]byte)
 	Ram() []byte
 }
@@ -67,6 +70,11 @@ type Io interface {
 /* Share of a multiplication triple */
 type Triple struct {
 	a, b, c uint32
+}
+
+type MaskTriple struct {
+	a byte
+	B,C []byte
 }
 
 type GlobalIO struct {
@@ -81,6 +89,7 @@ type BlockIO struct {
 	triples32   []Triple
 	triples8    []struct{ a, b, c uint8 }
 	triples1    []struct{ a, b, c bool }
+	maskTriples []MaskTriple
 	rchannels   []chan uint32
 	wchannels   []chan uint32
 	otSenders   []*ot.StreamSender
@@ -256,7 +265,7 @@ func NewPeerIO(numBlocks int, numParties int, id int) *PeerIO {
 	for i := range io.blocks {
 		io.blocks[i] = &BlockIO{
 			io.GlobalIO,
-			nil, nil, nil,
+			nil, nil, nil, nil,
 			make([]chan uint32, numParties),
 			make([]chan uint32, numParties),
 			make([]*ot.StreamSender, numParties),
@@ -433,14 +442,96 @@ func combine(arr []byte) uint32 {
 	return result
 }
 
-func piMulR(val []byte, thisReceiver *ot.StreamReceiver) []byte {
-	return thisReceiver.ReceiveMBits(val)
+func piMulRMask(val []byte, receiver *ot.StreamReceiver) []ot.Message {
+	return receiver.ReceiveM(val)
 }
 
-func piMulS(val []byte, thisSender *ot.StreamSender) []byte {
+func piMulSMask(val [][]byte, sender *ot.StreamSender) []ot.Message {
+	x0 := make([]ot.Message, len(val))
+	x1 := make([]ot.Message, len(val))
+	for i := range x0 {
+		B := val[i]
+		x0[i] = randomBytes(len(B))
+		x1[i] = ot.XorBytes(x0[i], B)
+	}
+	sender.SendM(x0, x1)
+	return x0
+}
+
+func AndVector(a byte, b []byte) []byte {
+	mask := byte(0)
+	if a != 0 {
+		mask = 0xff
+	}
+	result := make([]byte, len(b))
+	for i, v := range b {
+		result[i] = v & mask
+	}
+	return result
+}
+
+func maskTriple(id int, senders []*ot.StreamSender, receivers []*ot.StreamReceiver,
+	numTriples, numBytes int) []MaskTriple {
+	if numTriples%8 != 0 {
+		panic("maskTriple: can only generate mask triples in multiples of 8")
+	}
+	n := len(senders)
+	result := make([]MaskTriple, numTriples)
+	// Notation is from Figure 9 (p11) of
+	//
+	// "Multiparty Computation for Dishonest Majority: from Passive to Active Security at Low Cost"
+	// by Damgard and Orlandi
+	// http://eprint.iacr.org/2010/318
+
+	// use i to range over parties (0...n-1)
+	// use j to range over triples (0...numTriples-1)
+	A := randomBytes(numTriples/8)
+	B := make([][]byte, numTriples)
+	for j := range B {
+		B[j] = randomBytes(numBytes)
+	}
+	C := make([][]byte, numTriples)
+	D := make([][]ot.Message, n)
+	E := make([][]ot.Message, n)
+	for i := range D {
+		if i == id {
+			continue
+		}
+		if id > i {
+			D[i] = piMulRMask(A, receivers[i])
+			E[i] = piMulSMask(B, senders[i])
+		} else {
+			E[i] = piMulSMask(B, senders[i])
+			D[i] = piMulRMask(A, receivers[i])
+		}
+	}
+	for j := range C {
+		a := bit.GetBit(A, j)
+		c := AndVector(a, B[j])
+		for i := range D {
+			if i == id {
+				continue
+			}
+			c = ot.XorBytes(c,
+				ot.XorBytes(D[i][j], E[i][j]))
+		}
+		C[j] = c
+	}
+	for j := range result {
+		a := bit.GetBit(A, j)
+		result[j] = MaskTriple{a, B[j], C[j]}
+	}
+	return result
+}
+
+func piMulR(val []byte, receiver *ot.StreamReceiver) []byte {
+	return receiver.ReceiveMBits(val)
+}
+
+func piMulS(val []byte, sender *ot.StreamSender) []byte {
 	x0 := randomBytes(len(val))
 	x1 := ot.XorBytes(x0, val)
-	thisSender.SendMBits(x0, x1)
+	sender.SendMBits(x0, x1)
 	return x0
 }
 
@@ -453,7 +544,7 @@ func randomBytes(numBytes int) []byte {
 	return result
 }
 
-func triple32(thisPartyId int, senders []*ot.StreamSender, receivers []*ot.StreamReceiver) []Triple {
+func triple32(id int, senders []*ot.StreamSender, receivers []*ot.StreamReceiver) []Triple {
 	n := len(senders)
 	result := make([]Triple, NUM_TRIPLES)
 	numBytes := NUM_TRIPLES * 4
@@ -476,10 +567,10 @@ func triple32(thisPartyId int, senders []*ot.StreamSender, receivers []*ot.Strea
 	e := make([][]byte, n)
 
 	for i := 0; i < n; i++ {
-		if i == thisPartyId {
+		if i == id {
 			continue
 		}
-		if thisPartyId > i {
+		if id > i {
 			d[i] = piMulR(a, receivers[i])
 			e[i] = piMulS(b, senders[i])
 		} else {
@@ -490,7 +581,7 @@ func triple32(thisPartyId int, senders []*ot.StreamSender, receivers []*ot.Strea
 
 	c := AndBytes(a, b)
 	for i := 0; i < n; i++ {
-		if i == thisPartyId {
+		if i == id {
 			continue
 		}
 		c = ot.XorBytes(c,
@@ -514,6 +605,15 @@ func AndBytes(a, b []byte) []byte {
 		result[i] = v & b[i]
 	}
 	return result
+}
+
+func (x *BlockIO) MaskTriple32() (a byte, B uint32, C uint32) {
+	if len(x.maskTriples) == 0 {
+		x.maskTriples = maskTriple(x.id, x.otSenders, x.otReceivers, 32, 4) // 32 triples, 4 bytes each
+	}
+	result := x.maskTriples[0]
+	x.maskTriples = x.maskTriples[1:]
+	return result.a, combine(result.B), combine(result.C)
 }
 
 func (x *BlockIO) Triple32() (a, b, c uint32) {

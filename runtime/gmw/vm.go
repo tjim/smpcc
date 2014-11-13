@@ -565,19 +565,53 @@ func Ashr64(io Io, a uint64, b uint) uint64 {
 }
 
 func Mask1(io Io, s bool, a bool) bool {
-	return Select1(io, s, a, Uint1(io, 0))
+	a32 := uint32(0)
+	if a {
+		a32 = uint32(1)
+	}
+	if (Mask32(io, s, a32) & 1) == 0 {
+		return false
+	} else {
+		return true
+	}
 }
 
 func Mask8(io Io, s bool, a uint8) uint8 {
-	return Select8(io, s, a, Uint8(io, 0))
+	return uint8(Mask32(io, s, uint32(a)))
 }
 
-func Mask32(io Io, s bool, a uint32) uint32 {
-	return Select32(io, s, a, Uint32(io, 0))
+func Mask32(io Io, s bool, Y uint32) uint32 {
+	x := byte(0)
+	if s {
+		x = byte(1)
+	}
+	// x is 0 or 1
+	a, B, C := io.MaskTriple32()
+	// a is 0 or 1
+	d := io.Open8(x ^ a)
+	// d is 0 or 1
+	A := uint32(0)
+	if a != 0 {
+		A = 0xffffffff
+	}
+	D := uint32(0)
+	if d != 0 {
+		D = 0xffffffff
+	}
+	E := io.Open32(Y ^ B)
+	if io.Id() == 0 {
+		return C ^ D&B ^ E&A ^ D&E
+	} else {
+		return C ^ D&B ^ E&A
+	}
 }
 
 func Mask64(io Io, s bool, a uint64) uint64 {
-	return Select64(io, s, a, Uint64(io, 0))
+	low := uint32(a)
+	high := uint32(a >> 32)
+	mlow := Mask32(io, s, low)
+	mhigh := Mask32(io, s, high)
+	return uint64(mlow) | (uint64(mhigh) << 32)
 }
 
 func NumPeers32(io Io) uint32 {
