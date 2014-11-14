@@ -62,6 +62,28 @@ module V = State.V
   that it is correct.  Note that if L1 has a single branch then we
   could merge L1' into L1 (the same for L2 of course).
 
+  LOAD/STORE ELIMINATION
+
+  For each llvm block, split any block that has a memory access into two blocks.
+  The second block should expect the result of the memory access in vMemRes.
+  So for example
+
+      %1 = load %2
+      ...
+
+  becomes
+
+      %vMemAct = 2  // load
+      %vMemSize = 4 // ... of 4 bytes
+      %vMemLoc = %2 // ... from memory at location %2
+      br label %9 // ... at label %9
+      // end of old block
+
+      // new block
+      %9:
+      %1 = %vMemRes
+      ...
+
   BRANCH ELIMINATION
 
   We transform
@@ -85,31 +107,6 @@ module V = State.V
 
       %vAnswer = i32 0
       %vIsDone = i1 1
-
-  LOAD/STORE ELIMINATION
-
-  For each llvm block, split any block that has a memory access into two blocks.
-  The second block should expect the result of the memory access in vMemRes.
-  So for example
-
-      %1 = load %2
-      ...
-
-  becomes
-
-      %vMemAct = 2  // load
-      %vMemSize = 4 // ... of 4 bytes
-      %vMemLoc = %2 // ... from memory at location %2
-      %vStateO = %9 // ... at label %9
-      // end of old block
-
-      // new block
-      %9:
-      %1 = %vMemRes
-      ...
-
-  We modify the load/store instruction to refer to the new block to branch to,
-  unconditionally, rather than add a branch, because that makes the implementation easier.
 
   GEP ELIMINATION
 
@@ -515,7 +512,8 @@ let load_store_elimination f =
             [ assign_instr V.vMemAct (Integer 2) (Integer 2) (big 1);
               assign_instr V.vMemSize (Integer 32) (Integer 32) (big (State.bytewidth result_ty));
               assign_instr V.vMemLoc (Integer 64) (Integer 64) addr;
-              assign_instr (V.vStateO()) Label Label (Basicblock bname) ],
+              (None, Br((Label,Basicblock bname),None,[])) ],
+(*              assign_instr (V.vStateO()) Label Label (Basicblock bname) ],*)
             {bname;binstrs}::bl_list
         | (None, Store(_,_,(typ,x),(_,addr),_,_,_))::tl ->
             (* TODO: alignment *)
@@ -525,7 +523,8 @@ let load_store_elimination f =
               assign_instr V.vMemSize (Integer 32) (Integer 32) (big (State.bytewidth typ));
               assign_instr V.vMemLoc (Integer 64) (Integer 64) addr;
               assign_instr V.vMemVal (Integer 32) typ x; (* TODO: memval should be 64 bits *)
-              assign_instr (V.vStateO()) Label Label (Basicblock bname) ],
+              (None, Br((Label,Basicblock bname),None,[])) ],
+(*              assign_instr (V.vStateO()) Label Label (Basicblock bname) ],*)
             {bname;binstrs}::bl_list
         | hd::tl ->
             let binstrs, bl_list = split tl in
@@ -619,10 +618,10 @@ let run_phases ctyps f =
   optional_print f options.prf (fun () ->
     phi_elimination f;
     optional_print f options.phi (fun () ->
-      branch_elimination f;
-      optional_print f options.branch (fun () ->
-        load_store_elimination f;
-        optional_print f options.load_store (fun () ->
+      load_store_elimination f;
+      optional_print f options.load_store (fun () ->
+        branch_elimination f;
+        optional_print f options.branch (fun () ->
           gep_elimination ctyps f;
           optional_print f options.gep (fun () ->
             State.set_bl_bits (List.length f.fblocks))))))
@@ -846,14 +845,14 @@ begin
     end
     else begin
       let toggle_before =
-        if options.branch then
+        if options.phi then
           (options.prf <- true; (fun () -> options.prf <- false))
-        else if options.phi then
-          (options.branch <- true; (fun () -> options.branch <- false))
         else if options.load_store then
           (options.phi <- true; (fun () -> options.phi <- false))
-        else if options.gep then
+        else if options.branch then
           (options.load_store <- true; (fun () -> options.load_store <- false))
+        else if options.gep then
+          (options.branch <- true; (fun () -> options.branch <- false))
         else (fun () -> ()) in
       let file_before = Filename.temp_file "smpcc." ".diff" in
       options.output <- Some file_before;
