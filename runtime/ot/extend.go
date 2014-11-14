@@ -10,10 +10,10 @@ package ot
 // Modified with preprocessing step
 
 import (
-	"bitbucket.org/ede/sha3"
 	"crypto/rand"
 	"fmt"
 	"github.com/tjim/smpcc/runtime/bit"
+	"golang.org/x/crypto/sha3"
 	"io"
 )
 
@@ -130,9 +130,8 @@ func RO(input []byte, outBits int) []byte {
 	if outBits%8 != 0 {
 		panic("output size must be a multiple of 8")
 	}
-	h := sha3.NewCipher(input, nil)
 	output := make([]byte, outBits/8)
-	h.XORKeyStream(output, output)
+	sha3.ShakeSum256(output, input)
 	return output
 }
 
@@ -208,7 +207,7 @@ func (R *ExtendReceiver) ReceiveM(r []byte) []Message { // r is a packed vector 
 	result := make([]Message, 8*len(r))
 	for i := range r {
 		for bit := 0; bit < 8; bit++ {
-			selector := Selector((r[i] >> uint(7 - bit)) & 1)
+			selector := Selector((r[i] >> uint(7-bit)) & 1)
 			result[i+bit] = R.Receive(selector)
 		}
 	}
@@ -224,7 +223,7 @@ func (S *ExtendSender) SendMBits(a, b []byte) { // messages are packed in bytes
 	for i := range a {
 		for bit := 0; bit < 8; bit++ {
 			mask := byte(0x80 >> uint(bit))
-			S.Send([]byte{a[i]&mask}, []byte{b[i]&mask})
+			S.Send([]byte{a[i] & mask}, []byte{b[i] & mask})
 		}
 	}
 }
@@ -233,7 +232,7 @@ func (R *ExtendReceiver) ReceiveMBits(r []byte) []byte { // r is a packed vector
 	for i := range r {
 		for bit := 0; bit < 8; bit++ {
 			mask := byte(0x80 >> uint(bit))
-			selector := Selector((r[i] >> uint(7 - bit)) & 1)
+			selector := Selector((r[i] >> uint(7-bit)) & 1)
 			result[i] |= mask & R.Receive(selector)[0]
 		}
 	}
