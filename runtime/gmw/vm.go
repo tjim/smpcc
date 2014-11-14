@@ -830,6 +830,51 @@ func Reveal64(io Io, a uint64) uint64 {
 	return io.Open64(a)
 }
 
+// Convert a binary value to a unary value.
+// (Can be used to efficiently compute MUX)
+// Let A be a []bool with LSB in position 0
+// So if A = []{false, true, true} then A represents 6
+// Output should be an array B where B[i] iff A represents i
+//
+// Label a binary tree with root as 1
+// Next level 2, 3
+// Next level 4, 5, 6, 7
+// 
+// So to move down left, multiply by two
+// So to move down right, multiply by two and add 1
+// So to move up, divide by two
+// 
+// Say the root is at level 0
+// Children of root at level 1
+// etc.
+// 
+// Leftmost node at level x is therefore 2^x
+// Level of a node labeled x is log_2(x)
+// 
+// Suppose we have N input bits A[0],A[1],..,A[N-1]
+// Define a tree with 2^N leaves, N levels
+// Label edges of tree as 0 if child is on left, 1 if on right
+// Define a boolean value phi[x] for each node x in the tree
+// phi(x) iff path from x to root has labels according to ...,A[N-2],A[N-1]
+// i.e., as many high-order bits of A as necessary.
+// Then the output of phi(x) of the leaves, left to right, gives the value of A in unary.
+func Unary(io Io, A []bool) []bool {
+	phi := make([]bool, 2*(1<<uint(len(A))))
+	phi[1] = Uint1(io, uint8(1))
+	for i := range A {
+		leftmost := (1 << uint(i)) * 2
+		for j := leftmost; j < leftmost*2; j++ {
+			switch j % 2 {
+			case 0:
+				phi[j] = And1(io, phi[j/2], Not1(io, A[len(A)-i-1]))
+			case 1:
+				phi[j] = And1(io, phi[j/2], A[len(A)-i-1])
+			}
+		}
+	}
+	return phi[len(phi)/2:]
+}
+
 /* This (temporary) implementation reveals the memory access pattern but not memory contents */
 func Load(io Io, loc uint64, eltsize uint32) uint64 {
 	address := int(Reveal64(io, loc))
