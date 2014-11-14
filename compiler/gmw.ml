@@ -355,12 +355,12 @@ let bpr_main b f =
           (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (Gc.govar var) (State.bl_num bl.bname)) sources))
       else
         (* non-specials keep their value from before the blocks unless the active block assigned them *)
-        bprintf b "\t\t%s = Select%d(io, TreeXor1(io, %s), TreeXor%d(io, %s), %s)\n"
+        bprintf b "\t\t%s = TreeXor%d(io, %s, Mask%d(io, Not1(io, TreeXor1(io, %s)), %s))\n"
           (Gc.govar var)
           (roundup_bitwidth (State.typ_of_var var))
-          (String.concat ", " (List.map (fun bl -> sprintf "mask_%d" (State.bl_num bl.bname)) sources))
-          (roundup_bitwidth (State.typ_of_var var))
           (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (Gc.govar var) (State.bl_num bl.bname)) sources))
+          (roundup_bitwidth (State.typ_of_var var))
+          (String.concat ", " (List.map (fun bl -> sprintf "mask_%d" (State.bl_num bl.bname)) sources))
           (Gc.govar var))
     (outputs_of_blocks blocks);
   if VSet.mem State.V.vMemRes blocks_fv then begin
