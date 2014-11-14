@@ -451,39 +451,15 @@ func Select1(io Io, s bool, a, b bool) bool {
 }
 
 func Select8(io Io, s bool, a, b uint8) uint8 {
-	var result uint8 = 0
-	for i := uint8(1); i > 0; i = i * 2 {
-		ai := (a & i) > 0
-		bi := (b & i) > 0
-		if xor(bi, And1(io, s, xor(ai, bi))) {
-			result |= i
-		}
-	}
-	return result
+	return b ^ Mask8(io, s, a^b)
 }
 
 func Select32(io Io, s bool, a, b uint32) uint32 {
-	var result uint32 = 0
-	for i := uint32(1); i > 0; i = i * 2 {
-		ai := (a & i) > 0
-		bi := (b & i) > 0
-		if xor(bi, And1(io, s, xor(ai, bi))) {
-			result |= i
-		}
-	}
-	return result
+	return b ^ Mask32(io, s, a^b)
 }
 
 func Select64(io Io, s bool, a, b uint64) uint64 {
-	var result uint64 = 0
-	for i := uint64(1); i > 0; i = i * 2 {
-		ai := (a & i) > 0
-		bi := (b & i) > 0
-		if xor(bi, And1(io, s, xor(ai, bi))) {
-			result |= i
-		}
-	}
-	return result
+	return b ^ Mask64(io, s, a^b)
 }
 
 func Mul8(io Io, a, b uint8) uint8 {
@@ -839,18 +815,18 @@ func Reveal64(io Io, a uint64) uint64 {
 // Label a binary tree with root as 1
 // Next level 2, 3
 // Next level 4, 5, 6, 7
-// 
+//
 // So to move down left, multiply by two
 // So to move down right, multiply by two and add 1
 // So to move up, divide by two
-// 
+//
 // Say the root is at level 0
 // Children of root at level 1
 // etc.
-// 
+//
 // Leftmost node at level x is therefore 2^x
 // Level of a node labeled x is log_2(x)
-// 
+//
 // Suppose we have N input bits A[0],A[1],..,A[N-1]
 // Define a tree with 2^N leaves, N levels
 // Label edges of tree as 0 if child is on left, 1 if on right
