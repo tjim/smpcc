@@ -217,27 +217,6 @@ let bpr_gmw_block_args print_types b bl =
   else
     VSet.iter (fun var -> bprintf b ", %s" (Gc.govar var)) fv
 
-(* Block masks will appear as free variables in Switch by the current branch elimination phase.
-   These should be treated as assignments here. *)
-let free_of_block bl =
-  VSet.diff (free_of_block bl) !State.bl_vars
-
-(* DIFFERENT from util.ml version in that it handles switch after branch elimination phase *)
-let assigned_of_block bl =
-  let rec loop = function
-    | [] -> VSet.empty
-    | (None, Switch(_,(_, Var x),branches,_))::tl ->
-        List.fold_left VSet.union VSet.empty
-          ((VSet.singleton x)::(loop tl)::
-           (List.map
-              (function
-                | (_,(_, Var y)) -> VSet.singleton y
-                | _ -> VSet.empty)
-              branches))
-    | (None,i)::tl -> loop tl
-    | (Some x,i)::tl -> VSet.union (VSet.singleton x) (loop tl) in
-  loop bl.binstrs
-
 let outputs_of_block blocks_fv bl =
   VSet.inter (assigned_of_block bl) (VSet.union State.V.special (VSet.union blocks_fv !State.bl_vars))
 
