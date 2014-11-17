@@ -583,17 +583,48 @@ let cfg f =
   printf "}\n"
 
 let branch_elimination f =
+  List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
   List.iter
     (fun bl ->
+      let my_block = State.bl_num bl.bname in
       let elim (nopt,instr) =
         match instr with
-        | Switch _ ->
-            (* Ought to deal with switch better here but see gc.ml instead *)
-            [(Some(V.vStateO()), instr)]
-        | Br((ty,op), None, _) ->
-            [assign_instr (V.vStateO()) ty ty op]
-        | Br(x, Some(y,z), _) ->
-            [Some(V.vStateO()), Select([x;y;z],[])] (* NB do NOT swap order of y,z *)
+        | Switch((ty,e),(Label, Basicblock switchDefault),branches,md) ->
+            let x = Name(false, State.fresh()) in
+            [(Some x, Call(false, None, [], Integer(List.length(branches)+1),
+                           (Var(Util.Name(true, "unary"))),
+                           [(ty,[],e);(Integer 32, [], big(List.length(branches)))],
+                           [],[]))]@
+              [(assign_instr (State.bl_mask(my_block)) (Integer 1) (Integer 1) (big 0))]@ (* NB my_block could be an explicit branch target *)
+              (let rec loop i =
+                let call = Call(false, None, [], Integer 1,
+                                (Var(Util.Name(true, "selectbit"))),
+                                [(Integer(List.length(branches)+1), [], Var x);(Integer 32, [], big i)],
+                                [],[]) in
+                function 
+                  | [] -> [(Some(State.bl_mask(State.bl_num switchDefault)), call)]
+                  | ((Integer _, Int j),(Label, Basicblock target))::tl ->
+                      if Big_int.int_of_big_int j <> i then
+                        failwith "unexpected switch in branch elimination"
+                      else
+                        (Some(State.bl_mask(State.bl_num target)), call)::(loop (i+1) tl)
+                  | _ -> failwith "unexpected switch in branch elimination"
+              in loop 0 branches)
+        | Br((Label,Basicblock target), None, _) ->
+            let target_block = State.bl_num target in
+            if target_block = my_block then
+              []
+            else
+              [(assign_instr (State.bl_mask(my_block)) (Integer 1) (Integer 1) (big 0));
+               (assign_instr (State.bl_mask(target_block)) (Integer 1) (Integer 1) (big 1))]
+        | Br(x, Some((Label, Basicblock y), (Label, Basicblock z)), _) ->
+            let y_block = State.bl_num y in
+            let z_block = State.bl_num z in
+            (if my_block <> y_block && my_block <> z_block then
+              [(assign_instr (State.bl_mask(my_block)) (Integer 1) (Integer 1) (big 0))]
+            else [])@
+            [(assign_instr (State.bl_mask(y_block)) (Integer 1) (Integer 1) (snd x));
+             (Some (State.bl_mask(z_block)), Xor(x,(big 1),[])) (* not(x) *)]
         | Indirectbr _ ->
             failwith "branch elimination: indirectbr is unsupported"
         | Return(None,_) ->
@@ -624,7 +655,7 @@ let run_phases ctyps f =
         optional_print f options.branch (fun () ->
           gep_elimination ctyps f;
           optional_print f options.gep (fun () ->
-            State.set_bl_bits (List.length f.fblocks))))))
+            ())))))
 
 let file2cu cil_extra_args file =
   if Filename.check_suffix file ".ll" then

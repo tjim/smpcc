@@ -834,7 +834,7 @@ func Reveal64(io Io, a uint64) uint64 {
 // phi(x) iff path from x to root has labels according to ...,A[N-2],A[N-1]
 // i.e., as many high-order bits of A as necessary.
 // Then the output of phi(x) of the leaves, left to right, gives the value of A in unary.
-func Unary(io Io, A []bool) []bool {
+func unaryB(io Io, A []bool) []bool {
 	phi := make([]bool, 2*(1<<uint(len(A))))
 	phi[1] = Uint1(io, uint8(1))
 	for i := range A {
@@ -849,6 +849,38 @@ func Unary(io Io, A []bool) []bool {
 		}
 	}
 	return phi[len(phi)/2:]
+}
+
+func Unary(io Io, x uint32, y int) uint32 {
+	b := make([]bool, 32)
+	for i := range b {
+		b[i] = (((x >> uint(i)) & 1) > 0)
+	}
+	dflt := false
+	var lowbits []bool
+	for i := range b {
+		if (1 << uint(i)) > y {
+			dflt = Or1(io, dflt, b[i])
+			if lowbits == nil {
+				lowbits = b[:i]
+			}
+		}
+	}
+	unary := unaryB(io, lowbits)
+	result := uint32(0)
+	for i := range unary {
+		switch {
+		case i >= y:
+			dflt = Or1(io, dflt, unary[i])
+		case unary[i]:
+			result |= (1 << uint(i))
+		}
+	}
+	result = Mask32(io, Not1(io, dflt), result)
+	if dflt {
+		result |= (1 << uint(y))
+	}
+	return result
 }
 
 /* This (temporary) implementation reveals the memory access pattern but not memory contents */

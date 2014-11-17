@@ -94,6 +94,11 @@ let bpr_go_instr b is_gen declared_vars (nopt,i) =
                bprintf b "%sPrintf(vm, mask, \"%%c\", %a)\n" pkg bpr_go_value (typ, value)
   | Call(_,_,_,_,Var(Name(true, "input")),[typ,_,value],_,_) ->
       bprintf b "%sInput32(vm, mask, %a, next_arg)\n" pkg bpr_go_value (typ, value)
+  | Call(_,_,_,_,Var(Name(true, "unary")),[(ty,_,op);(_,_,Int l)],_,_) ->
+      bprintf b "%sUnary(vm, %a, %d)\n" pkg bpr_go_value (ty, op) (Big_int.int_of_big_int l)
+  | Call(_,_,_,_,Var(Name(true, "selectbit")),[(ty,_,Var v);(_,_,Int l)],_,_) ->
+      let bitnum = Big_int.int_of_big_int l in
+      bprintf b "%s[%d:%d]\n" (govar v) bitnum (bitnum+1)
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.start")),_,_,_) ->
       ()
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.end")),_,_,_) ->
@@ -194,7 +199,7 @@ let bpr_go_block_args b bl =
   VSet.iter (fun var -> bprintf b ", %s" (govar var)) fv
 
 let outputs_of_block blocks_fv bl =
-  VSet.inter (assigned_of_block bl) (VSet.union State.V.special blocks_fv)
+  VSet.inter (assigned_of_block bl) (VSet.union State.V.special (VSet.union blocks_fv !State.bl_vars))
 
 let outputs_of_blocks blocks =
   let blocks_fv =
@@ -216,7 +221,7 @@ let bpr_go_block b blocks_fv is_gen bl =
     | Id(_,n) -> string_of_int n
     | Name(_,n) -> n in
   bprintf b "\n// <label>:%s\n" name;
-  bprintf b "func %s%d(vm %sVM, ch chan []%s, block_num%a []%s) {\n"
+  bprintf b "func %s%d(vm %sVM, ch chan []%s, mask%a []%s) {\n"
     (gen_or_eval is_gen)
     (State.bl_num bl.bname)
     pkg
@@ -224,23 +229,6 @@ let bpr_go_block b blocks_fv is_gen bl =
     bpr_go_block_args bl
     (bit_type is_gen);
   let outputs = outputs_of_block blocks_fv bl in
-  let block_requires_mask =
-    options.debug_blocks
-  || not(VSet.is_empty outputs)
-  || (List.fold_left
-        (fun a (_,i) ->
-          a ||
-          (match i with (* see bpr_go_instr, these are all cases using mask *)
-          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "input"))),_,_,_)
-          | Load _
-          | Store _ ->
-              true
-          | _ ->
-              false))
-        false
-        bl.binstrs) in
-  if block_requires_mask then
-    bprintf b "\tmask := %sIcmp_eq(vm, block_num, %sUint(vm, %d, 32))\n" pkg pkg (State.bl_num bl.bname);
   if options.debug_blocks then
     bprintf b "\t%sPrintf(vm, mask, \"Block %d\\n\")\n" pkg (State.bl_num bl.bname);
   ignore(List.fold_left (bpr_go_instr b is_gen) (free_of_block bl) bl.binstrs);
@@ -277,8 +265,13 @@ let bpr_main b f is_gen =
     (fun var ->
       bprintf b "\t%s := %sUint(vms[0], 0, %d)\n" (govar var) pkg (State.bitwidth (State.typ_of_var var));
     )
-    (VSet.add (State.V.vStateO()) (* if there is only one block this is used but not assigned *)
-       (VSet.inter State.V.special (assigned_of_blocks blocks)));
+    (VSet.inter State.V.special (assigned_of_blocks blocks));
+  bprintf b "\n";
+  bprintf b "\t/* block masks */\n";
+  VSet.iter
+    (fun var -> bprintf b "\t%s := %sUint(vms[0], 0, 1)\n" (govar var) pkg)
+    !State.bl_vars;
+  bprintf b "\t%s = %sUint(vms[0], 1, 1)\n" (govar (State.bl_mask 0)) pkg;
   bprintf b "\n";
   bprintf b "\t/* block free variables */\n";
   VSet.iter
@@ -293,11 +286,12 @@ let bpr_main b f is_gen =
   bprintf b "\t\t/* one goroutine invocation per block */\n";
   List.iter
     (fun bl ->
-      bprintf b "\t\tgo %s%d(vms[%d], ch%d, _vStateO%a)\n"
+      bprintf b "\t\tgo %s%d(vms[%d], ch%d, %s%a)\n"
         (gen_or_eval is_gen)
         (State.bl_num bl.bname)
         (State.bl_num bl.bname + 1)
         (State.bl_num bl.bname)
+        (govar (State.bl_mask (State.bl_num bl.bname)))
         bpr_go_block_args bl)
     blocks;
   bprintf b "\n";

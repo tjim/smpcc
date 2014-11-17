@@ -539,6 +539,48 @@ func InitRam(contents []byte) {
 	Ram = contents
 }
 
+/* commented in gmw/vm.go */
+func unaryB(io VM, A []base.Wire) []base.Wire {
+	phi := make([]base.Wire, 2*(1<<uint(len(A))))
+	phi[1] = Uint(io, 1, 1)[0]
+	for i := range A {
+		leftmost := (1 << uint(i)) * 2
+		for j := leftmost; j < leftmost*2; j++ {
+			k := len(A)-i-1
+			switch j % 2 {
+			case 0:
+				phi[j] = And(io, phi[j/2:j/2+1], Not(io, A[k:k+1]))[0]
+			case 1:
+				phi[j] = And(io, phi[j/2:j/2+1], A[k:k+1])[0]
+			}
+		}
+	}
+	return phi[len(phi)/2:]
+}
+
+func Unary(io VM, b []base.Wire, y int) []base.Wire {
+	dflt := Uint(io, 0, 1)
+	var lowbits []base.Wire
+	for i := range b {
+		if (1 << uint(i)) > y {
+			dflt = Or(io, dflt, b[i:i+1])
+			if lowbits == nil {
+				lowbits = b[:i]
+			}
+		}
+	}
+	unary := unaryB(io, lowbits)
+	lowresult := make([]base.Wire, y)
+	copy(lowresult, unary[:y])
+	for i := range unary {
+		if i >= y {
+			dflt = Or(io, dflt, unary[i:i+1])
+		}
+	}
+	result := Mask(io, Not(io, dflt), lowresult)
+	return append(result, dflt[0])
+}
+
 /* Gen-side load */
 func Load(io VM, loc, eltsize []base.Wire) []base.Wire {
 	fmt.Printf("Loading Ram[0x")

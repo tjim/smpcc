@@ -10,18 +10,21 @@ let add_mux x = muxes := x::!muxes
 let get_muxes() = !muxes
 let bl_bits = ref 32
 let get_bl_bits() = !bl_bits
-let set_bl_bits n =
-(* TEMPORARY because Labels have fixed bitwidth 32 in my llvm interface
-      let rec loop n = if n <= 2 then 1 else 1 + loop(n/2) in
-      bl_bits <- loop n;
-*)
-  initialized := true
 
 let v_map = function
   | Util.Name(true, n) -> "@"^n
   | Util.Name(false, n) -> "%"^n
   | Util.Id(true, n) -> "@"^(string_of_int n)
   | Util.Id(false, n) -> "%"^(string_of_int n)
+
+let typ_of_var var =
+  try Hashtbl.find vartyp_tbl var
+  with Not_found -> failwith("Could not find type of " ^ (Util.string_of_var var))
+let add_vartyp var typ =
+  if Hashtbl.mem vartyp_tbl var then
+    eprintf "Warning: more than one value for %s in vartyp_tbl\n%!" (Util.string_of_var var);
+  Hashtbl.add vartyp_tbl var typ;
+  var
 
 let fresh() =
   let x = sprintf "x%d" !x_count in
@@ -37,15 +40,18 @@ let freshen name =
       !x_count in
   x_count := !x_count + 1;
   x
+let bl_vars = ref Util.VSet.empty
 let bl_num bl =
   if Hashtbl.mem bl_tbl bl then Hashtbl.find bl_tbl bl else
   let num = !bl_count in
   bl_count := !bl_count + 1;
   Hashtbl.add bl_tbl bl num;
+  let x = sprintf "block%d" num in
+  bl_vars := Util.VSet.add (add_vartyp (Util.Name(false,x)) (Util.Integer 1)) !bl_vars;
   num
-let bl_map bl =
-  if not(!initialized) then failwith "bl_map: must set_bl_bits first" else
-  sprintf "%d:%d" (bl_num bl) !bl_bits
+let bl_mask num =
+  let x = sprintf "block%d" num in
+  Util.Name(false,x)
 let dump() =
   let b = Buffer.create 11 in
   bprintf b "// BLOCK ASSIGNMENT, %d blocks, %d bits\n" !bl_count !bl_bits;
@@ -54,15 +60,6 @@ let dump() =
       bprintf b "// %s <-> %a\n" (sprintf "%d:%d" bl !bl_bits) Util.bpr_var var)
     bl_tbl;
   printf "%s" (Buffer.contents b)
-
-let typ_of_var var =
-  try Hashtbl.find vartyp_tbl var
-  with Not_found -> failwith("Could not find type of " ^ (Util.string_of_var var))
-let add_vartyp var typ =
-  if Hashtbl.mem vartyp_tbl var then
-    eprintf "Warning: more than one value for %s in vartyp_tbl\n%!" (Util.string_of_var var);
-  Hashtbl.add vartyp_tbl var typ;
-  var
 
 let fresh_label() =
   let x = sprintf "vLabel%d" !x_count in

@@ -104,6 +104,11 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
       bprintf b "Input32(io, mask, %a)\n" bpr_gmw_value (typ, value)
   | Call(_,_,_,_,Var(Name(true, "num_peers")),_,_,_) ->
       bprintf b "NumPeers32(io)\n"
+  | Call(_,_,_,_,Var(Name(true, "unary")),[(ty,_,op);(_,_,Int l)],_,_) ->
+      bprintf b "Unary(io, %a, %d)\n" bpr_gmw_value (ty, op) (Big_int.int_of_big_int l)
+  | Call(_,_,_,_,Var(Name(true, "selectbit")),[(ty,_,Var v);(_,_,Int l)],_,_) ->
+      let bitnum = Big_int.int_of_big_int l in
+      bprintf b "((%s >> %d) & 1) > 0\n" (Gc.govar v) bitnum
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.start")),_,_,_) ->
       ()
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.end")),_,_,_) ->
@@ -170,7 +175,8 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
         bprintf b "uint%d(%a)\n" bits_result bpr_gmw_value (ty,op);
   | Select([x;(typ,y);z],_) -> (* TODO: maybe enforce 3 args in datatype? *)
       bprintf b "Select%d(io, %a, %a, %a)\n" (roundup_bitwidth typ) bpr_gmw_value x bpr_gmw_value (typ,y) bpr_gmw_value z
-  | Switch(op0,op1,ops,_) ->
+(*
+  | Switch((ty0,op0),op1,ops,_) ->
       (* op0 is the value to switch on.
          op1 is the default target.
          ops is a list of pairs; the first element of each pair should be an
@@ -180,6 +186,7 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
       let cases = List.map snd ops in (* throw away the 0, 1, ... part of the pairs *)
       bprintf b "Switch%d(io, %a, %a, %a)\n" (roundup_bitwidth (fst op0)) bpr_gmw_value op0 bpr_gmw_value op1
         (between ", " bpr_gmw_value) cases
+*)
   | Trunc(x, ty,_) ->
       let bits_result = roundup_bitwidth ty in
       (match bits_result with
@@ -210,8 +217,29 @@ let bpr_gmw_block_args print_types b bl =
   else
     VSet.iter (fun var -> bprintf b ", %s" (Gc.govar var)) fv
 
+(* Block masks will appear as free variables in Switch by the current branch elimination phase.
+   These should be treated as assignments here. *)
+let free_of_block bl =
+  VSet.diff (free_of_block bl) !State.bl_vars
+
+(* DIFFERENT from util.ml version in that it handles switch after branch elimination phase *)
+let assigned_of_block bl =
+  let rec loop = function
+    | [] -> VSet.empty
+    | (None, Switch(_,(_, Var x),branches,_))::tl ->
+        List.fold_left VSet.union VSet.empty
+          ((VSet.singleton x)::(loop tl)::
+           (List.map
+              (function
+                | (_,(_, Var y)) -> VSet.singleton y
+                | _ -> VSet.empty)
+              branches))
+    | (None,i)::tl -> loop tl
+    | (Some x,i)::tl -> VSet.union (VSet.singleton x) (loop tl) in
+  loop bl.binstrs
+
 let outputs_of_block blocks_fv bl =
-  VSet.inter (assigned_of_block bl) (VSet.union State.V.special blocks_fv)
+  VSet.inter (assigned_of_block bl) (VSet.union State.V.special (VSet.union blocks_fv !State.bl_vars))
 
 let outputs_of_blocks blocks =
   let blocks_fv =
@@ -230,27 +258,10 @@ let bpr_gmw_block b blocks_fv bl =
     | Id(_,n) -> string_of_int n
     | Name(_,n) -> n in
   bprintf b "// <label>:%s\n" name;
-  bprintf b "func block%d(io Io, ch chan uint64, block_num uint32%a) {\n"
+  bprintf b "func block%d(io Io, ch chan uint64, mask bool%a) {\n"
     (State.bl_num bl.bname)
     (bpr_gmw_block_args true) bl;
   let outputs = outputs_of_block blocks_fv bl in
-  let block_requires_mask =
-    options.debug_blocks
-  || not(VSet.is_empty outputs)
-  || (List.fold_left
-        (fun a (_,i) ->
-          a ||
-          (match i with (* see bpr_gmw_instr, these are all cases using mask *)
-          | Call(_,_,_,_,Var(Name(true, ("printf" | "puts" | "putchar" | "input"))),_,_,_)
-          | Load _
-          | Store _ ->
-              true
-          | _ ->
-              false))
-        false
-        bl.binstrs) in
-  if block_requires_mask then
-    bprintf b "\tmask := Icmp_eq32(io, block_num, Uint32(io, %d))\n" (State.bl_num bl.bname);
   if options.debug_blocks then
     bprintf b "\tPrintf(io, mask, \"Block %d\\n\")\n" (State.bl_num bl.bname);
   ignore(List.fold_left (bpr_gmw_instr b) (free_of_block bl) bl.binstrs);
@@ -299,8 +310,13 @@ let bpr_main b f =
     (fun var ->
       bprintf b "\t%s := Uint%d(io, 0)\n" (Gc.govar var) (roundup_bitwidth (State.typ_of_var var));
     )
-    (VSet.add (State.V.vStateO()) (* if there is only one block this is used but not assigned *)
-       (VSet.inter State.V.special (assigned_of_blocks blocks)));
+    (VSet.inter State.V.special (assigned_of_blocks blocks));
+  bprintf b "\n";
+  bprintf b "\t/* block masks */\n";
+  VSet.iter
+    (fun var -> bprintf b "\t%s := Uint1(io, 0)\n" (Gc.govar var))
+    !State.bl_vars;
+  bprintf b "\t%s = Uint1(io, 1)\n" (Gc.govar (State.bl_mask 0));
   bprintf b "\n";
   bprintf b "\t/* block free variables */\n";
   VSet.iter
@@ -315,10 +331,11 @@ let bpr_main b f =
   bprintf b "\t\t/* one goroutine invocation per block */\n";
   List.iter
     (fun bl ->
-      bprintf b "\t\tgo block%d(ios[%d], ch%d, _vStateO%a)\n"
+      bprintf b "\t\tgo block%d(ios[%d], ch%d, %s%a)\n"
         (State.bl_num bl.bname)
         (State.bl_num bl.bname)
         (State.bl_num bl.bname)
+        (Gc.govar (State.bl_mask (State.bl_num bl.bname)))
         (bpr_gmw_block_args false) bl)
     blocks;
   bprintf b "\n";
