@@ -16,10 +16,10 @@ module V = State.V
   We will be using a stepped execution model where in each step, all
   blocks are executed.  One block will be the designated "current"
   block, and the result of a step of execution will be the results of
-  the current block; results of all other blocks are discarded.  The
-  input variable "vState" will indicate the current block, and
-  the output variable "vStateO" will indicate the current block
-  for the next step.
+  the current block; results of all other blocks are discarded.
+
+  The current block is maintained in unary form: boolean variables
+  block0, block1, ..., exactly one of which is true at any step.
 
   The compiler has the following phases.
 
@@ -92,9 +92,21 @@ module V = State.V
 
   into
 
-      %vStateO = select i1 %1, label %split13, label %.lr.ph // ... in this next state
+      %blockX = 0
+      %blockY = %1
+      %blockZ = xor i1 %1, 1
 
-  There is a similar transformation for switch instructions.
+  where %blockX variable for the current block (containing the br instruction),
+  %blockY is the variable for the block with label %split13,
+  %blockZ is the variable for the block with label %.lr.ph.
+
+  Note that X might be Y or Z; so the output of branch elimination can
+  include multiple assignments in a block.  This must be handled
+  properly in our eventual conversion to the back end.
+
+  There is a similar transformation for switch instructions, however,
+  it is much more complicated.  Switch requires us to convert a binary
+  value into our unary representation.
 
   We don't support indirectbr for the moment (it computes a label and
   branches to it).
@@ -601,7 +613,7 @@ let branch_elimination f =
                                 (Var(Util.Name(true, "selectbit"))),
                                 [(Integer(List.length(branches)+1), [], Var x);(Integer 32, [], big i)],
                                 [],[]) in
-                function 
+                function
                   | [] -> [(Some(State.bl_mask(State.bl_num switchDefault)), call)]
                   | ((Integer _, Int j),(Label, Basicblock target))::tl ->
                       if Big_int.int_of_big_int j <> i then
