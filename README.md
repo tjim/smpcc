@@ -71,16 +71,21 @@ following in foo.c:
 
 Then you can compile and run the program as follows:
 
-    $ smpcc foo.c -sim
-    $ go run foo.go
+    $ smpcc foo.c
+    $ go run foo.go -sim
     eval: 5
     gen: 5
     Done
     $
 
 This runs the program in a single process; the generator and evaluator
-run as different (sets of) goroutines.  smpcc can also produce go
-programs that run the generator and evaluator on different machines.
+run as different (sets of) goroutines.  You can also run in two separate processes:
+
+    $ go run foo.go -id 1 &
+    $ go run foo.go
+    eval: 5
+    gen: 5
+    Done
 
 You can supply input to the program over the command line.  Put the
 following in foo.c:
@@ -100,8 +105,8 @@ should be between 0 and n-1.
 
 Then you can do
 
-    $ smpcc foo.c -sim
-    $ go run foo.go 9 2
+    $ smpcc foo.c
+    $ go run foo.go -sim 9 2
     eval: 20
     gen: 20
     Done

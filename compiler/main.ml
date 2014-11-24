@@ -808,7 +808,6 @@ begin
      printf "         -fname <function name>      Specify the function to compile (default is first function)\n";
      printf "         -o <file name>              Specify the output file (default is standard out)\n";
      printf "         -run                        Compile and run the program immediately\n";
-     printf "         -sim                        Compile for simulation\n";
      printf "         -fv                         Print the free variables of the function\n";
      printf "         -ram                        Print the RAM assignment\n";
      printf "         -pr                         Print the LLVM assembly language of the file\n";
