@@ -796,7 +796,6 @@ begin
   let (x,args) = getopt "-O4" args               in if x then options.optflag <- "-O4";
   let (x,args) = getopt "-v" args                in options.verbose <- x;
   let (x,args) = getopt "-run" args              in options.run <- x;
-  let (x,args) = getopt "-sim" args              in options.sim <- x;
   let (cil_extra_args,args) = getallopts args    in
   if options.help then
     (printf "Usage: ./smpcc foo.c [options]\n";

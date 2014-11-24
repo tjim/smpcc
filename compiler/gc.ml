@@ -430,17 +430,8 @@ let print_function_circuit m f =
   bprintf b "import \"%sgc/gen\"\n" package_prefix;
   bprintf b "import \"%sgc/eval\"\n" package_prefix;
   bprintf b "import \"%sgc\"\n" package_prefix;
+  bprintf b "import \"%sgc/runtime\"\n" package_prefix;
   bprintf b "import \"fmt\"\n";
-  (* the main() imports *)
-  if options.sim then begin
-    bprintf b "import \"%sgc/%s/sim\"\n" package_prefix (match options.circuitlib with None -> "yao" | Some x -> x);
-    bprintf b "import \"os\"\n";
-    bprintf b "import \"runtime/pprof\"\n";
-  end else begin
-    bprintf b "import vmeval \"github.com/tjim/smpcc/runtime/gc/%s/eval\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
-    bprintf b "import vmgen \"github.com/tjim/smpcc/runtime/gc/%s/gen\"\n" (match options.circuitlib with None -> "yao" | Some x -> x);
-    bprintf b "import \"flag\"\n";
-  end;
   bprintf b "\n";
   (* gen side *)
   bpr_globals b m true;
@@ -454,74 +445,7 @@ let print_function_circuit m f =
   List.iter (bpr_go_block b blocks_fv false) f.fblocks;
   bprintf b "\n";
   (* main function *)
-  if options.sim then begin
-    bprintf b "var args []string\n";
-    bprintf b "\n";
-    bprintf b "func init_args() {\n";
-    bprintf b "	args = os.Args[1:]\n";
-    bprintf b "	if len(args) > 0 && args[0] == \"-pprof\" {\n";
-    bprintf b "		args = args[1:]\n";
-    bprintf b "		file := \"cpu.pprof\"\n";
-    bprintf b "		f, err := os.Create(file)\n";
-    bprintf b "		if err != nil {\n";
-    bprintf b "			fmt.Println(\"Error: \", err)\n";
-    bprintf b "		}\n";
-    bprintf b "		pprof.StartCPUProfile(f)\n";
-    bprintf b "		defer pprof.StopCPUProfile()\n";
-    bprintf b "	}\n";
-    bprintf b "}\n";
-    bprintf b "func next_arg() uint64 {\n";
-    bprintf b "\tif len(args) <= 0 {\n";
-    bprintf b "\t\tpanic(\"Not enough command-line arguments\")\n";
-    bprintf b "\t}\n";
-    bprintf b "\targ := 0\n";
-    bprintf b "\tfmt.Sscanf(args[0], \"%%d\", &arg)\n";
-    bprintf b "\targs = args[1:]\n";
-    bprintf b "\treturn uint64(arg)\n";
-    bprintf b "}\n";
-    bprintf b "\n";
-    bprintf b "func main() {\n";
-    bprintf b "\tinit_args()\n";
-    bprintf b "\tgvms, evms := sim.VMs(%d)\n" (List.length f.fblocks + 1);
-    bprintf b "\tgo gen_main(gvms)\n";
-    bprintf b "\teval_main(evms)\n";
-    bprintf b "\n";
-    bprintf b "\tfmt.Println(\"Done\")\n";
-    bprintf b "}\n";
-  end else begin
-    bprintf b "var id int\n";
-    bprintf b "var addr string\n";
-    bprintf b "var args []string\n";
-    bprintf b "var do_old bool\n";
-    bprintf b "\n";
-    bprintf b "func init_args() {\n";
-    bprintf b "\tflag.BoolVar(&do_old, \"old\", false, \"use old, non-multiplex OT (default false)\")\n";
-    bprintf b "\tflag.IntVar(&id, \"id\", 0, \"identity (default 0)\")\n";
-    bprintf b "\tflag.StringVar(&addr, \"addr\", \"127.0.0.1:3042\", \"network address (default 127.0.0.1:3042)\")\n";
-    bprintf b "\tflag.Parse()\n";
-    bprintf b "\targs = flag.Args()\n";
-    bprintf b "}\n";
-    bprintf b "func next_arg() uint64 {\n";
-    bprintf b "\tif len(args) <= 0 {\n";
-    bprintf b "\t\tpanic(\"Not enough command-line arguments\")\n";
-    bprintf b "\t}\n";
-    bprintf b "\targ := 0\n";
-    bprintf b "\tfmt.Sscanf(args[0], \"%%d\", &arg)\n";
-    bprintf b "\targs = args[1:]\n";
-    bprintf b "\treturn uint64(arg)\n";
-    bprintf b "}\n";
-    bprintf b "\n";
-    bprintf b "func main() {\n";
-    bprintf b "\tinit_args()\n";
-    bprintf b "\tif id == 0 && do_old {\n";
-    bprintf b "\t\tgen.Client(addr, gen_main, %d, vmgen.NewVM)\n" (List.length f.fblocks + 1);
-    bprintf b "\t} else if id == 0 {\n";
-    bprintf b "\t\tgen.Client2(addr, gen_main, %d, vmgen.NewVM)\n" (List.length f.fblocks + 1);
-    bprintf b "\t} else if do_old {\n";
-    bprintf b "\t\teval.Server(addr, eval_main, %d, vmeval.NewVM)\n" (List.length f.fblocks + 1);
-    bprintf b "\t} else {\n";
-    bprintf b "\t\teval.Server2(addr, eval_main, %d, vmeval.NewVM)\n" (List.length f.fblocks + 1);
-    bprintf b "\t}\n";
-    bprintf b "}\n";
-  end;
+  bprintf b "func main() {\n";
+  bprintf b "\truntime.Run(%d, gen_main, eval_main)\n" (List.length f.fblocks);
+  bprintf b "}\n";
   pr_output_file ".go" (Buffer.contents b)
