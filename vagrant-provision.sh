@@ -25,7 +25,7 @@ cd
 mkdir -p /home/vagrant/gowork/src/github.com/tjim
 ln -s /vagrant /home/vagrant/gowork/src/github.com/tjim/smpcc
 export GOPATH=/home/vagrant/gowork
-go get bitbucket.org/ede/sha3
+go get golang.org/x/crypto/sha3
 go get github.com/tjim/fatchan
 cat >>/home/vagrant/.bashrc <<EOF
 export GOPATH=/home/vagrant/gowork
