@@ -62,6 +62,15 @@ module V = State.V
   that it is correct.  Note that if L1 has a single branch then we
   could merge L1' into L1 (the same for L2 of course).
 
+  Phi elimination is also called "back translation" or the
+  "out-of-SSA" transform.  A better algorithm is given in
+
+    Vugranam C. Sreedhar, Roy Dz-Ching Ju, David M. Gillies, and Vatsa
+    Santhanam. Translating out of static single assignment form. In
+    Proceedings of the Static Analysis Symposium, volume 1694 of
+    Lecture Notes in Computer Science, pages 194-210, 1999.
+    (http://www.tjhsst.edu/~rlatimer/papers/sreedharTranslatingOutOfStaticSingleAssignmentForm.pdf)
+
   LOAD/STORE ELIMINATION
 
   For each llvm block, split any block that has a memory access into two blocks.
