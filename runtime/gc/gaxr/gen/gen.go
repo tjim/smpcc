@@ -7,7 +7,7 @@ import (
 	"github.com/tjim/smpcc/runtime/gc"
 	basegen "github.com/tjim/smpcc/runtime/gc/gen"
 	"github.com/tjim/smpcc/runtime/ot"
-	"math/rand"
+	"github.com/tjim/smpcc/runtime/bit"
 )
 
 type vm struct {
@@ -289,10 +289,16 @@ func (y vm) Random(bits int) []gc.Wire {
 		panic("Random: bits < 1")
 	}
 	result := make([]gc.Wire, bits)
+	numBytes := bits / 8
+	if bits % 8 != 0 {
+		numBytes++
+	}
+	random := make([]byte, numBytes)
+	gc.GenKey(random)
 	for i, _ := range result {
 		w := genWire()
 		result[i] = w
-		switch rand.Intn(2) {
+		switch bit.GetBit(random, i) {
 		case 0:
 			y.io.Send(ot.Message(w[0]), ot.Message(w[1]))
 		default:

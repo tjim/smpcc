@@ -5,7 +5,7 @@ import (
 	"github.com/tjim/smpcc/runtime/gc"
 	baseeval "github.com/tjim/smpcc/runtime/gc/eval"
 	"github.com/tjim/smpcc/runtime/ot"
-	"math/rand"
+	"github.com/tjim/smpcc/runtime/bit"
 )
 
 type vm struct {
@@ -169,9 +169,15 @@ func (y vm) Random(bits int) []gc.Key {
 		panic("Random: bits < 1")
 	}
 	result := make([]gc.Key, bits)
+	numBytes := bits / 8
+	if bits % 8 != 0 {
+		numBytes++
+	}
+	random := make([]byte, numBytes)
+	gc.GenKey(random)
 	for i, _ := range result {
 		selector := ot.Selector(0)
-		if rand.Intn(2) != 0 {
+		if bit.GetBit(random, i) != 0 {
 			selector = 1
 		}
 		result[i] = gc.Key(y.io.Receive(selector))
