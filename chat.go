@@ -10,10 +10,10 @@ import (
 	"github.com/apcera/nats"
 	"golang.org/x/crypto/ssh/terminal"
 	"log"
+	"math/big"
 	"os"
 	"runtime"
 	"strings"
-	"math/big"
 )
 
 var keyFormat string = "%x_%x"
@@ -140,6 +140,7 @@ func client() {
 	Tprintf(term, "join foo      (join the chatroom named foo)\n")
 	Tprintf(term, "leave foo     (leave the chatroom named foo)\n")
 	Tprintf(term, "nick foo      (change your nickname to foo)\n")
+	Tprintf(term, "members       (list the parties in the current room)\n")
 	Tprintf(term, "^D            (buh-bye)\n")
 	Tprintf(term, "anything else (send anything else to your current chatroom)\n")
 
@@ -206,9 +207,13 @@ func client() {
 				}
 			}
 		case "members":
-			st := MyRooms[MyRoom]
-			for _, member := range st.Members {
-				Tprintf(term, "%s\n", member.Nick)
+			if MyRoom == "" {
+				Tprintf(term, "You must join a room before you can see the members of the room\n")
+			} else {
+				st := MyRooms[MyRoom]
+				for _, member := range st.Members {
+					Tprintf(term, "%s (%s)\n", member.Key, member.Nick)
+				}
 			}
 		default:
 			if MyRoom != "" {
