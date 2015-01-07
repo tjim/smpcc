@@ -11,6 +11,7 @@ package ot
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"github.com/tjim/smpcc/runtime/bit"
 	"golang.org/x/crypto/sha3"
@@ -132,6 +133,25 @@ func RO(input []byte, outBits int) []byte {
 	}
 	output := make([]byte, outBits/8)
 	sha3.ShakeSum256(output, input)
+	return output
+}
+
+// Currently not used because of Footnote 10, page 13 of Ishai03:
+// It is not hard to verify that as long as the receiver is honest,
+// the protocol remains secure. The inclusion of j in the input to
+// the random oracle slightly simplifies the analysis and is useful
+// towards realizing the fully secure variant of this protocol.
+func RO_j(curPair int, input []byte, outBits int) []byte {
+	if outBits <= 0 {
+		panic("output size <= 0")
+	}
+	if outBits%8 != 0 {
+		panic("output size must be a multiple of 8")
+	}
+	curPair_bytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(curPair_bytes, curPair)
+	output := make([]byte, outBits/8)
+	sha3.ShakeSum256(output, append(curPair_bytes, input))
 	return output
 }
 
