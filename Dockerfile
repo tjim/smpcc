@@ -27,4 +27,6 @@ ADD ./gowork /root/gowork
 ENV GOPATH /root/gowork
 RUN go get golang.org/x/crypto/sha3
 RUN go get github.com/tjim/fatchan
-CMD smpcc
+WORKDIR /root/examples
+ENTRYPOINT ["smpcc", "-circuitlib", "gmw"]
+CMD ["vickrey.c"]
