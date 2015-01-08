@@ -156,9 +156,6 @@ From the top level of the smpcc source directory run:
 
 Then run 
 
-    docker run -v [absolute path to smpcc source dir]/examples:/root/examples -t -i smpcc /bin/bash 
+    docker run -v [absolute path to smpcc source dir]/examples:/root/examples smpcc [.c file under examples directory]
 
-Now you can test smpcc by doing:
-
-    cd /root/examples
-    smpcc vickrey.c -circuitlib gmw
+`smpcc` output will be generated under the examples directory.
