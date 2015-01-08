@@ -160,10 +160,10 @@ Then run
 
 For example:
 
-        docker run -v [absolute path to smpcc source dir]/examples:/root/examples smpcc vickrey.c
+    docker run -v [absolute path to smpcc source dir]/examples:/root/examples smpcc vickrey.c
 
 Will compile the Vickrey-Clarke-Grove example. For instructive purposes, vickrey.c is also the default file to be compiled, so running: 
 
-        docker run -v [absolute path to smpcc source dir]/examples:/root/examples smpcc 
+    docker run -v [absolute path to smpcc source dir]/examples:/root/examples smpcc 
 
 Will also compile vickrey.c. The output from `smpcc` will be stored under the examples directory.
