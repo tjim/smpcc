@@ -146,3 +146,24 @@ Within the c file you can read an input by declaring
 Then you read from party n with input(n).  Obtain the number of parties with
 
     extern unsigned int num_peers();
+
+## Docker image creation and usage
+
+Install docker, boot2docker, or another tool that allows you to run docker.
+From the top level of the smpcc source directory run:
+
+    docker build -t smpcc .
+
+Then run 
+
+    docker run -v [absolute path to smpcc source dir]/examples:/root/examples smpcc [.c file under examples directory]
+
+For example:
+
+    docker run -v [absolute path to smpcc source dir]/examples:/root/examples smpcc vickrey.c
+
+Will compile the Vickrey-Clarke-Grove example. For instructive purposes, vickrey.c is also the default file to be compiled, so running: 
+
+    docker run -v [absolute path to smpcc source dir]/examples:/root/examples smpcc 
+
+Will also compile vickrey.c. The output from `smpcc` will be stored under the examples directory.
