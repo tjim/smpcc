@@ -149,9 +149,9 @@ func RO_j(curPair int, input []byte, outBits int) []byte {
 		panic("output size must be a multiple of 8")
 	}
 	curPair_bytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(curPair_bytes, curPair)
+	binary.LittleEndian.PutUint32(curPair_bytes, uint32(curPair))
 	output := make([]byte, outBits/8)
-	sha3.ShakeSum256(output, append(curPair_bytes, input))
+	sha3.ShakeSum256(output, append(curPair_bytes, input...))
 	return output
 }
 
