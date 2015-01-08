@@ -146,3 +146,20 @@ Within the c file you can read an input by declaring
 Then you read from party n with input(n).  Obtain the number of parties with
 
     extern unsigned int num_peers();
+
+## Docker image creation and usage
+
+Install docker, boot2docker, or another tool that allows you to run docker.
+From the top level of the smpcc source directory run:
+
+    docker build .
+
+This will output a hash like: df01f28ab6a4
+Then run 
+
+    docker run -v [absolute path to smpcc source dir]/examples:/root/examples -t -i [your image hash] /bin/bash 
+
+Now you can test smpcc by doing:
+
+    cd /root/examples
+    smpcc vickrey.c -circuitlib gmw
