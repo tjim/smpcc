@@ -2,33 +2,29 @@ package main
 
 import (
 	"bytes"
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/gob"
 	"fmt"
 	"github.com/apcera/nats"
+	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/ssh/terminal"
 	"log"
-	"math/big"
 	"os"
 	"runtime"
 	"strings"
 )
 
-var keyFormat string = "%x_%x"
-
-func MarshalPublicKey(c ecdsa.PublicKey) string {
-	var buf bytes.Buffer
-	fmt.Fprintf(&buf, keyFormat, c.X, c.Y)
-	return buf.String()
+func MarshalPublicKey(c *[32]byte) string {
+	return fmt.Sprintf("%x", *c)
 }
 
-func UnmarshalPublicKey(s string) ecdsa.PublicKey {
-	x := new(big.Int)
-	y := new(big.Int)
-	fmt.Sscanf(s, keyFormat, x, y)
-	return ecdsa.PublicKey{elliptic.P224(), x, y}
+func UnmarshalPublicKey(s string) *[32]byte {
+	if len(s) != 64 {
+		panic("Malformed public key (wrong length)")
+	}
+	result := new([32]byte)
+	fmt.Sscanf(s, "%x", result)
+	return result
 }
 
 type Room struct {
@@ -81,7 +77,7 @@ func encode(p interface{}) []byte {
 	return buf.Bytes()
 }
 
-var MyPrivateKey *ecdsa.PrivateKey
+var MyPrivateKey *[32]byte
 var MyPublicKey string
 var MyParty Party
 var MyRooms map[string]*RoomState
@@ -90,8 +86,9 @@ var MyNick string
 
 func initialize() {
 	Init()
-	MyPrivateKey, _ = ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
-	MyPublicKey = MarshalPublicKey(MyPrivateKey.PublicKey)
+	rawPrivateKey, rawPublicKey, _ := box.GenerateKey(rand.Reader)
+	MyPrivateKey = rawPrivateKey
+	MyPublicKey = MarshalPublicKey(rawPublicKey)
 	MyNick = "AnonymousCoward"
 	MyParty = Party{MyNick, MyPublicKey}
 	MyRooms = make(map[string]*RoomState)
