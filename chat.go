@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/sha1"
 	"encoding/gob"
 	"fmt"
 	"github.com/apcera/nats"
 	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/ssh/terminal"
+	"io"
 	"log"
 	"os"
 	"runtime"
@@ -21,6 +23,13 @@ func MarshalPublicKey(c *[32]byte) string {
 func UnmarshalPublicKey(s string) *[32]byte {
 	if len(s) != 64 {
 		panic("Malformed public key (wrong length)")
+	}
+	for _, v := range s {
+		switch v {
+		default:
+			panic("Malformed public key (not lowercase hexidecimal)")
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f':
+		}
 	}
 	result := new([32]byte)
 	fmt.Sscanf(s, "%x", result)
@@ -207,10 +216,13 @@ func client() {
 			if MyRoom == "" {
 				Tprintf(term, "You must join a room before you can see the members of the room\n")
 			} else {
+				h := sha1.New()
 				st := MyRooms[MyRoom]
 				for _, member := range st.Members {
+					io.WriteString(h, member.Key)
 					Tprintf(term, "%s (%s)\n", member.Key, member.Nick)
 				}
+				Tprintf(term, "Hash: %x\n", h.Sum(nil))
 			}
 		default:
 			if MyRoom != "" {
