@@ -74,6 +74,7 @@ func Init() {
 type RoomState struct {
 	Sub     *nats.Subscription
 	Members []Party
+	Hash    []byte
 }
 
 func encode(p interface{}) []byte {
@@ -216,13 +217,11 @@ func client() {
 			if MyRoom == "" {
 				Tprintf(term, "You must join a room before you can see the members of the room\n")
 			} else {
-				h := sha1.New()
 				st := MyRooms[MyRoom]
 				for _, member := range st.Members {
-					io.WriteString(h, member.Key)
 					Tprintf(term, "%s (%s)\n", member.Key, member.Nick)
 				}
-				Tprintf(term, "Hash: %x\n", h.Sum(nil))
+				Tprintf(term, "Hash: %x\n", st.Hash)
 			}
 		default:
 			if MyRoom != "" {
@@ -252,11 +251,17 @@ func joinTerm(nc *nats.Conn, term *terminal.Terminal, rm string) {
 				Tprintf(term, "[%s]: %s -- (%s)\n", rm, r.Message, r.Party.Nick)
 			}
 		case Members:
-			MyRooms[rm].Members = r.Parties
+			st := MyRooms[rm]
+			st.Members = r.Parties
+			h := sha1.New()
+			for _, member := range st.Members {
+				io.WriteString(h, member.Key)
+			}
+			st.Hash = h.Sum(nil)
 		}
 	})
 	checkError(err)
-	MyRooms[rm] = &RoomState{sub, nil} // needs lock
+	MyRooms[rm] = &RoomState{sub, nil, nil} // needs lock
 }
 
 func secretary() {
