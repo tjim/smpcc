@@ -7,6 +7,8 @@ import (
 	"encoding/gob"
 	"fmt"
 	"github.com/apcera/nats"
+	"github.com/tjim/smpcc/runtime/gmw"
+	"github.com/tjim/smpcc/runtime/vickrey"
 	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/ssh/terminal"
 	"io"
@@ -14,6 +16,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"os/signal"
 )
 
 func MarshalPublicKey(c *[32]byte) string {
@@ -54,6 +57,10 @@ type LeaveRequest struct {
 	Party
 }
 
+type StartRequest struct {
+	Party
+}
+
 // messages from secretary to clients
 type Message struct {
 	Party
@@ -67,6 +74,7 @@ type Members struct {
 func Init() {
 	gob.Register(JoinRequest{})
 	gob.Register(LeaveRequest{})
+	gob.Register(StartRequest{})
 	gob.Register(Message{})
 	gob.Register(Members{})
 }
@@ -75,6 +83,15 @@ type RoomState struct {
 	Sub     *nats.Subscription
 	Members []Party
 	Hash    []byte
+}
+
+func (st RoomState) indexOfParty(p Party) (int, error) {
+	for i, v := range st.Members {
+		if v == p {
+			return i, nil
+		}
+	}
+	return 0, nil
 }
 
 func encode(p interface{}) []byte {
@@ -141,6 +158,13 @@ func client() {
 	}
 	defer terminal.Restore(0, oldState)
 
+	sigChan := make(chan os.Signal)
+	signal.Notify(sigChan) // sadly this is useless in raw mode. cbreak mode might help but not supported by terminal package
+	go func() {
+		s := <-sigChan
+		panic(fmt.Sprintf("Signal: %v", s))
+	}()
+
 	term := terminal.NewTerminal(os.Stdin, "> ")
 	Tprintf(term, "Greetings, %s!\n", MyNick)
 	Tprintf(term, "Commands:\n")
@@ -159,6 +183,7 @@ func client() {
 	for {
 		line, err := term.ReadLine()
 		if err != nil {
+			log.Println("Error!", err)
 			break
 		}
 		words := strings.Fields(line)
@@ -197,6 +222,8 @@ func client() {
 					delete(MyRooms, room)
 					err = st.Sub.Unsubscribe()
 					checkError(err)
+					err = nc.Publish(fmt.Sprintf("secretary.%s", room), encode(LeaveRequest{MyParty}))
+					checkError(err)
 					if MyRoom == room {
 						if len(MyRooms) == 0 {
 							MyRoom = ""
@@ -223,6 +250,13 @@ func client() {
 				}
 				Tprintf(term, "Hash: %x\n", st.Hash)
 			}
+		case "run":
+			if MyRoom == "" {
+				Tprintf(term, "You must join a room before you can start a computation\n")
+			} else {
+				Tprintf(term, "Starting computation\n")
+				session(nc, words[1:])
+			}
 		default:
 			if MyRoom != "" {
 				msg := strings.TrimSpace(line)
@@ -233,6 +267,117 @@ func client() {
 			}
 		}
 	}
+}
+
+func session(nc *nats.Conn, args []string) {
+	inputs := make([]uint32, len(args))
+	for i, v := range args {
+		input := 0
+		fmt.Sscanf(v, "%d", &input)
+		inputs[i] = uint32(input)
+	}
+	Handle := vickrey.Handle
+	numBlocks := Handle.NumBlocks
+	id := -1
+	rm := MyRoom
+	st := MyRooms[rm]
+	for i, v := range st.Members {
+		if v == MyParty {
+			id = i
+			break
+		}
+	}
+	if id == -1 {
+		panic("Non-member trying to start a computation in a room")
+	}
+	ec, _ := nats.NewEncodedConn(nc, "gob")
+
+	numParties := len(st.Members)
+	io := gmw.NewPeerIO(numBlocks, numParties, id)
+	io.Inputs = inputs
+	blocks := io.Blocks
+	numBlocks = len(blocks) // increased by one by NewPeerIo
+
+	xs := make([]*gmw.PerNodePair, numParties)
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		x := gmw.NewPerNodePair(io)
+		xs[p] = x
+		if io.Leads(p) {
+			// leader is server
+			// that means it receives in the fatchan sense
+			// also it is going to act as sender for the base OT
+			ec.BindSendChan(fmt.Sprintf("%s-%d-%d-ParamChan", rm, id, p), x.ParamChan)
+			ec.BindRecvChan(fmt.Sprintf("%s-%d-%d-NpRecvPk", rm, p, id), x.NpRecvPk)
+			ec.BindSendChan(fmt.Sprintf("%s-%d-%d-NpSendEncs", rm, id, p), x.NpSendEncs)
+			for i := 0; i < numBlocks; i++ {
+				ec.BindSendChan(fmt.Sprintf("%s-%d-%d-%d", rm, id, p, i), x.BlockChans[i].SAS.Rwchannel)
+				ec.BindRecvChan(fmt.Sprintf("%s-%d-%d-%d", rm, p, id, i), x.BlockChans[i].CAS.Rwchannel)
+				ec.BindRecvChan(fmt.Sprintf("%s-%d-%d-%d-CAS-S2R", rm, p, id, i), x.BlockChans[i].CAS.S2R)
+				ec.BindSendChan(fmt.Sprintf("%s-%d-%d-%d-CAS-R2S", rm, id, p, i), x.BlockChans[i].CAS.R2S)
+				ec.BindRecvChan(fmt.Sprintf("%s-%d-%d-%d-SAS-R2S", rm, p, id, i), x.BlockChans[i].SAS.R2S)
+				ec.BindSendChan(fmt.Sprintf("%s-%d-%d-%d-SAS-S2R", rm, id, p, i), x.BlockChans[i].SAS.S2R)
+			}
+		} else {
+			ec.BindRecvChan(fmt.Sprintf("%s-%d-%d-ParamChan", rm, p, id), x.ParamChan)
+			ec.BindSendChan(fmt.Sprintf("%s-%d-%d-NpRecvPk", rm, id, p), x.NpRecvPk)
+			ec.BindRecvChan(fmt.Sprintf("%s-%d-%d-NpSendEncs", rm, p, id), x.NpSendEncs)
+			for i := 0; i < numBlocks; i++ {
+				ec.BindRecvChan(fmt.Sprintf("%s-%d-%d-%d", rm, p, id, i), x.BlockChans[i].SAS.Rwchannel)
+				ec.BindSendChan(fmt.Sprintf("%s-%d-%d-%d", rm, id, p, i), x.BlockChans[i].CAS.Rwchannel)
+				ec.BindSendChan(fmt.Sprintf("%s-%d-%d-%d-CAS-S2R", rm, id, p, i), x.BlockChans[i].CAS.S2R)
+				ec.BindRecvChan(fmt.Sprintf("%s-%d-%d-%d-CAS-R2S", rm, p, id, i), x.BlockChans[i].CAS.R2S)
+				ec.BindSendChan(fmt.Sprintf("%s-%d-%d-%d-SAS-R2S", rm, id, p, i), x.BlockChans[i].SAS.R2S)
+				ec.BindRecvChan(fmt.Sprintf("%s-%d-%d-%d-SAS-S2R", rm, p, id, i), x.BlockChans[i].SAS.S2R)
+			}
+		}
+	}
+	// tell secretary we want to start the computation
+	okStart := make(chan bool)
+	ec.BindRecvChan(fmt.Sprintf("%s.secretary.okStart", rm), okStart)
+	err := nc.Publish(fmt.Sprintf("secretary.%s", rm), encode(StartRequest{MyParty}))
+	checkError(err)
+	log.Println("Waiting...")
+	if !(<-okStart) {
+		panic("Computation failed to start")
+	}
+	log.Println("Got the all clear")
+
+	done := make(chan bool)
+	log.Printf("There are %d parties and I am party %d\n", numParties, id)
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		log.Printf("Working on party %d\n", p)
+		x := xs[p]
+		if io.Leads(p) {
+			log.Println("Starting server side for", p)
+			go gmw.ServerSideIOSetup(io, p, x, done) 
+		} else {
+			log.Println("Starting client side for", p)
+			go gmw.ClientSideIOSetup(io, p, x, false, done)
+		}
+	}
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		<-done
+	}
+	log.Println("Done setup")
+
+	// TODO: start computation
+	numBlocks = Handle.NumBlocks // make sure we have the right numBlocks
+	// copy io.blocks[1:] to make an []Io; []BlockIO is not []Io
+	x := make([]gmw.Io, numBlocks)
+	for j := 0; j < numBlocks; j++ {
+		x[j] = io.Blocks[j+1]
+	}
+	go Handle.Main(io.Blocks[0], x)
+	<-Handle.Done
 }
 
 func joinTerm(nc *nats.Conn, term *terminal.Terminal, rm string) {
@@ -270,6 +415,7 @@ func secretary() {
 	changeNick("ChatAdministrator")
 	rooms := make(map[string]bool)
 	members := make(map[string](map[Party]bool))
+	starters := make(map[string](map[Party]bool))
 	nc, err := nats.Connect(nats.DefaultURL)
 	if err != nil {
 		panic("unable to connect to NATS server")
@@ -286,6 +432,31 @@ func secretary() {
 			rooms[room] = true
 		}
 		switch r := p.(type) {
+		case StartRequest:
+			log.Println(r.Party, "asking to run in room", room)
+			if _, ok := members[room]; !ok {
+				log.Println("Warning: run request for empty room", room)
+				return
+			}
+			if _, ok := starters[room]; !ok {
+				starters[room] = make(map[Party]bool)
+				for k, _ := range members[room] {
+					starters[room][k] = false
+				}
+			}
+			starters[room][r.Party] = true
+			for k, v := range starters[room] {
+				if !v {
+					log.Println("Still waiting for", k, "to run the computation in", room)
+					return 
+				}
+			}
+			log.Println("Starting computation in", room)
+			ec, _ := nats.NewEncodedConn(nc, "gob")
+			okStart := make(chan bool)
+			ec.BindSendChan(fmt.Sprintf("%s.secretary.okStart", room), okStart)
+			okStart <- true
+			log.Println("Should be started")
 		case LeaveRequest:
 			delete(members[room], r.Party)
 			_ = nc.Publish(room, encode(Message{MyParty, fmt.Sprintf("%s has left the room", r.Party.Nick)}))

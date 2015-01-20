@@ -80,7 +80,7 @@ type MaskTriple struct {
 type GlobalIO struct {
 	n      int      /* number of parties */
 	id     int      /* id of party, range is 0..n-1 */
-	inputs []uint32 /* inputs of this party */
+	Inputs []uint32 /* inputs of this party */
 	ram    []byte
 }
 
@@ -142,7 +142,7 @@ const (
 	base_port int = 3042
 )
 
-func (io *PeerIO) connect(party int) {
+func (io *PeerIO) connect(party int, done chan bool) {
 	if io.id == party {
 		panic("connect0")
 	}
@@ -157,10 +157,8 @@ func (io *PeerIO) connect(party int) {
 	xport.FromChan(nu)
 	x := NewPerNodePair(io)
 	nu <- x
-	clientSideIOSetup(io, party, x, true)
+	ClientSideIOSetup(io, party, x, true, done)
 }
-
-var done chan struct{} = make(chan struct{})
 
 func NewPerNodePair(peer *PeerIO) *PerNodePair {
 	blocks := peer.Blocks
@@ -180,7 +178,7 @@ func NewPerNodePair(peer *PeerIO) *PerNodePair {
 	return &x
 }
 
-func clientSideIOSetup(peer *PeerIO, party int, x *PerNodePair, wait bool) {
+func ClientSideIOSetup(peer *PeerIO, party int, x *PerNodePair, wait bool, done chan bool) {
 	blocks := peer.Blocks
 	numBlocks := len(blocks)
 	ParamChan := x.ParamChan
@@ -211,10 +209,10 @@ func clientSideIOSetup(peer *PeerIO, party int, x *PerNodePair, wait bool) {
 		blocks[i].otReceivers[party] = receiver
 	}
 
-	done <- struct{}{}
+	done <- true
 }
 
-func (io *PeerIO) listen(party int) {
+func (io *PeerIO) listen(party int, done chan bool) {
 	if io.id == party {
 		panic("listen0")
 	}
@@ -230,10 +228,10 @@ func (io *PeerIO) listen(party int) {
 	xport := fatchan.New(conn, nil)
 	nu := make(chan *PerNodePair)
 	xport.ToChan(nu)
-	serverSideIOSetup(io, party, <-nu)
+	ServerSideIOSetup(io, party, <-nu, done)
 }
 
-func serverSideIOSetup(peer *PeerIO, party int, x *PerNodePair) {
+func ServerSideIOSetup(peer *PeerIO, party int, x *PerNodePair, done chan bool) {
 	blocks := peer.Blocks
 	numBlocks := len(blocks)
 
@@ -262,7 +260,7 @@ func serverSideIOSetup(peer *PeerIO, party int, x *PerNodePair) {
 		blocks[i].otSenders[party] = sender
 	}
 
-	done <- struct{}{}
+	done <- true
 }
 
 func NewPeerIO(numBlocks int, numParties int, id int) *PeerIO {
@@ -287,18 +285,19 @@ func NewPeerIO(numBlocks int, numParties int, id int) *PeerIO {
 
 func SetupPeer(inputs []uint32, numBlocks int, numParties int, id int, runPeer func(Io, []Io), peerDone <-chan bool) {
 	io := NewPeerIO(numBlocks, numParties, id)
-	io.inputs = inputs
+	io.Inputs = inputs
+	done := make(chan bool)
 	// start listening for clients
 	for i := 0; i < numParties; i++ {
 		if io.id != i && !io.Leads(i) {
-			go io.listen(i)
+			go io.listen(i, done)
 		}
 	}
 	time.Sleep(2 * time.Second) // wait for servers of other parties to start listening
 	// start connecting to servers of other parties
 	for i := 0; i < numParties; i++ {
 		if io.id != i && io.Leads(i) {
-			go io.connect(i)
+			go io.connect(i, done)
 		}
 	}
 	for i := 0; i < numParties; i++ {
@@ -327,25 +326,26 @@ func Simulation(inputs []uint32, numBlocks int, runPeer func(Io, []Io), peerDone
 	for i := 0; i < numParties; i++ {
 		peer := NewPeerIO(numBlocks, numParties, i)
 		if len(inputs) > i {
-			peer.inputs = inputs[i : i+1]
+			peer.Inputs = inputs[i : i+1]
 		}
 		ios[i] = peer
 	}
 	xs := make([]*PerNodePair, numParties*numParties)
+	done := make(chan bool)
 	for i := 0; i < numParties; i++ {
 		for j := 0; j < numParties; j++ {
 			if i != j && !ios[i].Leads(j) {
 				x := NewPerNodePair(ios[i])
-				xs[i*numParties+j] = x             // server i talking to client j
-				go serverSideIOSetup(ios[i], j, x) // i's setup server for party j
+				xs[i*numParties+j] = x                   // server i talking to client j
+				go ServerSideIOSetup(ios[i], j, x, done) // i's setup server for party j
 			}
 		}
 	}
 	for i := 0; i < numParties; i++ {
 		for j := 0; j < numParties; j++ {
 			if i != j && ios[i].Leads(j) {
-				x := xs[j*numParties+i]                   // client i talking to server j
-				go clientSideIOSetup(ios[i], j, x, false) // i's setup client for party j
+				x := xs[j*numParties+i]                         // client i talking to server j
+				go ClientSideIOSetup(ios[i], j, x, false, done) // i's setup client for party j
 			}
 		}
 	}
@@ -787,8 +787,8 @@ func (x *BlockIO) Receive64(party int) uint64 {
 }
 
 func (x *BlockIO) GetInput() uint32 {
-	result := x.inputs[0]
-	x.inputs = x.inputs[1:]
+	result := x.Inputs[0]
+	x.Inputs = x.Inputs[1:]
 	return result
 }
 
