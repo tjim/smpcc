@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha1"
+	"golang.org/x/crypto/sha3"
 	"encoding/gob"
 	"fmt"
 	"github.com/apcera/nats"
@@ -450,7 +450,7 @@ func joinTerm(nc *nats.Conn, term *terminal.Terminal, rm string) {
 		case Members:
 			st := MyRooms[rm]
 			st.Members = r.Parties
-			h := sha1.New()
+			h := sha3.New256()
 			for _, member := range st.Members {
 				io.WriteString(h, member.Key)
 			}
