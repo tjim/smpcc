@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"crypto/cipher"
 	"crypto/rand"
 	"encoding/gob"
 	"fmt"
 	"github.com/apcera/nats"
 	"github.com/tjim/smpcc/runtime/gmw"
+	"github.com/tjim/smpcc/runtime/ot"
 	"github.com/tjim/smpcc/runtime/vickrey"
 	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/sha3"
@@ -70,6 +72,56 @@ type Message struct {
 
 type Members struct {
 	Parties []Party
+}
+
+type PairConn struct {
+	Nc     *nats.Conn
+	Stream []cipher.Stream
+}
+
+func xorBytes(a, b, c []byte) {
+	if len(a) != len(b) || len(b) != len(c) {
+		panic("xorBytes: length mismatch")
+	}
+	for i := range a {
+		a[i] = b[i] ^ c[i]
+	}
+}
+
+func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
+	peerPk := UnmarshalPublicKey(notMe.Key)
+	encapsulatedKey := make([]byte, 32)
+	var nonce [24]byte
+	rand.Read(encapsulatedKey)
+	rand.Read(nonce[:])
+	ciphertext := []byte{}
+	box.Seal(ciphertext, encapsulatedKey, &nonce, peerPk, MyPrivateKey)
+
+	ec, err := nats.NewEncodedConn(nc, "gob")
+	if err != nil {
+		panic(err)
+	}
+
+	recvChan := make(chan []byte, 10)
+	sendChan := make(chan []byte, 10)
+	ec.BindRecvChan(fmt.Sprintf("KE-%s-%s", MyPublicKey, notMe.Key), recvChan)
+	ec.BindSendChan(fmt.Sprintf("KE-%s-%s", notMe.Key, MyPublicKey), sendChan)
+
+	sendChan <- nonce[:]
+	sendChan <- ciphertext
+	oNonceArr := <-recvChan
+	var oNonce [24]byte
+	copy(oNonce[:], oNonceArr)
+	oCiphertext := <-recvChan
+	oEncapsulatedKey := make([]byte, 32)
+	_, isValid := box.Open(encapsulatedKey, oCiphertext, &oNonce, peerPk, MyPrivateKey)
+	if !isValid {
+		panic("Not valid!!!")
+	}
+
+	seedBytes := make([]byte, 32)
+	xorBytes(encapsulatedKey, oEncapsulatedKey, seedBytes)
+	return &PairConn{nc, []cipher.Stream{ot.NewPRG(seedBytes)}}
 }
 
 func Init() {
