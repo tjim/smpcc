@@ -2,21 +2,23 @@ package main
 
 import (
 	"bytes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/gob"
 	"fmt"
 	"github.com/apcera/nats"
 	"github.com/tjim/smpcc/runtime/gmw"
+	"github.com/tjim/smpcc/runtime/ot"
 	"github.com/tjim/smpcc/runtime/vickrey"
 	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/ssh/terminal"
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
-	"os/signal"
 )
 
 func MarshalPublicKey(c *[32]byte) string {
@@ -69,6 +71,56 @@ type Message struct {
 
 type Members struct {
 	Parties []Party
+}
+
+type PairConn struct {
+	Nc     *nats.Conn
+	Stream []cipher.Stream
+}
+
+func xorBytes(a, b, c []byte) {
+	if len(a) != len(b) || len(b) != len(c) {
+		panic("xorBytes: length mismatch")
+	}
+	for i := range a {
+		a[i] = b[i] ^ c[i]
+	}
+}
+
+func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
+	peerPk := UnmarshalPublicKey(notMe.Key)
+	encapsulatedKey := make([]byte, 32)
+	var nonce [24]byte
+	rand.Read(encapsulatedKey)
+	rand.Read(nonce[:])
+	ciphertext := []byte{}
+	box.Seal(ciphertext, encapsulatedKey, &nonce, peerPk, MyPrivateKey)
+
+	ec, err := nats.NewEncodedConn(nc, "gob")
+	if err != nil {
+		panic(err)
+	}
+
+	recvChan := make(chan []byte, 10)
+	sendChan := make(chan []byte, 10)
+	ec.BindRecvChan(fmt.Sprintf("KE-%s-%s", MyPublicKey, notMe.Key), recvChan)
+	ec.BindSendChan(fmt.Sprintf("KE-%s-%s", notMe.Key, MyPublicKey), sendChan)
+
+	sendChan <- nonce[:]
+	sendChan <- ciphertext
+	oNonceArr := <-recvChan
+	var oNonce [24]byte
+	copy(oNonce[:], oNonceArr)
+	oCiphertext := <-recvChan
+	oEncapsulatedKey := make([]byte, 32)
+	_, isValid := box.Open(encapsulatedKey, oCiphertext, &oNonce, peerPk, MyPrivateKey)
+	if !isValid {
+		panic("Not valid!!!")
+	}
+
+	seedBytes := make([]byte, 32)
+	xorBytes(encapsulatedKey, oEncapsulatedKey, seedBytes)
+	return &PairConn{nc, []cipher.Stream{ot.NewPRG(seedBytes)}}
 }
 
 func Init() {
@@ -355,7 +407,7 @@ func session(nc *nats.Conn, args []string) {
 		x := xs[p]
 		if io.Leads(p) {
 			log.Println("Starting server side for", p)
-			go gmw.ServerSideIOSetup(io, p, x, done) 
+			go gmw.ServerSideIOSetup(io, p, x, done)
 		} else {
 			log.Println("Starting client side for", p)
 			go gmw.ClientSideIOSetup(io, p, x, false, done)
@@ -448,7 +500,7 @@ func secretary() {
 			for k, v := range starters[room] {
 				if !v {
 					log.Println("Still waiting for", k, "to run the computation in", room)
-					return 
+					return
 				}
 			}
 			log.Println("Starting computation in", room)
