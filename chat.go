@@ -81,19 +81,34 @@ type PairConn struct {
 }
 
 type ChannelCrypto struct {
-	Key []byte
-	PRG cipher.Stream
+	BlockCipher cipher.AEAD
+	PRG         cipher.Stream
 }
 
 func (p *PairConn) CryptoFromTag(tag string) ChannelCrypto {
-	cc := ChannelCrypto{make([]byte, 32), nil}
+	cc := ChannelCrypto{}
 	hashedTagKey := sha3.Sum256([]byte("KEY_" + tag))
 	hashedTagPrg := sha3.Sum256([]byte("PRG_" + tag))
 	prgSeed := make([]byte, 32)
-	p.ChanMasterPRF.Encrypt(cc.Key, hashedTagKey[:])
+	key := make([]byte, 32)
+	p.ChanMasterPRF.Encrypt(key, hashedTagKey[:])
 	p.ChanMasterPRF.Encrypt(prgSeed, hashedTagPrg[:])
 	cc.PRG = ot.NewPRG(prgSeed)
+	aesPrf, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err)
+	}
+
+	cc.BlockCipher, err = cipher.NewGCM(aesPrf)
+	if err != nil {
+		panic(err)
+	}
+
 	return cc
+}
+
+func (c *ChannelCrypto) Encrypt(plaintext []byte) {
+
 }
 
 func xorBytes(a, b, c []byte) {
