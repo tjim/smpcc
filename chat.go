@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/apcera/nats"
 	"github.com/tjim/smpcc/runtime/gmw"
+	"github.com/tjim/smpcc/runtime/ot"
 	"github.com/tjim/smpcc/runtime/vickrey"
 	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/sha3"
@@ -80,15 +81,18 @@ type PairConn struct {
 }
 
 type ChannelCrypto struct {
-	Key, PRGSeed []byte
+	Key []byte
+	PRG cipher.Stream
 }
 
 func (p *PairConn) CryptoFromTag(tag string) ChannelCrypto {
-	cc := ChannelCrypto{make([]byte, 32), make([]byte, 32)}
+	cc := ChannelCrypto{make([]byte, 32), nil}
 	hashedTagKey := sha3.Sum256([]byte("KEY_" + tag))
 	hashedTagPrg := sha3.Sum256([]byte("PRG_" + tag))
+	prgSeed := make([]byte, 32)
 	p.ChanMasterPRF.Encrypt(cc.Key, hashedTagKey[:])
-	p.ChanMasterPRF.Encrypt(cc.PRGSeed, hashedTagPrg[:])
+	p.ChanMasterPRF.Encrypt(prgSeed, hashedTagPrg[:])
+	cc.PRG = ot.NewPRG(prgSeed)
 	return cc
 }
 
