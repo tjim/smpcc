@@ -107,8 +107,23 @@ func (p *PairConn) CryptoFromTag(tag string) ChannelCrypto {
 	return cc
 }
 
-func (c *ChannelCrypto) Encrypt(plaintext []byte) {
+func (c *ChannelCrypto) Encrypt(plaintext []byte) []byte {
+	nonce := make([]byte, c.BlockCipher.NonceSize())
+	c.PRG.XORKeyStream(nonce, nonce)
+	ciphertext := make([]byte, len(plaintext)+c.BlockCipher.Overhead())
+	c.BlockCipher.Seal(ciphertext, nonce, plaintext, nil)
+	return ciphertext
+}
 
+func (c *ChannelCrypto) Decrypt(ciphertext []byte) []byte {
+	nonce := make([]byte, c.BlockCipher.NonceSize())
+	c.PRG.XORKeyStream(nonce, nonce)
+	plaintext := make([]byte, len(ciphertext)-c.BlockCipher.Overhead())
+	_, err := c.BlockCipher.Open(plaintext, nonce, ciphertext, nil)
+	if err != nil {
+		panic(err)
+	}
+	return plaintext
 }
 
 func xorBytes(a, b, c []byte) {
@@ -393,7 +408,9 @@ func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe in
 			if !ok {
 				return // channel closed so we don't need goroutine any more
 			}
-			nc.Publish(subject, encode(val.Interface()))
+			plaintext := encode(val.Interface())
+			ciphertext := cc.Encrypt(plaintext)
+			nc.Publish(subject, ciphertext)
 		}
 	}()
 }
@@ -407,7 +424,9 @@ func bindRecv(nc *nats.Conn, channel interface{}, room, tag string, me, notMe in
 		panic("Can only bind channels")
 	}
 	_, err := nc.Subscribe(subject, func(m *nats.Msg) {
-		dec := gob.NewDecoder(bytes.NewBuffer(m.Data))
+		ciphertext := m.Data
+		plaintext := cc.Decrypt(ciphertext)
+		dec := gob.NewDecoder(bytes.NewBuffer(plaintext))
 		var p interface{}
 		err := dec.Decode(&p)
 		if err != nil {
