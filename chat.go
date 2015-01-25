@@ -2,13 +2,13 @@ package main
 
 import (
 	"bytes"
+	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/gob"
 	"fmt"
 	"github.com/apcera/nats"
 	"github.com/tjim/smpcc/runtime/gmw"
-	"github.com/tjim/smpcc/runtime/ot"
 	"github.com/tjim/smpcc/runtime/vickrey"
 	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/sha3"
@@ -76,8 +76,20 @@ type Members struct {
 
 type PairConn struct {
 	Nc            *nats.Conn
-	Stream        cipher.Stream
 	ChanMasterPRF cipher.Block
+}
+
+type ChannelCrypto struct {
+	Key, PRGSeed []byte
+}
+
+func (p *PairConn) CryptoFromTag(tag string) ChannelCrypto {
+	cc := ChannelCrypto{make([]byte, 32), make([]byte, 32)}
+	hashedTagKey := sha3.Sum256([]byte("KEY_" + tag))
+	hashedTagPrg := sha3.Sum256([]byte("PRG_" + tag))
+	p.ChanMasterPRF.Encrypt(cc.Key, hashedTagKey[:])
+	p.ChanMasterPRF.Encrypt(cc.PRGSeed, hashedTagPrg[:])
+	return cc
 }
 
 func xorBytes(a, b, c []byte) {
@@ -122,10 +134,8 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 
 	seedBytes := make([]byte, 32)
 	xorBytes(encapsulatedKey, oEncapsulatedKey, seedBytes)
-	pc := PairConn{nc, ot.NewPRG(seedBytes)}
-	chanPRFKey := make([]byte, 32)
-	pc.Stream.XORKeyStream(chanPRFKey, chanPRFKey)
-	pc.ChanMasterPRF, err = aes.NewCipher(chanPRFKey)
+	pc := PairConn{nc, nil}
+	pc.ChanMasterPRF, err = aes.NewCipher(seedBytes)
 	if err != nil {
 		panic(err)
 	}
@@ -349,7 +359,7 @@ func client() {
 	}
 }
 
-func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe int) {
+func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe int, cc ChannelCrypto) {
 	subject := fmt.Sprintf("%s.%d.%d.%s", room, notMe, me, tag)
 	log.Println("Sending to", subject)
 	// goroutine forwards values from channel over nats
@@ -369,7 +379,7 @@ func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe in
 	}()
 }
 
-func bindRecv(nc *nats.Conn, channel interface{}, room, tag string, me, notMe int) {
+func bindRecv(nc *nats.Conn, channel interface{}, room, tag string, me, notMe int, cc ChannelCrypto) {
 	// goroutine forwards values from nats to a channel
 	subject := fmt.Sprintf("%s.%d.%d.%s", room, notMe, me, tag)
 	log.Println("Receiving from", subject)
@@ -424,32 +434,35 @@ func session(nc *nats.Conn, args []string) {
 		}
 		x := gmw.NewPerNodePair(io)
 		xs[p] = x
+
+		pc := NewPairConn(nc, st.Members[id], st.Members[p])
+
 		if io.Leads(p) {
 			// leader is server
 			// that means it receives in the fatchan sense
 			// also it is going to act as sender for the base OT
-			bindSend(nc, x.ParamChan, rm, "ParamChan", id, p)
-			bindRecv(nc, x.NpRecvPk, rm, "NpRecvPk", id, p)
-			bindSend(nc, x.NpSendEncs, rm, "NpSendEncs", id, p)
+			bindSend(nc, x.ParamChan, rm, "ParamChan", id, p, pc.CryptoFromTag("ParamChan"))
+			bindRecv(nc, x.NpRecvPk, rm, "NpRecvPk", id, p, pc.CryptoFromTag("NpRecvPk"))
+			bindSend(nc, x.NpSendEncs, rm, "NpSendEncs", id, p, pc.CryptoFromTag("NpSendEncs"))
 			for i := 0; i < numBlocks; i++ {
-				bindSend(nc, x.BlockChans[i].SAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p)
-				bindRecv(nc, x.BlockChans[i].CAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p)
-				bindRecv(nc, x.BlockChans[i].CAS.S2R, rm, fmt.Sprintf("block%d-CAS-S2R", i), id, p)
-				bindSend(nc, x.BlockChans[i].CAS.R2S, rm, fmt.Sprintf("block%d-CAS-R2S", i), id, p)
-				bindRecv(nc, x.BlockChans[i].SAS.R2S, rm, fmt.Sprintf("block%d-SAS-R2S", i), id, p)
-				bindSend(nc, x.BlockChans[i].SAS.S2R, rm, fmt.Sprintf("block%d-SAS-S2R", i), id, p)
+				bindSend(nc, x.BlockChans[i].SAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d", i)))
+				bindRecv(nc, x.BlockChans[i].CAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d", i)))
+				bindRecv(nc, x.BlockChans[i].CAS.S2R, rm, fmt.Sprintf("block%d-CAS-S2R", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-CAS-S2R", i)))
+				bindSend(nc, x.BlockChans[i].CAS.R2S, rm, fmt.Sprintf("block%d-CAS-R2S", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-CAS-R2S", i)))
+				bindRecv(nc, x.BlockChans[i].SAS.R2S, rm, fmt.Sprintf("block%d-SAS-R2S", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-SAS-R2S", i)))
+				bindSend(nc, x.BlockChans[i].SAS.S2R, rm, fmt.Sprintf("block%d-SAS-S2R", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-SAS-S2R", i)))
 			}
 		} else {
-			bindRecv(nc, x.ParamChan, rm, "ParamChan", id, p)
-			bindSend(nc, x.NpRecvPk, rm, "NpRecvPk", id, p)
-			bindRecv(nc, x.NpSendEncs, rm, "NpSendEncs", id, p)
+			bindRecv(nc, x.ParamChan, rm, "ParamChan", id, p, pc.CryptoFromTag("ParamChan"))
+			bindSend(nc, x.NpRecvPk, rm, "NpRecvPk", id, p, pc.CryptoFromTag("NpRecvPk"))
+			bindRecv(nc, x.NpSendEncs, rm, "NpSendEncs", id, p, pc.CryptoFromTag("NpSendEncs"))
 			for i := 0; i < numBlocks; i++ {
-				bindRecv(nc, x.BlockChans[i].SAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p)
-				bindSend(nc, x.BlockChans[i].CAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p)
-				bindSend(nc, x.BlockChans[i].CAS.S2R, rm, fmt.Sprintf("block%d-CAS-S2R", i), id, p)
-				bindRecv(nc, x.BlockChans[i].CAS.R2S, rm, fmt.Sprintf("block%d-CAS-R2S", i), id, p)
-				bindSend(nc, x.BlockChans[i].SAS.R2S, rm, fmt.Sprintf("block%d-SAS-R2S", i), id, p)
-				bindRecv(nc, x.BlockChans[i].SAS.S2R, rm, fmt.Sprintf("block%d-SAS-S2R", i), id, p)
+				bindRecv(nc, x.BlockChans[i].SAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d", i)))
+				bindSend(nc, x.BlockChans[i].CAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d", i)))
+				bindSend(nc, x.BlockChans[i].CAS.S2R, rm, fmt.Sprintf("block%d-CAS-S2R", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-CAS-S2R", i)))
+				bindRecv(nc, x.BlockChans[i].CAS.R2S, rm, fmt.Sprintf("block%d-CAS-R2S", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-CAS-S2R", i)))
+				bindSend(nc, x.BlockChans[i].SAS.R2S, rm, fmt.Sprintf("block%d-SAS-R2S", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-SAS-R2S", i)))
+				bindRecv(nc, x.BlockChans[i].SAS.S2R, rm, fmt.Sprintf("block%d-SAS-S2R", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-SAS-S2R", i)))
 			}
 		}
 	}
