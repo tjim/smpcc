@@ -75,8 +75,9 @@ type Members struct {
 }
 
 type PairConn struct {
-	Nc     *nats.Conn
-	Stream []cipher.Stream
+	Nc            *nats.Conn
+	Stream        cipher.Stream
+	ChanMasterPRF cipher.Block
 }
 
 func xorBytes(a, b, c []byte) {
@@ -104,8 +105,8 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 
 	recvChan := make(chan []byte, 10)
 	sendChan := make(chan []byte, 10)
-	ec.BindRecvChan(fmt.Sprintf("KE-%s-%s", MyPublicKey, notMe.Key), recvChan)
-	ec.BindSendChan(fmt.Sprintf("KE-%s-%s", notMe.Key, MyPublicKey), sendChan)
+	ec.BindRecvChan(fmt.Sprintf("KEY-AGREEMENT-%s-%s", MyPublicKey, notMe.Key), recvChan)
+	ec.BindSendChan(fmt.Sprintf("KEY-AGREEMENT-%s-%s", notMe.Key, MyPublicKey), sendChan)
 
 	sendChan <- nonce[:]
 	sendChan <- ciphertext
@@ -121,7 +122,15 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 
 	seedBytes := make([]byte, 32)
 	xorBytes(encapsulatedKey, oEncapsulatedKey, seedBytes)
-	return &PairConn{nc, []cipher.Stream{ot.NewPRG(seedBytes)}}
+	pc := PairConn{nc, ot.NewPRG(seedBytes)}
+	chanPRFKey := make([]byte, 32)
+	pc.Stream.XORKeyStream(chanPRFKey, chanPRFKey)
+	pc.ChanMasterPRF, err = aes.NewCipher(chanPRFKey)
+	if err != nil {
+		panic(err)
+	}
+
+	return &pc
 }
 
 func Init() {
