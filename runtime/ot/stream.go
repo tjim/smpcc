@@ -68,10 +68,10 @@ const (
 	NumStreams = 80 // the constant formerly known as k.  Must be a multiple of 8
 )
 
-func newPRG(seed []byte) cipher.Stream {
+func NewPRG(seed []byte) cipher.Stream {
 	blockcipher, err := aes.NewCipher(seed)
 	if err != nil {
-		panic("newPRG")
+		panic("NewPRG")
 	}
 	iv := make([]byte, aes.BlockSize) // zero iv
 	return cipher.NewCTR(blockcipher, iv)
@@ -126,8 +126,8 @@ func NewStreamReceiver(sender Sender, to chan<- []byte, from <-chan MessagePair)
 		tSeed := RandomBytes(SeedBytes)
 		vSeed := RandomBytes(SeedBytes)
 		sender.Send(tSeed, vSeed)
-		tStream[i] = newPRG(tSeed)
-		vStream[i] = newPRG(vSeed)
+		tStream[i] = NewPRG(tSeed)
+		vStream[i] = NewPRG(vSeed)
 	}
 	return &StreamReceiver{tStream, vStream, to, from}
 }
@@ -154,7 +154,7 @@ func NewStreamSender(receiver Receiver, to chan<- MessagePair, from <-chan []byt
 	wStream := make([]cipher.Stream, k)
 	for i := range wStream {
 		wSeed := receiver.Receive(Selector(bit.GetBit(sPacked, i)))
-		wStream[i] = newPRG(wSeed)
+		wStream[i] = NewPRG(wSeed)
 	}
 	return &StreamSender{sPacked, sWide, wStream, to, from}
 }
@@ -427,7 +427,7 @@ func (S *StreamSender) Fork(to chan<- MessagePair, from chan []byte) *StreamSend
 	wStream := make([]cipher.Stream, len(S.wStream))
 	for i, v := range S.wStream {
 		wSeed := bytesFrom(v, SeedBytes)
-		wStream[i] = newPRG(wSeed)
+		wStream[i] = NewPRG(wSeed)
 	}
 	return &StreamSender{sPacked, sWide, wStream, to, from}
 }
@@ -439,11 +439,11 @@ func (R *StreamReceiver) Fork(to chan []byte, from chan MessagePair) *StreamRece
 	vStream := make([]cipher.Stream, len(R.vStream))
 	for i, v := range R.tStream {
 		tSeed := bytesFrom(v, SeedBytes)
-		tStream[i] = newPRG(tSeed)
+		tStream[i] = NewPRG(tSeed)
 	}
 	for i, v := range R.vStream {
 		vSeed := bytesFrom(v, SeedBytes)
-		vStream[i] = newPRG(vSeed)
+		vStream[i] = NewPRG(vSeed)
 	}
 	return &StreamReceiver{tStream, vStream, to, from}
 }

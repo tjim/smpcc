@@ -22,11 +22,6 @@ RUN echo "cp -pr /vagrant/compiler /tmp/compiler"
 ADD ./compiler /tmp/compiler
 RUN echo "cd /tmp/compiler; make; make install"
 RUN cd /tmp/compiler; make; make install
-
-ADD ./gowork /root/gowork
-ENV GOPATH /root/gowork
-RUN go get golang.org/x/crypto/sha3
-RUN go get github.com/tjim/fatchan
 WORKDIR /root/examples
 ENTRYPOINT ["smpcc", "-circuitlib", "gmw"]
 CMD ["vickrey.c"]
