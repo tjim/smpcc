@@ -421,7 +421,7 @@ func client() {
 
 func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe int, cc ChannelCrypto) {
 	subject := fmt.Sprintf("%s.%d.%d.%s", room, me, notMe, tag)
-	log.Println("Sending to", subject)
+	log.Println("bindSend", subject)
 	// goroutine forwards values from channel over nats
 	go func() {
 		chVal := reflect.ValueOf(channel)
@@ -434,13 +434,17 @@ func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe in
 			if !ok {
 				return // channel closed so we don't need goroutine any more
 			}
-			var msg []byte
+			if !val.CanInterface() {
+				log.Println("Error: failure due to unexported fields")
+			}
 			plaintext := encode(val.Interface())
+			var msg []byte
 			if p2pAuth {
 				msg = cc.Encrypt(plaintext)
 			} else {
 				msg = plaintext
 			}
+			log.Printf("sending on %s: %x\n", subject, msg)
 			nc.Publish(subject, msg)
 		}
 	}()
@@ -449,7 +453,7 @@ func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe in
 func bindRecv(nc *nats.Conn, channel interface{}, room, tag string, me, notMe int, cc ChannelCrypto) {
 	// goroutine forwards values from nats to a channel
 	subject := fmt.Sprintf("%s.%d.%d.%s", room, notMe, me, tag)
-	log.Println("Receiving from", subject)
+	log.Println("bindRecv", subject)
 	chVal := reflect.ValueOf(channel)
 	if chVal.Kind() != reflect.Chan {
 		panic("Can only bind channels")
