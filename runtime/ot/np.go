@@ -26,22 +26,22 @@ const (
 )
 
 type HashedElGamalCiph struct {
-	C0 big.Int
+	C0 *big.Int
 	C1 []byte
 }
 
 type NPSender struct {
-	npRecvPk   chan big.Int
+	npRecvPk   chan *big.Int
 	npSendEncs chan HashedElGamalCiph
-	npC        chan big.Int
-	C          big.Int
+	npC        chan *big.Int
+	C          *big.Int
 }
 
 type NPReceiver struct {
-	npRecvPk   chan big.Int
+	npRecvPk   chan *big.Int
 	npSendEncs chan HashedElGamalCiph
-	npC        chan big.Int
-	C          big.Int
+	npC        chan *big.Int
+	C          *big.Int
 }
 
 var publicParams = PublicKey{G: fromHex(generatorHex), P: fromHex(primeHex)}
@@ -51,14 +51,14 @@ func timeTrack(start time.Time, name string) {
 	log.Printf("%s took %s", name, elapsed)
 }
 
-func GenNPParam() big.Int {
+func GenNPParam() *big.Int {
 	X := generateNumNonce(publicParams.P)
-	C := *new(big.Int).Exp(publicParams.G, X, publicParams.P)
+	C := new(big.Int).Exp(publicParams.G, X, publicParams.P)
 	return C
 }
 
-func NewNPSender(npC chan big.Int,
-	npRecvPk chan big.Int,
+func NewNPSender(npC chan *big.Int,
+	npRecvPk chan *big.Int,
 	npSendEncs chan HashedElGamalCiph) *NPSender {
 
 	sender := new(NPSender)
@@ -69,8 +69,8 @@ func NewNPSender(npC chan big.Int,
 	return sender
 }
 
-func NewNPReceiver(npC chan big.Int,
-	npRecvPk chan big.Int,
+func NewNPReceiver(npC chan *big.Int,
+	npRecvPk chan *big.Int,
 	npSendEncs chan HashedElGamalCiph) *NPReceiver {
 
 	receiver := new(NPReceiver)
@@ -82,8 +82,8 @@ func NewNPReceiver(npC chan big.Int,
 }
 
 func NewNP() (*NPSender, *NPReceiver) {
-	npC := make(chan big.Int)
-	npRecvPk := make(chan big.Int)
+	npC := make(chan *big.Int)
+	npRecvPk := make(chan *big.Int)
 	npSendEncs := make(chan HashedElGamalCiph)
 
 	return NewNPSender(npC, npRecvPk, npSendEncs),
@@ -101,19 +101,19 @@ func (self *NPSender) Send(m0, m1 Message) {
 		self.npC = nil
 	}
 	msglen := len(m0)
-	pks := make([]big.Int, 2)
+	pks := make([]*big.Int, 2)
 	pks[0] = <-self.npRecvPk
-	pks[1].ModInverse(&pks[0], publicParams.P)
-	pks[1].Mul(&pks[1], &self.C).Mod(&pks[1], publicParams.P)
+	pks[1] = new(big.Int).ModInverse(pks[0], publicParams.P)
+	pks[1].Mul(pks[1], self.C).Mod(pks[1], publicParams.P)
 	r0 := generateNumNonce(publicParams.P)
 	r1 := generateNumNonce(publicParams.P)
 
 	maskedVal0 := make([]byte, msglen)
-	xorBytes(maskedVal0, RO(expModP(&pks[0], r0).Bytes(), 8*msglen), m0)
+	xorBytes(maskedVal0, RO(expModP(pks[0], r0).Bytes(), 8*msglen), m0)
 	maskedVal1 := make([]byte, msglen)
-	xorBytes(maskedVal1, RO(expModP(&pks[1], r1).Bytes(), 8*msglen), m1)
-	e0 := HashedElGamalCiph{C0: *gExpModP(r0), C1: maskedVal0}
-	e1 := HashedElGamalCiph{C0: *gExpModP(r1), C1: maskedVal1}
+	xorBytes(maskedVal1, RO(expModP(pks[1], r1).Bytes(), 8*msglen), m1)
+	e0 := HashedElGamalCiph{C0: gExpModP(r0), C1: maskedVal0}
+	e1 := HashedElGamalCiph{C0: gExpModP(r1), C1: maskedVal1}
 	self.npSendEncs <- e0
 	self.npSendEncs <- e1
 	//	log.Println("Completed run of OTNPSender.Send")
@@ -129,15 +129,15 @@ func (self *NPReceiver) Receive(s Selector) Message {
 	k := generateNumNonce(publicParams.P)
 	pks[s] = gExpModP(k)
 	pks[1-s] = new(big.Int).ModInverse(pks[s], publicParams.P)
-	pks[1-s].Mul(pks[1-s], &self.C).Mod(pks[1-s], publicParams.P)
-	self.npRecvPk <- *pks[0]
+	pks[1-s].Mul(pks[1-s], self.C).Mod(pks[1-s], publicParams.P)
+	self.npRecvPk <- pks[0]
 	ciphs := []HashedElGamalCiph{<-self.npSendEncs, <-self.npSendEncs}
 	if len(ciphs[0].C1) != len(ciphs[1].C1) {
 		panic("(*ot.NPReceiver).Receive: messages have different lengths")
 	}
 	msglen := len(ciphs[0].C1)
 	res := make([]byte, msglen)
-	xorBytes(res, RO(expModP(&ciphs[s].C0, k).Bytes(), 8*msglen), ciphs[s].C1)
+	xorBytes(res, RO(expModP(ciphs[s].C0, k).Bytes(), 8*msglen), ciphs[s].C1)
 	//	log.Printf("Completed run of OTNPSender.Receive. len(res)=%d\n", len(res))
 	return res
 }
@@ -159,7 +159,7 @@ func (R *NPReceiver) ReceiveM(r []byte) []Message { // r is a packed vector of s
 	result := make([]Message, 8*len(r))
 	for i := range r {
 		for bit := 0; bit < 8; bit++ {
-			selector := Selector((r[i] >> uint(7 - bit)) & 1)
+			selector := Selector((r[i] >> uint(7-bit)) & 1)
 			result[i+bit] = R.Receive(selector)
 		}
 	}
@@ -175,7 +175,7 @@ func (S *NPSender) SendMBits(a, b []byte) { // messages are packed in bytes
 	for i := range a {
 		for bit := 0; bit < 8; bit++ {
 			mask := byte(0x80 >> uint(bit))
-			S.Send([]byte{a[i]&mask}, []byte{b[i]&mask})
+			S.Send([]byte{a[i] & mask}, []byte{b[i] & mask})
 		}
 	}
 }
@@ -184,7 +184,7 @@ func (R *NPReceiver) ReceiveMBits(r []byte) []byte { // r is a packed vector of 
 	for i := range r {
 		for bit := 0; bit < 8; bit++ {
 			mask := byte(0x80 >> uint(bit))
-			selector := Selector((r[i] >> uint(7 - bit)) & 1)
+			selector := Selector((r[i] >> uint(7-bit)) & 1)
 			result[i] |= mask & R.Receive(selector)[0]
 		}
 	}

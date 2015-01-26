@@ -52,8 +52,8 @@ func NewChanio() (io *Chanio) {
 			make(chan Key, 50),
 		},
 		ot.NPChans{
-			make(chan big.Int, 100),
-			make(chan big.Int, 1),
+			make(chan *big.Int, 100),
+			make(chan *big.Int, 1),
 			make(chan ot.HashedElGamalCiph, 100),
 		},
 		ot.ExtChans{
