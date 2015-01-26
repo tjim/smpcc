@@ -6,6 +6,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/gob"
+	"encoding/hex"
 	"fmt"
 	"github.com/apcera/nats"
 	"github.com/tjim/smpcc/runtime/gmw"
@@ -24,7 +25,7 @@ import (
 )
 
 func MarshalPublicKey(c *[32]byte) string {
-	return fmt.Sprintf("%x", *c)
+	return hex.EncodeToString((*c)[:])
 }
 
 func UnmarshalPublicKey(s string) *[32]byte {
@@ -38,9 +39,13 @@ func UnmarshalPublicKey(s string) *[32]byte {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f':
 		}
 	}
-	result := new([32]byte)
-	fmt.Sscanf(s, "%x", result)
-	return result
+	var result [32]byte
+	byteVal, err := hex.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	copy(result[:], byteVal)
+	return &result
 }
 
 type Room struct {
@@ -136,6 +141,7 @@ func xorBytes(a, b, c []byte) {
 }
 
 func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
+	log.Printf("Marshalled peerPK: %v\n", notMe.Key)
 	peerPk := UnmarshalPublicKey(notMe.Key)
 	encapsulatedKey := make([]byte, 32)
 	var nonce [24]byte
@@ -143,6 +149,8 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 	rand.Read(nonce[:])
 	ciphertext := []byte{}
 	box.Seal(ciphertext, encapsulatedKey, &nonce, peerPk, MyPrivateKey)
+
+	log.Printf("ciphertext = %v\nencapsulatedKey = %v\nnonce = %v\npeerpk = %v\n mysk = %v\n", ciphertext, encapsulatedKey, nonce, *peerPk, MyPrivateKey)
 
 	ec, err := nats.NewEncodedConn(nc, "gob")
 	if err != nil {
@@ -161,7 +169,9 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 	copy(oNonce[:], oNonceArr)
 	oCiphertext := <-recvChan
 	oEncapsulatedKey := make([]byte, 32)
+	log.Printf("Incoming\nciphertext = %v\nnonce = %v\npeerpk = %v\n mysk = %v\n", oCiphertext, oNonce, peerPk, MyPrivateKey)
 	_, isValid := box.Open(encapsulatedKey, oCiphertext, &oNonce, peerPk, MyPrivateKey)
+
 	if !isValid {
 		panic("Ciphertext not valid!!!")
 	}
@@ -456,6 +466,9 @@ func session(nc *nats.Conn, args []string) {
 	id := -1
 	rm := MyRoom
 	st := MyRooms[rm]
+
+	log.Printf("Starting session. Members=\n%+v\n", st.Members)
+
 	for i, v := range st.Members {
 		if v == MyParty {
 			id = i
