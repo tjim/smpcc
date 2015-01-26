@@ -144,6 +144,7 @@ func xorBytes(a, b, c []byte) {
 
 func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 	log.Printf("Marshalled peerPK: %v\n", notMe.Key)
+	log.Printf("Marshalled MyPK: %v\n", MyPublicKey)
 	peerPk := UnmarshalPublicKey(notMe.Key)
 	encapsulatedKey := make([]byte, 32)
 	var nonce [24]byte
@@ -153,7 +154,7 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 	ciphertext := []byte{}
 	ciphertext = box.Seal(ciphertext, encapsulatedKey, &nonce, peerPk, MyPrivateKey)
 
-	log.Printf("ciphertext = %v\nencapsulatedKey = %v\nnonce = %v\npeerpk = %v\n mysk = %v\n", ciphertext, encapsulatedKey, nonce, *peerPk, MyPrivateKey)
+	log.Printf("Out:\n%v\n%v\n%v\n%v\n\n", ciphertext, &nonce, peerPk, MyPrivateKey)
 
 	ec, err := nats.NewEncodedConn(nc, "gob")
 	if err != nil {
@@ -172,7 +173,9 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 	copy(oNonce[:], oNonceArr)
 	oCiphertext := <-recvChan
 	oEncapsulatedKey := []byte{}
-	log.Printf("Incoming\nciphertext = %v\nnonce = %v\npeerpk = %v\n mysk = %v\n", oCiphertext, oNonce, peerPk, MyPrivateKey)
+
+	log.Printf("In:\n%v\n%v\n%v\n%v\n\n", oCiphertext, oNonce, peerPk, MyPrivateKey)
+
 	oEncapsulatedKey, isValid := box.Open(oEncapsulatedKey, oCiphertext, &oNonce, peerPk, MyPrivateKey)
 
 	if p2pAuth && !isValid {
@@ -250,7 +253,7 @@ func initialize() {
 	natsOptions.ReconnectedCB = handleNats("Reconnect")
 	natsOptions.AsyncErrorCB = handleError
 
-	rawPrivateKey, rawPublicKey, _ := box.GenerateKey(rand.Reader)
+	rawPublicKey, rawPrivateKey, _ := box.GenerateKey(rand.Reader)
 	MyPrivateKey = rawPrivateKey
 	MyPublicKey = MarshalPublicKey(rawPublicKey)
 	MyNick = "AnonymousCoward"
