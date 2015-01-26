@@ -163,7 +163,7 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 	oEncapsulatedKey := make([]byte, 32)
 	_, isValid := box.Open(encapsulatedKey, oCiphertext, &oNonce, peerPk, MyPrivateKey)
 	if !isValid {
-		panic("Not valid!!!")
+		panic("Ciphertext not valid!!!")
 	}
 
 	seedBytes := make([]byte, 32)
@@ -380,6 +380,13 @@ func client() {
 			} else {
 				Tprintf(term, "Starting computation\n")
 				session(nc, words[1:])
+			}
+		case "test_crypto":
+			if MyRoom == "" {
+				Tprintf(term, "You must join a room before you can test encryption\n")
+			} else {
+				Tprintf(term, "Testing crypto\n")
+				// test crypto here
 			}
 		default:
 			if MyRoom != "" {
