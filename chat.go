@@ -147,8 +147,9 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 	var nonce [24]byte
 	rand.Read(encapsulatedKey)
 	rand.Read(nonce[:])
+
 	ciphertext := []byte{}
-	box.Seal(ciphertext, encapsulatedKey, &nonce, peerPk, MyPrivateKey)
+	ciphertext = box.Seal(ciphertext, encapsulatedKey, &nonce, peerPk, MyPrivateKey)
 
 	log.Printf("ciphertext = %v\nencapsulatedKey = %v\nnonce = %v\npeerpk = %v\n mysk = %v\n", ciphertext, encapsulatedKey, nonce, *peerPk, MyPrivateKey)
 
@@ -168,9 +169,9 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 	var oNonce [24]byte
 	copy(oNonce[:], oNonceArr)
 	oCiphertext := <-recvChan
-	oEncapsulatedKey := make([]byte, 32)
+	oEncapsulatedKey := []byte{}
 	log.Printf("Incoming\nciphertext = %v\nnonce = %v\npeerpk = %v\n mysk = %v\n", oCiphertext, oNonce, peerPk, MyPrivateKey)
-	_, isValid := box.Open(encapsulatedKey, oCiphertext, &oNonce, peerPk, MyPrivateKey)
+	oEncapsulatedKey, isValid := box.Open(oEncapsulatedKey, oCiphertext, &oNonce, peerPk, MyPrivateKey)
 
 	if !isValid {
 		panic("Ciphertext not valid!!!")
