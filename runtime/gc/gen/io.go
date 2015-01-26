@@ -71,8 +71,8 @@ func Client2(addr string, main func([]VM), numBlocks int, newVM func(io IO, id C
 
 	defer close(nu)
 
-	ParamChan := make(chan big.Int)
-	NpRecvPk := make(chan big.Int)
+	ParamChan := make(chan *big.Int)
+	NpRecvPk := make(chan *big.Int)
 	NpSendEncs := make(chan ot.HashedElGamalCiph)
 	x := PerNodePair{ot.NPChans{ParamChan, NpRecvPk, NpSendEncs}, make([]PerBlock, numBlocks)}
 
