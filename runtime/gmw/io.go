@@ -164,8 +164,8 @@ func NewPerNodePair(peer *PeerIO) *PerNodePair {
 	blocks := peer.Blocks
 	numBlocks := len(blocks)
 
-	ParamChan := make(chan big.Int)
-	NpRecvPk := make(chan big.Int)
+	ParamChan := make(chan *big.Int)
+	NpRecvPk := make(chan *big.Int)
 	NpSendEncs := make(chan ot.HashedElGamalCiph)
 	x := PerNodePair{ot.NPChans{ParamChan, NpRecvPk, NpSendEncs}, make([]PerBlock, numBlocks)}
 

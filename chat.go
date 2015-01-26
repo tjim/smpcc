@@ -401,7 +401,7 @@ func client() {
 }
 
 func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe int, cc ChannelCrypto) {
-	subject := fmt.Sprintf("%s.%d.%d.%s", room, notMe, me, tag)
+	subject := fmt.Sprintf("%s.%d.%d.%s", room, me, notMe, tag)
 	log.Println("Sending to", subject)
 	// goroutine forwards values from channel over nats
 	go func() {

@@ -3,8 +3,8 @@ package ot
 import "math/big"
 
 type NPChans struct {
-	ParamChan  chan big.Int           `fatchan:"reply"`
-	NpRecvPk   chan big.Int           `fatchan:"request"`
+	ParamChan  chan *big.Int          `fatchan:"reply"`
+	NpRecvPk   chan *big.Int          `fatchan:"request"`
 	NpSendEncs chan HashedElGamalCiph `fatchan:"reply"`
 }
 
