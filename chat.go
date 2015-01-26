@@ -24,6 +24,8 @@ import (
 	"strings"
 )
 
+var p2pAuth bool = true // temporary debugging flag, set to false to disable authentication and encryption
+
 func MarshalPublicKey(c *[32]byte) string {
 	return hex.EncodeToString((*c)[:])
 }
@@ -172,7 +174,7 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 	log.Printf("Incoming\nciphertext = %v\nnonce = %v\npeerpk = %v\n mysk = %v\n", oCiphertext, oNonce, peerPk, MyPrivateKey)
 	_, isValid := box.Open(encapsulatedKey, oCiphertext, &oNonce, peerPk, MyPrivateKey)
 
-	if !isValid {
+	if p2pAuth && !isValid {
 		panic("Ciphertext not valid!!!")
 	}
 
@@ -325,6 +327,9 @@ func client() {
 			continue
 		}
 		switch words[0] {
+		case "noauth":
+			p2pAuth = false
+			Tprintf(term, "AUTHORIZATION DISABLED\n")
 		case "nick":
 			if len(words) == 2 {
 				changeNick(words[1])
@@ -425,9 +430,14 @@ func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe in
 			if !ok {
 				return // channel closed so we don't need goroutine any more
 			}
+			var msg []byte
 			plaintext := encode(val.Interface())
-			ciphertext := cc.Encrypt(plaintext)
-			nc.Publish(subject, ciphertext)
+			if p2pAuth {
+				msg = cc.Encrypt(plaintext)
+			} else {
+				msg = plaintext
+			}
+			nc.Publish(subject, msg)
 		}
 	}()
 }
@@ -441,15 +451,20 @@ func bindRecv(nc *nats.Conn, channel interface{}, room, tag string, me, notMe in
 		panic("Can only bind channels")
 	}
 	_, err := nc.Subscribe(subject, func(m *nats.Msg) {
+		var decoderInput []byte
 		ciphertext := m.Data
-		plaintext := cc.Decrypt(ciphertext)
-		dec := gob.NewDecoder(bytes.NewBuffer(plaintext))
+		if p2pAuth {
+			decoderInput = cc.Decrypt(ciphertext)
+		} else {
+			decoderInput = ciphertext
+		}
+		dec := gob.NewDecoder(bytes.NewBuffer(decoderInput))
 		var p interface{}
 		err := dec.Decode(&p)
 		if err != nil {
 			log.Fatal("decode:", err)
 		}
-		chVal.Send(reflect.ValueOf(p)) // problem is this can block
+		chVal.Send(reflect.ValueOf(p)) // NB this is a blocking send.  NATS maintains a buffer before this
 	})
 	checkError(err)
 }
