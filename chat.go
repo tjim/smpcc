@@ -207,6 +207,8 @@ func Init() {
 	gob.Register(Message{})
 	gob.Register(Members{})
 	gob.Register(big.NewInt(0))
+	gob.Register(ot.HashedElGamalCiph{})
+	gob.Register(ot.MessagePair{})
 }
 
 type RoomState struct {
