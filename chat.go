@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"math/big"
 )
 
 var p2pAuth bool = true // temporary debugging flag, set to false to disable authentication and encryption
@@ -207,6 +208,7 @@ func Init() {
 	gob.Register(StartRequest{})
 	gob.Register(Message{})
 	gob.Register(Members{})
+	gob.Register(big.NewInt(0))
 }
 
 type RoomState struct {
@@ -470,7 +472,7 @@ func (pc *PairConn) bindRecv(channel interface{}) {
 	nc := pc.Nc
 	tag := pc.tag()
 	cc := pc.CryptoFromTag(tag)
-	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, MyParty.Key, pc.notMe.Key, tag)
+	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, pc.notMe.Key, MyParty.Key, tag)
 	log.Println("bindRecv", subject)
 	chVal := reflect.ValueOf(channel)
 	if chVal.Kind() != reflect.Chan {
