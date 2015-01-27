@@ -17,12 +17,12 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	"io"
 	"log"
+	"math/big"
 	"os"
 	"os/signal"
 	"reflect"
 	"runtime"
 	"strings"
-	"math/big"
 )
 
 var p2pAuth bool = true // temporary debugging flag, set to false to disable authentication and encryption
@@ -120,16 +120,14 @@ func (p *PairConn) CryptoFromTag(tag string) ChannelCrypto {
 func (c *ChannelCrypto) Encrypt(plaintext []byte) []byte {
 	nonce := make([]byte, c.BlockCipher.NonceSize())
 	c.PRG.XORKeyStream(nonce, nonce)
-	ciphertext := make([]byte, len(plaintext)+c.BlockCipher.Overhead())
-	c.BlockCipher.Seal(ciphertext, nonce, plaintext, nil)
+	ciphertext := c.BlockCipher.Seal(nil, nonce, plaintext, nil)
 	return ciphertext
 }
 
 func (c *ChannelCrypto) Decrypt(ciphertext []byte) []byte {
 	nonce := make([]byte, c.BlockCipher.NonceSize())
 	c.PRG.XORKeyStream(nonce, nonce)
-	plaintext := make([]byte, len(ciphertext)-c.BlockCipher.Overhead())
-	_, err := c.BlockCipher.Open(plaintext, nonce, ciphertext, nil)
+	plaintext, err := c.BlockCipher.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		panic(err)
 	}
