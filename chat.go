@@ -85,6 +85,8 @@ type Members struct {
 type PairConn struct {
 	Nc            *nats.Conn
 	ChanMasterPRF cipher.Block
+	counter       int
+	notMe         Party
 }
 
 type ChannelCrypto struct {
@@ -142,7 +144,17 @@ func xorBytes(a, b, c []byte) {
 	}
 }
 
-func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
+func pairSubscribe(nc *nats.Conn, notMe Party) chan []byte {
+	recvChan := make(chan []byte)
+	ec, err := nats.NewEncodedConn(nc, "gob")
+	if err != nil {
+		panic(err)
+	}
+	ec.BindRecvChan(fmt.Sprintf("KEY-AGREEMENT-%s-%s", MyPublicKey, notMe.Key), recvChan)
+	return recvChan
+}
+
+func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
 	log.Printf("Marshalled peerPK: %v\n", notMe.Key)
 	log.Printf("Marshalled MyPK: %v\n", MyPublicKey)
 	peerPk := UnmarshalPublicKey(notMe.Key)
@@ -156,14 +168,12 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 
 	log.Printf("Out:\n%v\n%v\n%v\n%v\n\n", ciphertext, &nonce, peerPk, MyPrivateKey)
 
-	ec, err := nats.NewEncodedConn(nc, "gob")
+	ec, err := nats.NewEncodedConn(pc.Nc, "gob")
 	if err != nil {
 		panic(err)
 	}
 
-	recvChan := make(chan []byte, 10)
-	sendChan := make(chan []byte, 10)
-	ec.BindRecvChan(fmt.Sprintf("KEY-AGREEMENT-%s-%s", MyPublicKey, notMe.Key), recvChan)
+	sendChan := make(chan []byte)
 	ec.BindSendChan(fmt.Sprintf("KEY-AGREEMENT-%s-%s", notMe.Key, MyPublicKey), sendChan)
 
 	sendChan <- nonce[:]
@@ -184,13 +194,11 @@ func NewPairConn(nc *nats.Conn, me, notMe Party) *PairConn {
 
 	seedBytes := make([]byte, 32)
 	xorBytes(encapsulatedKey, oEncapsulatedKey, seedBytes)
-	pc := PairConn{nc, nil}
 	pc.ChanMasterPRF, err = aes.NewCipher(seedBytes)
 	if err != nil {
 		panic(err)
 	}
-
-	return &pc
+	done <- true
 }
 
 func Init() {
@@ -419,8 +427,17 @@ func client() {
 	}
 }
 
-func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe int, cc ChannelCrypto) {
-	subject := fmt.Sprintf("%s.%d.%d.%s", room, me, notMe, tag)
+func (pc *PairConn) tag() string {
+	result := fmt.Sprintf("%d", pc.counter)
+	pc.counter++
+	return result
+}
+
+func (pc *PairConn) bindSend(channel interface{}) {
+	nc := pc.Nc
+	tag := pc.tag()
+	cc := pc.CryptoFromTag(tag)
+	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, MyParty.Key, pc.notMe.Key, tag)
 	log.Println("bindSend", subject)
 	// goroutine forwards values from channel over nats
 	go func() {
@@ -428,7 +445,6 @@ func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe in
 		if chVal.Kind() != reflect.Chan {
 			panic("Can only bind channels")
 		}
-		subject := fmt.Sprintf("%s.%d.%d.%s", room, me, notMe, tag)
 		for {
 			val, ok := chVal.Recv()
 			if !ok {
@@ -450,9 +466,11 @@ func bindSend(nc *nats.Conn, channel interface{}, room, tag string, me, notMe in
 	}()
 }
 
-func bindRecv(nc *nats.Conn, channel interface{}, room, tag string, me, notMe int, cc ChannelCrypto) {
-	// goroutine forwards values from nats to a channel
-	subject := fmt.Sprintf("%s.%d.%d.%s", room, notMe, me, tag)
+func (pc *PairConn) bindRecv(channel interface{}) {
+	nc := pc.Nc
+	tag := pc.tag()
+	cc := pc.CryptoFromTag(tag)
+	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, MyParty.Key, pc.notMe.Key, tag)
 	log.Println("bindRecv", subject)
 	chVal := reflect.ValueOf(channel)
 	if chVal.Kind() != reflect.Chan {
@@ -475,6 +493,22 @@ func bindRecv(nc *nats.Conn, channel interface{}, room, tag string, me, notMe in
 		chVal.Send(reflect.ValueOf(p)) // NB this is a blocking send.  NATS maintains a buffer before this
 	})
 	checkError(err)
+}
+
+func barrier(nc *nats.Conn) {
+	okChan := make(chan bool)
+	ec, err := nats.NewEncodedConn(nc, "gob")
+	if err != nil {
+		panic("2")
+	}
+	ec.BindRecvChan(fmt.Sprintf("%s.secretary.barrier", MyRoom), okChan)
+	err = nc.Publish(fmt.Sprintf("secretary.%s", MyRoom), encode(StartRequest{MyParty}))
+	checkError(err)
+	log.Println("Waiting...")
+	if !(<-okChan) {
+		panic("Barrier failed")
+	}
+	log.Println("Got the all clear")
 }
 
 func session(nc *nats.Conn, args []string) {
@@ -508,6 +542,33 @@ func session(nc *nats.Conn, args []string) {
 	blocks := io.Blocks
 	numBlocks = len(blocks) // increased by one by NewPeerIo
 
+	recvChans := make([]chan []byte, numParties)
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		notMe := st.Members[p]
+		recvChans[p] = pairSubscribe(nc, notMe)
+	}
+	barrier(nc)
+	pcs := make([]*PairConn, numParties)
+	done := make(chan bool)
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		notMe := st.Members[p]
+		pc := &PairConn{nc, nil, 0, notMe}
+		pcs[p] = pc
+		go pairInit(pc, notMe, recvChans[p], done)
+	}
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		<-done
+	}
+
 	xs := make([]*gmw.PerNodePair, numParties)
 	for p := 0; p < numParties; p++ {
 		if p == id {
@@ -516,53 +577,39 @@ func session(nc *nats.Conn, args []string) {
 		x := gmw.NewPerNodePair(io)
 		xs[p] = x
 
-		pc := NewPairConn(nc, st.Members[id], st.Members[p])
+		pc := pcs[p]
 
 		if io.Leads(p) {
 			// leader is server
 			// that means it receives in the fatchan sense
 			// also it is going to act as sender for the base OT
-			bindSend(nc, x.ParamChan, rm, "ParamChan", id, p, pc.CryptoFromTag("ParamChan"))
-			bindRecv(nc, x.NpRecvPk, rm, "NpRecvPk", id, p, pc.CryptoFromTag("NpRecvPk"))
-			bindSend(nc, x.NpSendEncs, rm, "NpSendEncs", id, p, pc.CryptoFromTag("NpSendEncs"))
+			pc.bindSend(x.ParamChan)
+			pc.bindRecv(x.NpRecvPk)
+			pc.bindSend(x.NpSendEncs)
 			for i := 0; i < numBlocks; i++ {
-				bindSend(nc, x.BlockChans[i].SAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d", i)))
-				bindRecv(nc, x.BlockChans[i].CAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d", i)))
-				bindRecv(nc, x.BlockChans[i].CAS.S2R, rm, fmt.Sprintf("block%d-CAS-S2R", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-CAS-S2R", i)))
-				bindSend(nc, x.BlockChans[i].CAS.R2S, rm, fmt.Sprintf("block%d-CAS-R2S", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-CAS-R2S", i)))
-				bindRecv(nc, x.BlockChans[i].SAS.R2S, rm, fmt.Sprintf("block%d-SAS-R2S", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-SAS-R2S", i)))
-				bindSend(nc, x.BlockChans[i].SAS.S2R, rm, fmt.Sprintf("block%d-SAS-S2R", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-SAS-S2R", i)))
+				pc.bindSend(x.BlockChans[i].SAS.Rwchannel)
+				pc.bindRecv(x.BlockChans[i].CAS.Rwchannel)
+				pc.bindRecv(x.BlockChans[i].CAS.S2R)
+				pc.bindSend(x.BlockChans[i].CAS.R2S)
+				pc.bindRecv(x.BlockChans[i].SAS.R2S)
+				pc.bindSend(x.BlockChans[i].SAS.S2R)
 			}
 		} else {
-			bindRecv(nc, x.ParamChan, rm, "ParamChan", id, p, pc.CryptoFromTag("ParamChan"))
-			bindSend(nc, x.NpRecvPk, rm, "NpRecvPk", id, p, pc.CryptoFromTag("NpRecvPk"))
-			bindRecv(nc, x.NpSendEncs, rm, "NpSendEncs", id, p, pc.CryptoFromTag("NpSendEncs"))
+			pc.bindRecv(x.ParamChan)
+			pc.bindSend(x.NpRecvPk)
+			pc.bindRecv(x.NpSendEncs)
 			for i := 0; i < numBlocks; i++ {
-				bindRecv(nc, x.BlockChans[i].SAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d", i)))
-				bindSend(nc, x.BlockChans[i].CAS.Rwchannel, rm, fmt.Sprintf("block%d", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d", i)))
-				bindSend(nc, x.BlockChans[i].CAS.S2R, rm, fmt.Sprintf("block%d-CAS-S2R", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-CAS-S2R", i)))
-				bindRecv(nc, x.BlockChans[i].CAS.R2S, rm, fmt.Sprintf("block%d-CAS-R2S", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-CAS-S2R", i)))
-				bindSend(nc, x.BlockChans[i].SAS.R2S, rm, fmt.Sprintf("block%d-SAS-R2S", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-SAS-R2S", i)))
-				bindRecv(nc, x.BlockChans[i].SAS.S2R, rm, fmt.Sprintf("block%d-SAS-S2R", i), id, p, pc.CryptoFromTag(fmt.Sprintf("block%d-SAS-S2R", i)))
+				pc.bindRecv(x.BlockChans[i].SAS.Rwchannel)
+				pc.bindSend(x.BlockChans[i].CAS.Rwchannel)
+				pc.bindSend(x.BlockChans[i].CAS.S2R)
+				pc.bindRecv(x.BlockChans[i].CAS.R2S)
+				pc.bindSend(x.BlockChans[i].SAS.R2S)
+				pc.bindRecv(x.BlockChans[i].SAS.S2R)
 			}
 		}
 	}
-	// tell secretary we want to start the computation
-	okStart := make(chan bool)
-	ec, err := nats.NewEncodedConn(nc, "gob")
-	if err != nil {
-		panic("2")
-	}
-	ec.BindRecvChan(fmt.Sprintf("%s.secretary.okStart", rm), okStart)
-	err = nc.Publish(fmt.Sprintf("secretary.%s", rm), encode(StartRequest{MyParty}))
-	checkError(err)
-	log.Println("Waiting...")
-	if !(<-okStart) {
-		panic("Computation failed to start")
-	}
-	log.Println("Got the all clear")
+	barrier(nc)
 
-	done := make(chan bool)
 	log.Printf("There are %d parties and I am party %d\n", numParties, id)
 	for p := 0; p < numParties; p++ {
 		if p == id {
@@ -670,9 +717,9 @@ func secretary() {
 			}
 			log.Println("Starting computation in", room)
 			ec, _ := nats.NewEncodedConn(nc, "gob")
-			okStart := make(chan bool)
-			ec.BindSendChan(fmt.Sprintf("%s.secretary.okStart", room), okStart)
-			okStart <- true
+			okChan := make(chan bool)
+			ec.BindSendChan(fmt.Sprintf("%s.secretary.barrier", room), okChan)
+			okChan <- true
 			log.Println("Should be started")
 		case LeaveRequest:
 			delete(members[room], r.Party)
