@@ -154,8 +154,8 @@ func pairSubscribe(nc *nats.Conn, notMe Party) chan []byte {
 }
 
 func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
-	log.Printf("Marshalled peerPK: %v\n", notMe.Key)
-	log.Printf("Marshalled MyPK: %v\n", MyPublicKey)
+	//log.Printf("Marshalled peerPK: %v\n", notMe.Key)
+	//log.Printf("Marshalled MyPK: %v\n", MyPublicKey)
 	peerPk := UnmarshalPublicKey(notMe.Key)
 	encapsulatedKey := make([]byte, 32)
 	var nonce [24]byte
@@ -165,7 +165,7 @@ func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
 	ciphertext := []byte{}
 	ciphertext = box.Seal(ciphertext, encapsulatedKey, &nonce, peerPk, MyPrivateKey)
 
-	log.Printf("Out:\n%v\n%v\n%v\n%v\n\n", ciphertext, &nonce, peerPk, MyPrivateKey)
+	//log.Printf("Out:\n%v\n%v\n%v\n%v\n\n", ciphertext, &nonce, peerPk, MyPrivateKey)
 
 	ec, err := nats.NewEncodedConn(pc.Nc, "gob")
 	if err != nil {
@@ -183,7 +183,7 @@ func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
 	oCiphertext := <-recvChan
 	oEncapsulatedKey := []byte{}
 
-	log.Printf("In:\n%v\n%v\n%v\n%v\n\n", oCiphertext, oNonce, peerPk, MyPrivateKey)
+	//log.Printf("In:\n%v\n%v\n%v\n%v\n\n", oCiphertext, oNonce, peerPk, MyPrivateKey)
 
 	oEncapsulatedKey, isValid := box.Open(oEncapsulatedKey, oCiphertext, &oNonce, peerPk, MyPrivateKey)
 
@@ -201,6 +201,7 @@ func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
 }
 
 func Init() {
+
 	gob.Register(JoinRequest{})
 	gob.Register(LeaveRequest{})
 	gob.Register(StartRequest{})
@@ -440,7 +441,7 @@ func (pc *PairConn) bindSend(channel interface{}) {
 	tag := pc.tag()
 	cc := pc.CryptoFromTag(tag)
 	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, MyParty.Key, pc.notMe.Key, tag)
-	log.Println("bindSend", subject)
+	//log.Println("bindSend", subject)
 	// goroutine forwards values from channel over nats
 	go func() {
 		chVal := reflect.ValueOf(channel)
@@ -462,7 +463,7 @@ func (pc *PairConn) bindSend(channel interface{}) {
 			} else {
 				msg = plaintext
 			}
-			log.Printf("sending on %s: %x\n", subject, msg)
+			//log.Printf("sending on %s: %x\n", subject, msg)
 			nc.Publish(subject, msg)
 		}
 	}()
@@ -473,7 +474,7 @@ func (pc *PairConn) bindRecv(channel interface{}) {
 	tag := pc.tag()
 	cc := pc.CryptoFromTag(tag)
 	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, pc.notMe.Key, MyParty.Key, tag)
-	log.Println("bindRecv", subject)
+	//log.Println("bindRecv", subject)
 	chVal := reflect.ValueOf(channel)
 	if chVal.Kind() != reflect.Chan {
 		panic("Can only bind channels")
@@ -612,18 +613,18 @@ func session(nc *nats.Conn, args []string) {
 	}
 	barrier(nc)
 
-	log.Printf("There are %d parties and I am party %d\n", numParties, id)
+	//log.Printf("There are %d parties and I am party %d\n", numParties, id)
 	for p := 0; p < numParties; p++ {
 		if p == id {
 			continue
 		}
-		log.Printf("Working on party %d\n", p)
+		//log.Printf("Working on party %d\n", p)
 		x := xs[p]
 		if io.Leads(p) {
-			log.Println("Starting server side for", p)
+			//log.Println("Starting server side for", p)
 			go gmw.ServerSideIOSetup(io, p, x, done)
 		} else {
-			log.Println("Starting client side for", p)
+			//log.Println("Starting client side for", p)
 			go gmw.ClientSideIOSetup(io, p, x, false, done)
 		}
 	}
