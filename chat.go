@@ -456,7 +456,6 @@ func (pc *PairConn) bindSend(channel interface{}) {
 			val, ok := chVal.Recv()
 //			log.Printf("%s.%s[%d] %v\n", shortKey(pc.notMe.Key), tag, counter, val.Type())
 			if !ok {
-				log.Println("Error: recv")
 				return // channel closed so we don't need goroutine any more
 			}
 			if !val.CanInterface() {
@@ -476,6 +475,7 @@ func (pc *PairConn) bindSend(channel interface{}) {
 	}()
 }
 
+// TODO: ought to return subscription so we can close the subscription
 func (pc *PairConn) bindRecv(channel interface{}) {
 	nc := pc.Nc
 	tag := pc.tag()
@@ -557,7 +557,10 @@ func session(nc *nats.Conn, args []string) {
 		notMe := st.Members[p]
 		recvChans[p] = pairSubscribe(nc, notMe)
 	}
-	barrier(nc)
+	if !barrier(nc) {
+		log.Println("Computation halted on error")
+		return
+	}
 	pcs := make([]*PairConn, numParties)
 	done := make(chan bool)
 	for p := 0; p < numParties; p++ {
@@ -593,6 +596,11 @@ func session(nc *nats.Conn, args []string) {
 			pc.bindSend(x.ParamChan)
 			pc.bindRecv(x.NpRecvPk)
 			pc.bindSend(x.NpSendEncs)
+
+			defer close(x.ParamChan)
+			defer close(x.NpRecvPk)
+			defer close(x.NpSendEncs)
+
 			for i := 0; i < numBlocks; i++ {
 				pc.bindSend(x.BlockChans[i].SAS.Rwchannel)
 				pc.bindRecv(x.BlockChans[i].CAS.Rwchannel)
@@ -600,11 +608,23 @@ func session(nc *nats.Conn, args []string) {
 				pc.bindSend(x.BlockChans[i].CAS.R2S)
 				pc.bindRecv(x.BlockChans[i].SAS.R2S)
 				pc.bindSend(x.BlockChans[i].SAS.S2R)
+
+				defer close(x.BlockChans[i].SAS.Rwchannel)
+				defer close(x.BlockChans[i].CAS.Rwchannel)
+				defer close(x.BlockChans[i].CAS.S2R)
+				defer close(x.BlockChans[i].CAS.R2S)
+				defer close(x.BlockChans[i].SAS.R2S)
+				defer close(x.BlockChans[i].SAS.S2R)
 			}
 		} else {
 			pc.bindRecv(x.ParamChan)
 			pc.bindSend(x.NpRecvPk)
 			pc.bindRecv(x.NpSendEncs)
+
+			defer close(x.ParamChan)
+			defer close(x.NpRecvPk)
+			defer close(x.NpSendEncs)
+
 			for i := 0; i < numBlocks; i++ {
 				pc.bindRecv(x.BlockChans[i].SAS.Rwchannel)
 				pc.bindSend(x.BlockChans[i].CAS.Rwchannel)
@@ -612,10 +632,20 @@ func session(nc *nats.Conn, args []string) {
 				pc.bindRecv(x.BlockChans[i].CAS.R2S)
 				pc.bindSend(x.BlockChans[i].SAS.R2S)
 				pc.bindRecv(x.BlockChans[i].SAS.S2R)
+
+				defer close(x.BlockChans[i].SAS.Rwchannel)
+				defer close(x.BlockChans[i].CAS.Rwchannel)
+				defer close(x.BlockChans[i].CAS.S2R)
+				defer close(x.BlockChans[i].CAS.R2S)
+				defer close(x.BlockChans[i].SAS.R2S)
+				defer close(x.BlockChans[i].SAS.S2R)
 			}
 		}
 	}
-	barrier(nc)
+	if !barrier(nc) {
+		log.Println("Computation halted on error")
+		return
+	}
 
 //	log.Printf("I am party %d of %d\n", id, numParties)
 //	log.Printf("%s (%s)\n", MyParty.Key, MyParty.Nick)
@@ -641,7 +671,6 @@ func session(nc *nats.Conn, args []string) {
 	}
 //	log.Println("Done setup")
 
-	// TODO: start computation
 	numBlocks = Handle.NumBlocks // make sure we have the right numBlocks
 	// copy io.blocks[1:] to make an []Io; []BlockIO is not []Io
 	x := make([]gmw.Io, numBlocks)
@@ -734,6 +763,7 @@ func secretary() {
 				}
 			}
 			log.Println("Starting computation in", room)
+			result = true
 		finish:
 			delete(starters, room)
 			ec, _ := nats.NewEncodedConn(nc, "gob")
