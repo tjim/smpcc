@@ -27,6 +27,13 @@ import (
 
 var p2pAuth bool = true // temporary debugging flag, set to false to disable authentication and encryption
 
+func shortKey(s string) string {
+	if len(s) != 64 {
+		panic("Malformed public key (wrong length)")
+	}
+	return s[:3]
+}
+
 func MarshalPublicKey(c *[32]byte) string {
 	return hex.EncodeToString((*c)[:])
 }
@@ -154,8 +161,6 @@ func pairSubscribe(nc *nats.Conn, notMe Party) chan []byte {
 }
 
 func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
-	log.Printf("Marshalled peerPK: %v\n", notMe.Key)
-	log.Printf("Marshalled MyPK: %v\n", MyPublicKey)
 	peerPk := UnmarshalPublicKey(notMe.Key)
 	encapsulatedKey := make([]byte, 32)
 	var nonce [24]byte
@@ -165,7 +170,7 @@ func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
 	ciphertext := []byte{}
 	ciphertext = box.Seal(ciphertext, encapsulatedKey, &nonce, peerPk, MyPrivateKey)
 
-	log.Printf("Out:\n%v\n%v\n%v\n%v\n\n", ciphertext, &nonce, peerPk, MyPrivateKey)
+	//log.Printf("Out:\n%v\n%v\n%v\n%v\n\n", ciphertext, &nonce, peerPk, MyPrivateKey)
 
 	ec, err := nats.NewEncodedConn(pc.Nc, "gob")
 	if err != nil {
@@ -183,7 +188,7 @@ func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
 	oCiphertext := <-recvChan
 	oEncapsulatedKey := []byte{}
 
-	log.Printf("In:\n%v\n%v\n%v\n%v\n\n", oCiphertext, oNonce, peerPk, MyPrivateKey)
+	//log.Printf("In:\n%v\n%v\n%v\n%v\n\n", oCiphertext, oNonce, peerPk, MyPrivateKey)
 
 	oEncapsulatedKey, isValid := box.Open(oEncapsulatedKey, oCiphertext, &oNonce, peerPk, MyPrivateKey)
 
@@ -440,16 +445,18 @@ func (pc *PairConn) bindSend(channel interface{}) {
 	tag := pc.tag()
 	cc := pc.CryptoFromTag(tag)
 	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, MyParty.Key, pc.notMe.Key, tag)
-	log.Println("bindSend", subject)
 	// goroutine forwards values from channel over nats
 	go func() {
 		chVal := reflect.ValueOf(channel)
 		if chVal.Kind() != reflect.Chan {
 			panic("Can only bind channels")
 		}
+		counter := 0
 		for {
 			val, ok := chVal.Recv()
+//			log.Printf("%s.%s[%d] %v\n", shortKey(pc.notMe.Key), tag, counter, val.Type())
 			if !ok {
+				log.Println("Error: recv")
 				return // channel closed so we don't need goroutine any more
 			}
 			if !val.CanInterface() {
@@ -462,8 +469,9 @@ func (pc *PairConn) bindSend(channel interface{}) {
 			} else {
 				msg = plaintext
 			}
-			log.Printf("sending on %s: %x\n", subject, msg)
 			nc.Publish(subject, msg)
+//			log.Printf("%s.%s[%d].\n", shortKey(pc.notMe.Key), tag, counter)
+			counter++
 		}
 	}()
 }
@@ -473,7 +481,6 @@ func (pc *PairConn) bindRecv(channel interface{}) {
 	tag := pc.tag()
 	cc := pc.CryptoFromTag(tag)
 	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, pc.notMe.Key, MyParty.Key, tag)
-	log.Println("bindRecv", subject)
 	chVal := reflect.ValueOf(channel)
 	if chVal.Kind() != reflect.Chan {
 		panic("Can only bind channels")
@@ -497,7 +504,7 @@ func (pc *PairConn) bindRecv(channel interface{}) {
 	checkError(err)
 }
 
-func barrier(nc *nats.Conn) {
+func barrier(nc *nats.Conn) bool {
 	okChan := make(chan bool)
 	ec, err := nats.NewEncodedConn(nc, "gob")
 	if err != nil {
@@ -506,11 +513,9 @@ func barrier(nc *nats.Conn) {
 	ec.BindRecvChan(fmt.Sprintf("%s.secretary.barrier", MyRoom), okChan)
 	err = nc.Publish(fmt.Sprintf("secretary.%s", MyRoom), encode(StartRequest{MyParty}))
 	checkError(err)
-	log.Println("Waiting...")
-	if !(<-okChan) {
-		panic("Barrier failed")
-	}
-	log.Println("Got the all clear")
+	result := <-okChan
+	close(okChan)
+	return result
 }
 
 func session(nc *nats.Conn, args []string) {
@@ -526,7 +531,7 @@ func session(nc *nats.Conn, args []string) {
 	rm := MyRoom
 	st := MyRooms[rm]
 
-	log.Printf("Starting session. Members=\n%+v\n", st.Members)
+//	log.Printf("Starting session. Members=\n%+v\n", st.Members)
 
 	for i, v := range st.Members {
 		if v == MyParty {
@@ -612,18 +617,19 @@ func session(nc *nats.Conn, args []string) {
 	}
 	barrier(nc)
 
-	log.Printf("There are %d parties and I am party %d\n", numParties, id)
+//	log.Printf("I am party %d of %d\n", id, numParties)
+//	log.Printf("%s (%s)\n", MyParty.Key, MyParty.Nick)
 	for p := 0; p < numParties; p++ {
 		if p == id {
 			continue
 		}
-		log.Printf("Working on party %d\n", p)
+//		log.Printf("Working on party %d\n", p)
 		x := xs[p]
 		if io.Leads(p) {
-			log.Println("Starting server side for", p)
+//			log.Println("Starting server side for", p)
 			go gmw.ServerSideIOSetup(io, p, x, done)
 		} else {
-			log.Println("Starting client side for", p)
+//			log.Println("Starting client side for", p)
 			go gmw.ClientSideIOSetup(io, p, x, false, done)
 		}
 	}
@@ -633,7 +639,7 @@ func session(nc *nats.Conn, args []string) {
 		}
 		<-done
 	}
-	log.Println("Done setup")
+//	log.Println("Done setup")
 
 	// TODO: start computation
 	numBlocks = Handle.NumBlocks // make sure we have the right numBlocks
@@ -699,16 +705,26 @@ func secretary() {
 		}
 		switch r := p.(type) {
 		case StartRequest:
+			var result bool = false
 			log.Println(r.Party, "asking to run in room", room)
 			if _, ok := members[room]; !ok {
-				log.Println("Warning: run request for empty room", room)
+				log.Println("Warning:", room, "is empty, ignoring")
+				return
+			}
+			if inRoom, ok := members[room][r.Party]; !(ok && inRoom) {
+				log.Println("Warning:", r.Party, "is not a member of room", room, ", ignoring")
 				return
 			}
 			if _, ok := starters[room]; !ok {
+				log.Println("Allocating starters for", room)
 				starters[room] = make(map[Party]bool)
 				for k, _ := range members[room] {
 					starters[room][k] = false
 				}
+			}
+			if starters[room][r.Party] {
+				log.Println("Warning:", r.Party, "has already requested to run in room", room, ", aborting")
+				goto finish
 			}
 			starters[room][r.Party] = true
 			for k, v := range starters[room] {
@@ -718,11 +734,13 @@ func secretary() {
 				}
 			}
 			log.Println("Starting computation in", room)
+		finish:
+			delete(starters, room)
 			ec, _ := nats.NewEncodedConn(nc, "gob")
 			okChan := make(chan bool)
 			ec.BindSendChan(fmt.Sprintf("%s.secretary.barrier", room), okChan)
-			okChan <- true
-			log.Println("Should be started")
+			okChan <- result
+			close(okChan)
 		case LeaveRequest:
 			delete(members[room], r.Party)
 			_ = nc.Publish(room, encode(Message{MyParty, fmt.Sprintf("%s has left the room", r.Party.Nick)}))
