@@ -746,9 +746,7 @@ func Printf(io Io, mask bool, f string, args ...uint64) {
 	for i := 0; i < len(args); i++ {
 		fargs[i] = io.Open64(args[i])
 	}
-	if io.Id() == 0 {
-		fmt.Printf(f, fargs...)
-	}
+	fmt.Printf(f, fargs...)
 }
 
 func Printf32(io Io, mask bool, f string, args ...uint32) {
