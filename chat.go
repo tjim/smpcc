@@ -161,6 +161,8 @@ func pairSubscribe(nc *nats.Conn, notMe Party) chan []byte {
 }
 
 func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
+	//log.Printf("Marshalled peerPK: %v\n", notMe.Key)
+	//log.Printf("Marshalled MyPK: %v\n", MyPublicKey)
 	peerPk := UnmarshalPublicKey(notMe.Key)
 	encapsulatedKey := make([]byte, 32)
 	var nonce [24]byte
@@ -206,6 +208,7 @@ func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
 }
 
 func Init() {
+
 	gob.Register(JoinRequest{})
 	gob.Register(LeaveRequest{})
 	gob.Register(StartRequest{})
@@ -445,6 +448,7 @@ func (pc *PairConn) bindSend(channel interface{}) {
 	tag := pc.tag()
 	cc := pc.CryptoFromTag(tag)
 	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, MyParty.Key, pc.notMe.Key, tag)
+	//log.Println("bindSend", subject)
 	// goroutine forwards values from channel over nats
 	go func() {
 		chVal := reflect.ValueOf(channel)
@@ -454,7 +458,7 @@ func (pc *PairConn) bindSend(channel interface{}) {
 		counter := 0
 		for {
 			val, ok := chVal.Recv()
-//			log.Printf("%s.%s[%d] %v\n", shortKey(pc.notMe.Key), tag, counter, val.Type())
+			//			log.Printf("%s.%s[%d] %v\n", shortKey(pc.notMe.Key), tag, counter, val.Type())
 			if !ok {
 				return // channel closed so we don't need goroutine any more
 			}
@@ -469,7 +473,7 @@ func (pc *PairConn) bindSend(channel interface{}) {
 				msg = plaintext
 			}
 			nc.Publish(subject, msg)
-//			log.Printf("%s.%s[%d].\n", shortKey(pc.notMe.Key), tag, counter)
+			//			log.Printf("%s.%s[%d].\n", shortKey(pc.notMe.Key), tag, counter)
 			counter++
 		}
 	}()
@@ -481,6 +485,7 @@ func (pc *PairConn) bindRecv(channel interface{}) {
 	tag := pc.tag()
 	cc := pc.CryptoFromTag(tag)
 	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, pc.notMe.Key, MyParty.Key, tag)
+	//log.Println("bindRecv", subject)
 	chVal := reflect.ValueOf(channel)
 	if chVal.Kind() != reflect.Chan {
 		panic("Can only bind channels")
@@ -531,7 +536,7 @@ func session(nc *nats.Conn, args []string) {
 	rm := MyRoom
 	st := MyRooms[rm]
 
-//	log.Printf("Starting session. Members=\n%+v\n", st.Members)
+	//	log.Printf("Starting session. Members=\n%+v\n", st.Members)
 
 	for i, v := range st.Members {
 		if v == MyParty {
@@ -647,19 +652,19 @@ func session(nc *nats.Conn, args []string) {
 		return
 	}
 
-//	log.Printf("I am party %d of %d\n", id, numParties)
-//	log.Printf("%s (%s)\n", MyParty.Key, MyParty.Nick)
+	//	log.Printf("I am party %d of %d\n", id, numParties)
+	//	log.Printf("%s (%s)\n", MyParty.Key, MyParty.Nick)
 	for p := 0; p < numParties; p++ {
 		if p == id {
 			continue
 		}
-//		log.Printf("Working on party %d\n", p)
+		//log.Printf("Working on party %d\n", p)
 		x := xs[p]
 		if io.Leads(p) {
-//			log.Println("Starting server side for", p)
+			//log.Println("Starting server side for", p)
 			go gmw.ServerSideIOSetup(io, p, x, done)
 		} else {
-//			log.Println("Starting client side for", p)
+			//log.Println("Starting client side for", p)
 			go gmw.ClientSideIOSetup(io, p, x, false, done)
 		}
 	}
@@ -669,7 +674,7 @@ func session(nc *nats.Conn, args []string) {
 		}
 		<-done
 	}
-//	log.Println("Done setup")
+	//	log.Println("Done setup")
 
 	numBlocks = Handle.NumBlocks // make sure we have the right numBlocks
 	// copy io.blocks[1:] to make an []Io; []BlockIO is not []Io
