@@ -342,8 +342,14 @@ func client() {
 	for {
 		line, err := term.ReadLine()
 		if err != nil {
-			log.Println("Error!", err)
-			break
+			if err.Error() != "EOF" {
+				log.Println("Error!", err)
+			} else {
+				log.Println("Goodbye!")
+			}
+			leaveRoom(nc, term)
+			nc.Close()
+			return // exit
 		}
 		words := strings.Fields(line)
 		if len(words) == 0 {
@@ -647,14 +653,18 @@ func session(nc *nats.Conn, args []string) {
 	<-Handle.Done
 }
 
-func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
+func leaveRoom(nc *nats.Conn, term *terminal.Terminal) {
 	if MyRoom != nil { // leave current room; can be nil on startup only
 		Tprintf(term, "You are leaving room %s\n", MyRoom.Name)
-		err := MyRoom.Sub.Unsubscribe()
+		err := nc.Publish(fmt.Sprintf("secretary.%s", MyRoom.Name), encode(LeaveRequest{MyParty}))
 		checkError(err)
-		err = nc.Publish(fmt.Sprintf("secretary.%s", MyRoom.Name), encode(LeaveRequest{MyParty}))
+		err = MyRoom.Sub.Unsubscribe()
 		checkError(err)
 	}
+}
+
+func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
+	leaveRoom(nc, term)
 	MyRoom = &RoomState{roomName, nil, nil, nil}
 	term.SetPrompt(fmt.Sprintf("%s> ", roomName))
 	err := nc.Publish(fmt.Sprintf("secretary.%s", roomName), encode(JoinRequest{MyParty}))
@@ -708,6 +718,8 @@ func secretary() {
 			rooms[room] = true
 		}
 		switch r := p.(type) {
+		default:
+			log.Println("Error: unknown message")
 		case StartRequest:
 			var result bool = false
 			log.Println(r.Party, "asking to run in room", room)
@@ -750,6 +762,13 @@ func secretary() {
 			delete(members[room], r.Party)
 			_ = nc.Publish(room, encode(Message{MyParty, fmt.Sprintf("%s has left the room", r.Party.Nick)}))
 			log.Println("Leave", room, r)
+			numMembers := len(members[room])
+			parties := make([]Party, 0, numMembers)
+			for party, _ := range members[room] {
+				parties = append(parties, party)
+			}
+			_ = nc.Publish(room, encode(Members{parties}))
+			log.Println("Members", room, members[room])
 		case JoinRequest:
 			if _, ok := members[room]; !ok {
 				members[room] = make(map[Party]bool)
