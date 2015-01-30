@@ -480,7 +480,7 @@ func (pc *PairConn) bindSend(channel interface{}) {
 }
 
 // TODO: ought to return subscription so we can close the subscription
-func (pc *PairConn) bindRecv(channel interface{}) {
+func (pc *PairConn) bindRecv(channel interface{}) *nats.Subscription {
 	nc := pc.Nc
 	tag := pc.tag()
 	cc := pc.CryptoFromTag(tag)
@@ -490,7 +490,7 @@ func (pc *PairConn) bindRecv(channel interface{}) {
 	if chVal.Kind() != reflect.Chan {
 		panic("Can only bind channels")
 	}
-	_, err := nc.Subscribe(subject, func(m *nats.Msg) {
+	sub, err := nc.Subscribe(subject, func(m *nats.Msg) {
 		var decoderInput []byte
 		ciphertext := m.Data
 		if p2pAuth {
@@ -507,6 +507,7 @@ func (pc *PairConn) bindRecv(channel interface{}) {
 		chVal.Send(reflect.ValueOf(p)) // NB this is a blocking send.  NATS maintains a buffer before this
 	})
 	checkError(err)
+	return sub
 }
 
 func barrier(nc *nats.Conn) bool {
@@ -599,19 +600,20 @@ func session(nc *nats.Conn, args []string) {
 			// that means it receives in the fatchan sense
 			// also it is going to act as sender for the base OT
 			pc.bindSend(x.ParamChan)
-			pc.bindRecv(x.NpRecvPk)
+			s1 := pc.bindRecv(x.NpRecvPk)
 			pc.bindSend(x.NpSendEncs)
 
 			defer close(x.ParamChan)
 			defer close(x.NpRecvPk)
 			defer close(x.NpSendEncs)
+			defer s1.Unsubscribe()
 
 			for i := 0; i < numBlocks; i++ {
 				pc.bindSend(x.BlockChans[i].SAS.Rwchannel)
-				pc.bindRecv(x.BlockChans[i].CAS.Rwchannel)
-				pc.bindRecv(x.BlockChans[i].CAS.S2R)
+				s2 := pc.bindRecv(x.BlockChans[i].CAS.Rwchannel)
+				s3 := pc.bindRecv(x.BlockChans[i].CAS.S2R)
 				pc.bindSend(x.BlockChans[i].CAS.R2S)
-				pc.bindRecv(x.BlockChans[i].SAS.R2S)
+				s4 := pc.bindRecv(x.BlockChans[i].SAS.R2S)
 				pc.bindSend(x.BlockChans[i].SAS.S2R)
 
 				defer close(x.BlockChans[i].SAS.Rwchannel)
@@ -620,23 +622,28 @@ func session(nc *nats.Conn, args []string) {
 				defer close(x.BlockChans[i].CAS.R2S)
 				defer close(x.BlockChans[i].SAS.R2S)
 				defer close(x.BlockChans[i].SAS.S2R)
+				defer s2.Unsubscribe()
+				defer s3.Unsubscribe()
+				defer s4.Unsubscribe()
 			}
 		} else {
-			pc.bindRecv(x.ParamChan)
+			s1 := pc.bindRecv(x.ParamChan)
 			pc.bindSend(x.NpRecvPk)
-			pc.bindRecv(x.NpSendEncs)
+			s2 := pc.bindRecv(x.NpSendEncs)
 
 			defer close(x.ParamChan)
 			defer close(x.NpRecvPk)
 			defer close(x.NpSendEncs)
+			defer s1.Unsubscribe()
+			defer s2.Unsubscribe()
 
 			for i := 0; i < numBlocks; i++ {
-				pc.bindRecv(x.BlockChans[i].SAS.Rwchannel)
+				s3 := pc.bindRecv(x.BlockChans[i].SAS.Rwchannel)
 				pc.bindSend(x.BlockChans[i].CAS.Rwchannel)
 				pc.bindSend(x.BlockChans[i].CAS.S2R)
-				pc.bindRecv(x.BlockChans[i].CAS.R2S)
+				s4 := pc.bindRecv(x.BlockChans[i].CAS.R2S)
 				pc.bindSend(x.BlockChans[i].SAS.R2S)
-				pc.bindRecv(x.BlockChans[i].SAS.S2R)
+				s5 := pc.bindRecv(x.BlockChans[i].SAS.S2R)
 
 				defer close(x.BlockChans[i].SAS.Rwchannel)
 				defer close(x.BlockChans[i].CAS.Rwchannel)
@@ -644,6 +651,9 @@ func session(nc *nats.Conn, args []string) {
 				defer close(x.BlockChans[i].CAS.R2S)
 				defer close(x.BlockChans[i].SAS.R2S)
 				defer close(x.BlockChans[i].SAS.S2R)
+				defer s3.Unsubscribe()
+				defer s4.Unsubscribe()
+				defer s5.Unsubscribe()
 			}
 		}
 	}
