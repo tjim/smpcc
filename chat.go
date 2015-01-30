@@ -208,7 +208,6 @@ func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
 }
 
 func Init() {
-
 	gob.Register(JoinRequest{})
 	gob.Register(LeaveRequest{})
 	gob.Register(StartRequest{})
@@ -220,6 +219,7 @@ func Init() {
 }
 
 type RoomState struct {
+	Name    string
 	Sub     *nats.Subscription
 	Members []Party
 	Hash    []byte
@@ -247,8 +247,7 @@ func encode(p interface{}) []byte {
 var MyPrivateKey *[32]byte
 var MyPublicKey string
 var MyParty Party
-var MyRooms map[string]*RoomState
-var MyRoom string
+var MyRoom *RoomState
 var MyNick string
 var natsOptions nats.Options
 
@@ -276,7 +275,6 @@ func initialize() {
 	MyPublicKey = MarshalPublicKey(rawPublicKey)
 	MyNick = "AnonymousCoward"
 	MyParty = Party{MyNick, MyPublicKey}
-	MyRooms = make(map[string]*RoomState)
 }
 
 func changeNick(nick string) {
@@ -323,20 +321,23 @@ func client() {
 		panic(fmt.Sprintf("Signal: %v", s))
 	}()
 
-	term := terminal.NewTerminal(os.Stdin, "> ")
-	Tprintf(term, "Greetings, %s!\n", MyNick)
-	Tprintf(term, "Commands:\n")
-	Tprintf(term, "join foo      (join the chatroom named foo)\n")
-	Tprintf(term, "leave foo     (leave the chatroom named foo)\n")
-	Tprintf(term, "nick foo      (change your nickname to foo)\n")
-	Tprintf(term, "members       (list the parties in the current room)\n")
-	Tprintf(term, "^D            (buh-bye)\n")
-	Tprintf(term, "anything else (send anything else to your current chatroom)\n")
-
 	nc, err := nats.Connect(nats.DefaultURL)
 	if err != nil {
 		panic("unable to connect to NATS server")
 	}
+
+	term := terminal.NewTerminal(os.Stdin, "> ")
+
+	Tprintf(term, "Greetings, %s!\n", MyNick)
+	Tprintf(term, "Commands:\n")
+	Tprintf(term, "join foo      (join the chatroom named foo)\n")
+	Tprintf(term, "nick foo      (change your nickname to foo)\n")
+	Tprintf(term, "members       (list the parties in the current room)\n")
+	Tprintf(term, "run <number>  (run Vickrey with input <number>)\n")
+	Tprintf(term, "^D            (buh-bye)\n")
+	Tprintf(term, "anything else (send anything else to your current chatroom)\n")
+
+	joinRoom(nc, term, "#general")
 
 	for {
 		line, err := term.ReadLine()
@@ -361,78 +362,30 @@ func client() {
 				Tprintf(term, "Nicknames must be one word\n")
 			}
 		case "join":
-			if len(words) == 2 {
-				room := words[1]
-				MyRoom = room
-				term.SetPrompt(fmt.Sprintf("[%s]> ", MyRoom))
-				_, ok := MyRooms[room]
-				if !ok {
-					joinTerm(nc, term, room)
-				}
-			} else {
-				Tprintf(term, "Join what room?\n")
-			}
-		case "rooms":
-			for room, _ := range MyRooms {
-				Tprintf(term, "%s\n", room)
-			}
-		case "leave":
-			words = words[1:]
-			for _, room := range words {
-				if st, ok := MyRooms[room]; ok {
-					delete(MyRooms, room)
-					err = st.Sub.Unsubscribe()
-					checkError(err)
-					err = nc.Publish(fmt.Sprintf("secretary.%s", room), encode(LeaveRequest{MyParty}))
-					checkError(err)
-					if MyRoom == room {
-						if len(MyRooms) == 0 {
-							MyRoom = ""
-							term.SetPrompt(fmt.Sprintf("> "))
-						} else {
-							for r, _ := range MyRooms {
-								MyRoom = r
-								term.SetPrompt(fmt.Sprintf("[%s]> ", MyRoom))
-								break
-							}
-						}
-					}
-				} else {
-					Tprintf(term, "Not a member of %s\n", room)
-				}
+			switch {
+			case len(words) == 1:
+				Tprintf(term, "You must say what room to join\n")
+			case len(words) == 2:
+				roomName := words[1]
+				joinRoom(nc, term, roomName)
+			default:
+				Tprintf(term, "You can only join one room at once\n")
 			}
 		case "members":
-			if MyRoom == "" {
-				Tprintf(term, "You must join a room before you can see the members of the room\n")
-			} else {
-				st := MyRooms[MyRoom]
-				for _, member := range st.Members {
-					Tprintf(term, "%s (%s)\n", member.Key, member.Nick)
-				}
-				Tprintf(term, "Hash: %x\n", st.Hash)
+			for _, member := range MyRoom.Members {
+				Tprintf(term, "%s (%s)\n", member.Key, member.Nick)
 			}
+			Tprintf(term, "Hash: %x\n", MyRoom.Hash)
 		case "run":
-			if MyRoom == "" {
-				Tprintf(term, "You must join a room before you can start a computation\n")
-			} else {
-				Tprintf(term, "Starting computation\n")
-				session(nc, words[1:])
-			}
+			Tprintf(term, "Starting computation\n")
+			session(nc, words[1:])
 		case "test_crypto":
-			if MyRoom == "" {
-				Tprintf(term, "You must join a room before you can test encryption\n")
-			} else {
-				Tprintf(term, "Testing crypto\n")
-				// test crypto here
-			}
+			Tprintf(term, "Testing crypto\n")
+			// test crypto here
 		default:
-			if MyRoom != "" {
-				msg := strings.TrimSpace(line)
-				err = nc.Publish(MyRoom, encode(Message{MyParty, msg}))
-				checkError(err)
-			} else {
-				Tprintf(term, "You must join a room first\n")
-			}
+			msg := strings.TrimSpace(line)
+			err = nc.Publish(MyRoom.Name, encode(Message{MyParty, msg}))
+			checkError(err)
 		}
 	}
 }
@@ -447,7 +400,7 @@ func (pc *PairConn) bindSend(channel interface{}) {
 	nc := pc.Nc
 	tag := pc.tag()
 	cc := pc.CryptoFromTag(tag)
-	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, MyParty.Key, pc.notMe.Key, tag)
+	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom.Name, MyParty.Key, pc.notMe.Key, tag)
 	//log.Println("bindSend", subject)
 	// goroutine forwards values from channel over nats
 	go func() {
@@ -484,7 +437,7 @@ func (pc *PairConn) bindRecv(channel interface{}) *nats.Subscription {
 	nc := pc.Nc
 	tag := pc.tag()
 	cc := pc.CryptoFromTag(tag)
-	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom, pc.notMe.Key, MyParty.Key, tag)
+	subject := fmt.Sprintf("%s.%s.%s.%s", MyRoom.Name, pc.notMe.Key, MyParty.Key, tag)
 	//log.Println("bindRecv", subject)
 	chVal := reflect.ValueOf(channel)
 	if chVal.Kind() != reflect.Chan {
@@ -516,8 +469,8 @@ func barrier(nc *nats.Conn) bool {
 	if err != nil {
 		panic("2")
 	}
-	ec.BindRecvChan(fmt.Sprintf("%s.secretary.barrier", MyRoom), okChan)
-	err = nc.Publish(fmt.Sprintf("secretary.%s", MyRoom), encode(StartRequest{MyParty}))
+	ec.BindRecvChan(fmt.Sprintf("%s.secretary.barrier", MyRoom.Name), okChan)
+	err = nc.Publish(fmt.Sprintf("secretary.%s", MyRoom.Name), encode(StartRequest{MyParty}))
 	checkError(err)
 	result := <-okChan
 	close(okChan)
@@ -534,12 +487,10 @@ func session(nc *nats.Conn, args []string) {
 	Handle := vickrey.Handle
 	numBlocks := Handle.NumBlocks
 	id := -1
-	rm := MyRoom
-	st := MyRooms[rm]
 
-	//	log.Printf("Starting session. Members=\n%+v\n", st.Members)
+	//	log.Printf("Starting session. Members=\n%+v\n", MyRoom.Members)
 
-	for i, v := range st.Members {
+	for i, v := range MyRoom.Members {
 		if v == MyParty {
 			id = i
 			break
@@ -549,7 +500,7 @@ func session(nc *nats.Conn, args []string) {
 		panic("Non-member trying to start a computation in a room")
 	}
 
-	numParties := len(st.Members)
+	numParties := len(MyRoom.Members)
 	io := gmw.NewPeerIO(numBlocks, numParties, id)
 	io.Inputs = inputs
 	blocks := io.Blocks
@@ -560,7 +511,7 @@ func session(nc *nats.Conn, args []string) {
 		if p == id {
 			continue
 		}
-		notMe := st.Members[p]
+		notMe := MyRoom.Members[p]
 		recvChans[p] = pairSubscribe(nc, notMe)
 	}
 	if !barrier(nc) {
@@ -573,7 +524,7 @@ func session(nc *nats.Conn, args []string) {
 		if p == id {
 			continue
 		}
-		notMe := st.Members[p]
+		notMe := MyRoom.Members[p]
 		pc := &PairConn{nc, nil, 0, notMe}
 		pcs[p] = pc
 		go pairInit(pc, notMe, recvChans[p], done)
@@ -696,10 +647,20 @@ func session(nc *nats.Conn, args []string) {
 	<-Handle.Done
 }
 
-func joinTerm(nc *nats.Conn, term *terminal.Terminal, rm string) {
-	err := nc.Publish(fmt.Sprintf("secretary.%s", rm), encode(JoinRequest{MyParty}))
+func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
+	if MyRoom != nil { // leave current room; can be nil on startup only
+		Tprintf(term, "You are leaving room %s\n", MyRoom.Name)
+		err := MyRoom.Sub.Unsubscribe()
+		checkError(err)
+		err = nc.Publish(fmt.Sprintf("secretary.%s", MyRoom.Name), encode(LeaveRequest{MyParty}))
+		checkError(err)
+	}
+	MyRoom = &RoomState{roomName, nil, nil, nil}
+	term.SetPrompt(fmt.Sprintf("%s> ", roomName))
+	err := nc.Publish(fmt.Sprintf("secretary.%s", roomName), encode(JoinRequest{MyParty}))
 	checkError(err)
-	sub, err := nc.Subscribe(rm, func(m *nats.Msg) {
+	Tprintf(term, "You have joined room %s\n", roomName)
+	sub, err := nc.Subscribe(roomName, func(m *nats.Msg) {
 		dec := gob.NewDecoder(bytes.NewBuffer(m.Data))
 		var p interface{}
 		err := dec.Decode(&p)
@@ -709,20 +670,19 @@ func joinTerm(nc *nats.Conn, term *terminal.Terminal, rm string) {
 		switch r := p.(type) {
 		case Message:
 			if r.Party != MyParty {
-				Tprintf(term, "[%s]: %s -- (%s)\n", rm, r.Message, r.Party.Nick)
+				Tprintf(term, "%s: %s -- (%s)\n", roomName, r.Message, r.Party.Nick)
 			}
 		case Members:
-			st := MyRooms[rm]
-			st.Members = r.Parties
+			MyRoom.Members = r.Parties
 			h := sha3.New256()
-			for _, member := range st.Members {
+			for _, member := range MyRoom.Members {
 				io.WriteString(h, member.Key)
 			}
-			st.Hash = h.Sum(nil)
+			MyRoom.Hash = h.Sum(nil)
 		}
 	})
 	checkError(err)
-	MyRooms[rm] = &RoomState{sub, nil, nil} // needs lock
+	MyRoom.Sub = sub
 }
 
 func secretary() {
