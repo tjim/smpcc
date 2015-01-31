@@ -10,12 +10,10 @@ RUN pacman -S --noconfirm ocaml-findlib
 # RUN useradd -ms /bin/bash stuff
 # RUN (mkdir -p /tmp/ocaml-findlib; chown -R stuff /tmp/ocaml-findlib; cd /tmp/ocaml-findlib; curl -o PKGBUILD https://projects.archlinux.org/svntogit/community.git/plain/trunk/PKGBUILD?h=packages/ocaml-findlib; su stuff -c 'makepkg --noconfirm')
 
-RUN git clone https://github.com/kerneis/cil; cd cil; ./configure; make; make install
+RUN cd /tmp; git clone https://github.com/kerneis/cil; cd cil; ./configure; make; make install
 ADD ./cilext /tmp/cilext
 RUN cd /tmp/cilext; ocamlbuild -use-ocamlfind -package cil flattener.cma flattener.cmxs; ocamlfind install flattener META _build/flattener.cma _build/flattener.cmxs
 ADD ./compiler /tmp/compiler
 RUN cd /tmp/compiler; make; make install
-WORKDIR /root/examples
-#ENTRYPOINT ["smpcc", "-circuitlib", "gmw"]
-ENTRYPOINT ["smpcc"]
-CMD ["-circuitlib", "gmw", "vickrey.c"]
+WORKDIR /root
+ENTRYPOINT ["/bin/bash"]
