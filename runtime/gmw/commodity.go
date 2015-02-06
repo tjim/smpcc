@@ -52,28 +52,56 @@ func (t *TripleState) TripleCorrection() []byte {
 
 // NB we use the same TripleState for mask triples and multiplication triples
 
-func (t *TripleState) MaskTripleCorrection(numTriples, numBytes int) [][]byte {
-
+func (t *TripleState) MaskTripleCorrection(numTriples, numBytesTriple int) []byte {
 	A := make([]byte, numTriples/8)
+	B := make([]byte, numTriples*numBytesTriple)
+	C := make([]byte, numTriples*numBytesTriple)
 	for _, v := range t.RandomStreams {
 		v.XORKeyStream(A, A)
+		v.XORKeyStream(B, B)
+		v.XORKeyStream(C, C)
 	}
-	B := make([][]byte, numTriples)
-	C := make([][]byte, numTriples)
-	correction := make([][]byte, numTriples)
-	for j := range B {
-		B[j] = make([]byte, numBytes)
-		C[j] = make([]byte, numBytes)
-		for _, v := range t.RandomStreams {
-			v.XORKeyStream(B[j], B[j])
-			v.XORKeyStream(C[j], C[j])
-		}
+	correction := make([]byte, numTriples*numBytesTriple)
+	for j := 0; j < numTriples; j++ {
+		low := j * numBytesTriple
+		high := low + numBytesTriple
 		if bit.GetBit(A, j) == 1 {
-			correction[j] = ot.XorBytes(B[j], C[j]) // B is desired output
-		} else { // 0
-			correction[j] = C[j] // all 0 is desired output
+			ot.XorBytesTo(B[low:high], C[low:high], correction[low:high]) // B is desired output
+		} else { // the bit is 0
+			copy(correction[low:high], C[low:high]) // all 0 is desired output
 		}
-
 	}
 	return correction
+}
+
+type ClientState struct {
+	RandomStream cipher.Stream
+	CorrectionCh chan []byte
+}
+
+func (s *ClientState) triple32() {
+	numBytes := NUM_TRIPLES * 4
+	a := make([]byte, numBytes)
+	b := make([]byte, numBytes)
+	c := make([]byte, numBytes)
+	s.RandomStream.XORKeyStream(a, a)
+	s.RandomStream.XORKeyStream(b, b)
+	s.RandomStream.XORKeyStream(c, c)
+	if s.CorrectionCh != nil {
+		correction := <-s.CorrectionCh
+		c = ot.XorBytes(c, correction)
+	}
+}
+
+func (s *ClientState) maskTriple(numTriples, numBytesTriple int) {
+	a := make([]byte, numTriples/8)
+	b := make([]byte, numTriples*numBytesTriple)
+	c := make([]byte, numTriples*numBytesTriple)
+	s.RandomStream.XORKeyStream(a, a)
+	s.RandomStream.XORKeyStream(b, b)
+	s.RandomStream.XORKeyStream(c, c)
+	if s.CorrectionCh != nil {
+		correction := <-s.CorrectionCh
+		c = ot.XorBytes(c, correction)
+	}
 }
