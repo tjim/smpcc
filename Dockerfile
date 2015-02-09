@@ -1,5 +1,7 @@
 FROM l3iggs/archlinux
 
+RUN curl "https://www.archlinux.org/mirrorlist/?country=CA&country=US&protocol=http&ip_version=4&use_mirror_status=on" | sed 's/#//' > /etc/pacman.d/mirrorlist
+
 RUN pacman -Sy --noconfirm
 RUN pacman -S --noconfirm archlinux-keyring
 RUN pacman -Su --noconfirm
