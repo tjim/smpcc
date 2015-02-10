@@ -102,7 +102,7 @@ func NewCommodityClientState(ch chan []byte, distinguished bool) *CommodityClien
 	return s
 }
 
-func (s *CommodityClientState) triple32() []Triple {
+func (s *CommodityClientState) triple32(id int) []Triple {
 	numBytes := NUM_TRIPLES * 4
 	a := make([]byte, numBytes)
 	b := make([]byte, numBytes)
@@ -124,7 +124,7 @@ func (s *CommodityClientState) triple32() []Triple {
 	return result
 }
 
-func (s *CommodityClientState) maskTriple(numTriples, numBytesTriple int) []MaskTriple {
+func (s *CommodityClientState) maskTriple(id, numTriples, numBytesTriple int) []MaskTriple {
 	a := make([]byte, numTriples/8)
 	b := make([]byte, numTriples*numBytesTriple)
 	c := make([]byte, numTriples*numBytesTriple)

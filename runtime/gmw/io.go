@@ -1,10 +1,8 @@
 package gmw
 
 import (
-	"crypto/rand"
 	"fmt"
 	"github.com/tjim/fatchan"
-	"github.com/tjim/smpcc/runtime/bit"
 	"github.com/tjim/smpcc/runtime/ot"
 	"log"
 	"math/big"
@@ -77,6 +75,11 @@ type MaskTriple struct {
 	B, C []byte
 }
 
+type TripleSource interface {
+	triple32() []Triple
+	maskTriple(numTriples, numBytesTriple int) []MaskTriple
+}
+
 type GlobalIO struct {
 	n      int      /* number of parties */
 	id     int      /* id of party, range is 0..n-1 */
@@ -92,8 +95,7 @@ type BlockIO struct {
 	maskTriples []MaskTriple
 	rchannels   []chan uint32
 	wchannels   []chan uint32
-	otSenders   []*ot.StreamSender
-	otReceivers []*ot.StreamReceiver
+	source      TripleSource
 }
 
 type PeerIO struct {
@@ -195,18 +197,18 @@ func ClientSideIOSetup(peer *PeerIO, party int, x *PerNodePair, wait bool, done 
 
 	baseReceiver := ot.NewNPReceiver(ParamChan, NpRecvPk, NpSendEncs)
 	sender0 := ot.NewStreamSender(baseReceiver, x.BlockChans[0].CAS.S2R, x.BlockChans[0].CAS.R2S)
-	blocks[0].otSenders[party] = sender0
+	receiver0 := ot.NewStreamReceiver(sender0, x.BlockChans[0].SAS.R2S, x.BlockChans[0].SAS.S2R)
+
+	source := blocks[0].source.(*OtState)
+	source.senders[party] = sender0
+	source.receivers[party] = receiver0
+
 	for i := 1; i < numBlocks; i++ {
 		sender := sender0.Fork(x.BlockChans[i].CAS.S2R, x.BlockChans[i].CAS.R2S)
-		blocks[i].otSenders[party] = sender
-	}
-
-	receiver0 := ot.NewStreamReceiver(sender0, x.BlockChans[0].SAS.R2S, x.BlockChans[0].SAS.S2R)
-	blocks[0].otReceivers[party] = receiver0
-
-	for i := 1; i < numBlocks; i++ {
 		receiver := receiver0.Fork(x.BlockChans[i].SAS.R2S, x.BlockChans[i].SAS.S2R)
-		blocks[i].otReceivers[party] = receiver
+		source := blocks[i].source.(*OtState)
+		source.senders[party] = sender
+		source.receivers[party] = receiver
 	}
 
 	done <- true
@@ -246,18 +248,18 @@ func ServerSideIOSetup(peer *PeerIO, party int, x *PerNodePair, done chan bool) 
 
 	baseSender := ot.NewNPSender(x.NPChans.ParamChan, x.NPChans.NpRecvPk, x.NPChans.NpSendEncs)
 	receiver0 := ot.NewStreamReceiver(baseSender, x.BlockChans[0].CAS.R2S, x.BlockChans[0].CAS.S2R)
-	blocks[0].otReceivers[party] = receiver0
-	for i := 1; i < numBlocks; i++ {
-		receiver := receiver0.Fork(x.BlockChans[i].CAS.R2S, x.BlockChans[i].CAS.S2R)
-		blocks[i].otReceivers[party] = receiver
-	}
-
 	sender0 := ot.NewStreamSender(receiver0, x.BlockChans[0].SAS.S2R, x.BlockChans[0].SAS.R2S)
-	blocks[0].otSenders[party] = sender0
+
+	source := blocks[0].source.(*OtState)
+	source.senders[party] = sender0
+	source.receivers[party] = receiver0
 
 	for i := 1; i < numBlocks; i++ {
 		sender := sender0.Fork(x.BlockChans[i].SAS.S2R, x.BlockChans[i].SAS.R2S)
-		blocks[i].otSenders[party] = sender
+		receiver := receiver0.Fork(x.BlockChans[i].CAS.R2S, x.BlockChans[i].CAS.S2R)
+		source := blocks[i].source.(*OtState)
+		source.senders[party] = sender
+		source.receivers[party] = receiver
 	}
 
 	done <- true
@@ -276,8 +278,7 @@ func NewPeerIO(numBlocks int, numParties int, id int) *PeerIO {
 			nil, nil, nil, nil,
 			make([]chan uint32, numParties),
 			make([]chan uint32, numParties),
-			make([]*ot.StreamSender, numParties),
-			make([]*ot.StreamReceiver, numParties),
+			NewOtState(id, numParties),
 		}
 	}
 	return &io
@@ -441,33 +442,6 @@ func (x *BlockIO) Triple8() (a, b, c uint8) {
 	return result.a, result.b, result.c
 }
 
-func combine(arr []byte) uint32 {
-	if len(arr) != 4 {
-		panic("combine")
-	}
-	result := uint32(0)
-	for i, v := range arr {
-		result |= uint32(v) << uint(i*8)
-	}
-	return result
-}
-
-func piMulRMask(val []byte, receiver *ot.StreamReceiver) []ot.Message {
-	return receiver.ReceiveM(val)
-}
-
-func piMulSMask(val [][]byte, sender *ot.StreamSender) []ot.Message {
-	x0 := make([]ot.Message, len(val))
-	x1 := make([]ot.Message, len(val))
-	for i := range x0 {
-		B := val[i]
-		x0[i] = randomBytes(len(B))
-		x1[i] = ot.XorBytes(x0[i], B)
-	}
-	sender.SendM(x0, x1)
-	return x0
-}
-
 func AndVector(a byte, b []byte) []byte {
 	mask := byte(0)
 	if a != 0 {
@@ -476,132 +450,6 @@ func AndVector(a byte, b []byte) []byte {
 	result := make([]byte, len(b))
 	for i, v := range b {
 		result[i] = v & mask
-	}
-	return result
-}
-
-func maskTriple(id int, senders []*ot.StreamSender, receivers []*ot.StreamReceiver,
-	numTriples, numBytes int) []MaskTriple {
-	if numTriples%8 != 0 {
-		panic("maskTriple: can only generate mask triples in multiples of 8")
-	}
-	n := len(senders)
-	result := make([]MaskTriple, numTriples)
-	// Notation is from Figure 9 (p11) of
-	//
-	// "Multiparty Computation for Dishonest Majority: from Passive to Active Security at Low Cost"
-	// by Damgard and Orlandi
-	// http://eprint.iacr.org/2010/318
-
-	// use i to range over parties (0...n-1)
-	// use j to range over triples (0...numTriples-1)
-	A := randomBytes(numTriples / 8)
-	B := make([][]byte, numTriples)
-	for j := range B {
-		B[j] = randomBytes(numBytes)
-	}
-	C := make([][]byte, numTriples)
-	D := make([][]ot.Message, n)
-	E := make([][]ot.Message, n)
-	for i := range D {
-		if i == id {
-			continue
-		}
-		if id > i {
-			D[i] = piMulRMask(A, receivers[i])
-			E[i] = piMulSMask(B, senders[i])
-		} else {
-			E[i] = piMulSMask(B, senders[i])
-			D[i] = piMulRMask(A, receivers[i])
-		}
-	}
-	for j := range C {
-		a := bit.GetBit(A, j)
-		c := AndVector(a, B[j])
-		for i := range D {
-			if i == id {
-				continue
-			}
-			c = ot.XorBytes(c,
-				ot.XorBytes(D[i][j], E[i][j]))
-		}
-		C[j] = c
-	}
-	for j := range result {
-		a := bit.GetBit(A, j)
-		result[j] = MaskTriple{a, B[j], C[j]}
-	}
-	return result
-}
-
-func piMulR(val []byte, receiver *ot.StreamReceiver) []byte {
-	return receiver.ReceiveMBits(val)
-}
-
-func piMulS(val []byte, sender *ot.StreamSender) []byte {
-	x0 := randomBytes(len(val))
-	x1 := ot.XorBytes(x0, val)
-	sender.SendMBits(x0, x1)
-	return x0
-}
-
-func randomBytes(numBytes int) []byte {
-	result := make([]byte, numBytes)
-	_, err := rand.Read(result)
-	if err != nil {
-		panic("random number generation")
-	}
-	return result
-}
-
-func triple32(id int, senders []*ot.StreamSender, receivers []*ot.StreamReceiver) []Triple {
-	n := len(senders)
-	result := make([]Triple, NUM_TRIPLES)
-	numBytes := NUM_TRIPLES * 4
-	// Notation is from Figure 9 (p11) of
-	//
-	// "Multiparty Computation for Dishonest Majority: from Passive to Active Security at Low Cost"
-	// by Damgard and Orlandi
-	// http://eprint.iacr.org/2010/318
-	//
-	// and Algorithm 1 from
-	//
-	// "More Efficient Oblivious Transfer and Extensions for Faster Secure Computation"
-	// Gilad Asharov and Yehuda Lindell and Thomas Schneider and Michael Zohner
-	// http://eprint.iacr.org/2013/552
-
-	a := randomBytes(numBytes)
-	b := randomBytes(numBytes)
-
-	d := make([][]byte, n)
-	e := make([][]byte, n)
-
-	for i := 0; i < n; i++ {
-		if i == id {
-			continue
-		}
-		if id > i {
-			d[i] = piMulR(a, receivers[i])
-			e[i] = piMulS(b, senders[i])
-		} else {
-			e[i] = piMulS(b, senders[i])
-			d[i] = piMulR(a, receivers[i])
-		}
-	}
-
-	c := AndBytes(a, b)
-	for i := 0; i < n; i++ {
-		if i == id {
-			continue
-		}
-		c = ot.XorBytes(c,
-			ot.XorBytes(d[i], e[i]))
-	}
-	for i := range result {
-		result[i] = Triple{combine(a[:4]), combine(b[:4]), combine(c[:4])}
-		a = a[4:]
-		b = b[4:]
-		c = c[4:]
 	}
 	return result
 }
@@ -617,9 +465,20 @@ func AndBytes(a, b []byte) []byte {
 	return result
 }
 
+func combine(arr []byte) uint32 {
+	if len(arr) != 4 {
+		panic("combine")
+	}
+	result := uint32(0)
+	for i, v := range arr {
+		result |= uint32(v) << uint(i*8)
+	}
+	return result
+}
+
 func (x *BlockIO) MaskTriple32() (a byte, B uint32, C uint32) {
 	if len(x.maskTriples) == 0 {
-		x.maskTriples = maskTriple(x.id, x.otSenders, x.otReceivers, 32, 4) // 32 triples, 4 bytes each
+		x.maskTriples = x.source.maskTriple(32, 4) // 32 triples, 4 bytes each
 	}
 	result := x.maskTriples[0]
 	x.maskTriples = x.maskTriples[1:]
@@ -628,7 +487,7 @@ func (x *BlockIO) MaskTriple32() (a byte, B uint32, C uint32) {
 
 func (x *BlockIO) Triple32() (a, b, c uint32) {
 	if len(x.triples32) == 0 {
-		x.triples32 = triple32(x.id, x.otSenders, x.otReceivers)
+		x.triples32 = x.source.triple32()
 		if log_triples && x.Id() == 0 {
 			stats_triple_chan <- true
 		}
