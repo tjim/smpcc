@@ -90,6 +90,23 @@ type Members struct {
 	Parties []Party
 }
 
+// messages from clients to commodity server
+type StartCommodity struct {
+	Hash    string
+	Parties []Party
+}
+
+type EndCommodity struct {
+}
+
+type TripleCommodity struct {
+}
+
+type MaskTripleCommodity struct {
+	numTriples     int
+	numBytesTriple int
+}
+
 type PairConn struct {
 	Nc            *nats.Conn
 	ChanMasterPRF cipher.Block
@@ -216,6 +233,10 @@ func Init() {
 	gob.Register(big.NewInt(0))
 	gob.Register(ot.HashedElGamalCiph{})
 	gob.Register(ot.MessagePair{})
+	gob.Register(StartCommodity{})
+	gob.Register(EndCommodity{})
+	gob.Register(TripleCommodity{})
+	gob.Register(MaskTripleCommodity{})
 }
 
 type RoomState struct {
@@ -693,6 +714,58 @@ func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
 	})
 	checkError(err)
 	MyRoom.Sub = sub
+}
+
+func commodity() {
+	// TODO: how to authenticate commodity server to chat participants
+	initialize()
+	states := make(map[string]*gmw.CommodityServerState)
+	nc, err := nats.Connect(nats.DefaultURL)
+	if err != nil {
+		panic("unable to connect to NATS server")
+	}
+	nc.Subscribe("commodity.>", func(m *nats.Msg) {
+		dec := gob.NewDecoder(bytes.NewBuffer(m.Data))
+		var p interface{}
+		err := dec.Decode(&p)
+		if err != nil {
+			log.Fatal("decode:", err)
+		}
+		offerHash := m.Subject[len("commodity."):] // NEED BLOCK NUMBER
+		switch r := p.(type) {
+		case StartCommodity:
+			_, ok := states[offerHash]
+			if ok {
+				// more than one offer for hash, something is wrong, halt that computation
+				delete(states, offerHash)
+				break
+			}
+			if r.Hash != offerHash {
+				// hashes don't match, ignore it
+				break
+			}
+			chs := make([]chan []byte, len(r.Parties))
+			ec, _ := nats.NewEncodedConn(nc, "gob")
+			for i, ch := range chs {
+				ec.BindSendChan(fmt.Sprintf("commodity.%s.%s", offerHash, r.Parties[i].Key), ch)
+			}
+			// ALL CHANNELS NEED AUTHENTICATED ENCRYPTION
+			// FIRST CHANNEL NEEDS SECURE SESSION
+			states[offerHash] = gmw.NewCommodityServerState(chs)
+		case EndCommodity:
+			delete(states, offerHash)
+		case TripleCommodity:
+			s, ok := states[offerHash]
+			if ok {
+				s.TripleCorrection()
+			}
+		case MaskTripleCommodity:
+			s, ok := states[offerHash]
+			if ok {
+				s.MaskTripleCorrection(r.numTriples, r.numBytesTriple)
+			}
+		}
+	})
 }
 
 func secretary() {
