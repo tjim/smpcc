@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/gob"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"github.com/apcera/nats"
 	"github.com/tjim/smpcc/runtime/gmw"
@@ -283,6 +284,7 @@ var MyParty Party
 var MyRoom *RoomState
 var MyNick string
 var natsOptions nats.Options
+var args []string // holds command line arguments after flag parsing
 
 func handleNats(condition string) func(*nats.Conn) {
 	return func(c *nats.Conn) {
@@ -308,6 +310,10 @@ func initialize() {
 	MyPublicKey = MarshalPublicKey(rawPublicKey)
 	MyNick = "AnonymousCoward"
 	MyParty = Party{MyNick, MyPublicKey}
+
+	flag.StringVar(&natsOptions.Url, "server", nats.DefaultURL, "nats address (default nats://localhost:4222)")
+	flag.Parse()
+	args = flag.Args()
 }
 
 func changeNick(nick string) {
@@ -340,7 +346,6 @@ func Tprintf(term *terminal.Terminal, format string, v ...interface{}) {
 }
 
 func client() {
-	initialize()
 	oldState, err := terminal.MakeRaw(0)
 	if err != nil {
 		panic(err.Error())
@@ -354,7 +359,7 @@ func client() {
 		panic(fmt.Sprintf("Signal: %v", s))
 	}()
 
-	nc, err := nats.Connect(nats.DefaultURL)
+	nc, err := natsOptions.Connect()
 	if err != nil {
 		panic("unable to connect to NATS server")
 	}
@@ -763,7 +768,7 @@ func commodity() {
 	// TODO: how to authenticate commodity server to chat participants
 	initialize()
 	states := make(map[string]*gmw.CommodityServerState)
-	nc, err := nats.Connect(nats.DefaultURL)
+	nc, err := natsOptions.Connect()
 	if err != nil {
 		panic("unable to connect to NATS server")
 	}
@@ -813,12 +818,11 @@ func commodity() {
 
 func secretary() {
 	log.Println("starting secretary")
-	initialize()
 	changeNick("ChatAdministrator")
 	rooms := make(map[string]bool)
 	members := make(map[string](map[Party]bool))
 	starters := make(map[string](map[Party]bool))
-	nc, err := nats.Connect(nats.DefaultURL)
+	nc, err := natsOptions.Connect()
 	if err != nil {
 		panic("unable to connect to NATS server")
 	}
@@ -913,7 +917,8 @@ func checkError(err error) {
 }
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "secretary" {
+	initialize()
+	if len(args) > 0 && args[0] == "secretary" {
 		secretary()
 	} else {
 		client()
