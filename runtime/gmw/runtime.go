@@ -9,8 +9,14 @@ import (
 	"strings"
 )
 
-var Hosts map[int] string = make(map[int]string)
-var Ports map[int] int = make(map[int]int)
+type MPC struct {
+	NumBlocks int
+	Main      func(io Io, ios []Io)
+	Done      chan bool
+}
+
+var Hosts map[int]string = make(map[int]string)
+var Ports map[int]int = make(map[int]int)
 
 // Read a configuration file, which consists a series lines of the form host:port, on per party, in order.
 // Return maps of hosts and ports, so hosts[i] is the host of party i and ports[i] is its base port.
@@ -41,7 +47,7 @@ func ReadConfig(filename string) bool {
 func SetupHostsPorts(parties int) {
 	for i := 0; i < parties; i++ {
 		Hosts[i] = "127.0.0.1"
-		Ports[i] = base_port + i * parties
+		Ports[i] = base_port + i*parties
 	}
 }
 

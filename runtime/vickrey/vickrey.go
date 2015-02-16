@@ -497,10 +497,4 @@ func block10(io Io, ch chan uint64, mask bool, ___main_penultimate_0 uint32, __m
 
 var _main_done = make(chan bool, 1)
 
-type MPC struct {
-	NumBlocks int
-	Main      func(io Io, ios []Io)
-	Done      chan bool
-}
-
 var Handle = MPC{11, blocks_main, _main_done}

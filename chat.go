@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/apcera/nats"
 	"github.com/tjim/smpcc/runtime/gmw"
+	"github.com/tjim/smpcc/runtime/max"
 	"github.com/tjim/smpcc/runtime/ot"
 	"github.com/tjim/smpcc/runtime/vickrey"
 	"golang.org/x/crypto/nacl/box"
@@ -74,6 +75,11 @@ type JoinRequest struct {
 
 type LeaveRequest struct {
 	Party
+}
+
+type FuncRequest struct {
+	Party
+	FunctionName string
 }
 
 type StartRequest struct {
@@ -198,9 +204,13 @@ func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
 
 	sendChan := make(chan []byte)
 	ec.BindSendChan(fmt.Sprintf("KEY-AGREEMENT-%s-%s", notMe.Key, MyPublicKey), sendChan)
-
+	sendChan <- []byte(MyRoom.MpcFunc)
 	sendChan <- nonce[:]
 	sendChan <- ciphertext
+	oMpcFunc := <-recvChan
+	if MyRoom.MpcFunc != string(oMpcFunc) {
+		panic("Disagreement on MPC function.")
+	}
 	oNonceArr := <-recvChan
 	var oNonce [24]byte
 	copy(oNonce[:], oNonceArr)
@@ -228,6 +238,7 @@ func Init() {
 	gob.Register(JoinRequest{})
 	gob.Register(LeaveRequest{})
 	gob.Register(StartRequest{})
+	gob.Register(FuncRequest{})
 	gob.Register(Message{})
 	gob.Register(Members{})
 	gob.Register(big.NewInt(0))
@@ -244,6 +255,7 @@ type RoomState struct {
 	Sub     *nats.Subscription
 	Members []Party
 	Hash    []byte
+	MpcFunc string
 }
 
 func (st RoomState) indexOfParty(p Party) (int, error) {
@@ -351,12 +363,13 @@ func client() {
 
 	Tprintf(term, "Greetings, %s!\n", MyNick)
 	Tprintf(term, "Commands:\n")
-	Tprintf(term, "join foo      (join the chatroom named foo)\n")
-	Tprintf(term, "nick foo      (change your nickname to foo)\n")
-	Tprintf(term, "members       (list the parties in the current room)\n")
-	Tprintf(term, "run <number>  (run Vickrey with input <number>)\n")
-	Tprintf(term, "^D            (buh-bye)\n")
-	Tprintf(term, "anything else (send anything else to your current chatroom)\n")
+	Tprintf(term, "join foo      	(join the chatroom named foo)\n")
+	Tprintf(term, "nick foo      	(change your nickname to foo)\n")
+	Tprintf(term, "members       	(list the parties in the current room)\n")
+	Tprintf(term, "func <function>  (propose a function for computation)\n")
+	Tprintf(term, "run <number>  	(run max with input <number>)\n")
+	Tprintf(term, "^D            	(buh-bye)\n")
+	Tprintf(term, "anything else 	(send anything else to your current chatroom)\n")
 
 	joinRoom(nc, term, "#general")
 
@@ -403,6 +416,16 @@ func client() {
 				Tprintf(term, "%s (%s)\n", member.Key, member.Nick)
 			}
 			Tprintf(term, "Hash: %x\n", MyRoom.Hash)
+		case "func":
+			switch {
+			case len(words) == 1:
+				Tprintf(term, "You must say what function you want to compute\n")
+			case len(words) == 2:
+				funcName := words[1]
+				proposeFunc(nc, term, funcName)
+			default:
+				Tprintf(term, "You can only propose one function at once\n")
+			}
 		case "run":
 			Tprintf(term, "Starting computation\n")
 			session(nc, words[1:])
@@ -511,7 +534,15 @@ func session(nc *nats.Conn, args []string) {
 		fmt.Sscanf(v, "%d", &input)
 		inputs[i] = uint32(input)
 	}
-	Handle := vickrey.Handle
+	// var Handle
+	var Handle gmw.MPC
+	switch MyRoom.MpcFunc {
+	case "max":
+		Handle = max.Handle
+	case "vickrey":
+		Handle = vickrey.Handle
+	}
+
 	numBlocks := Handle.NumBlocks
 	id := -1
 
@@ -684,14 +715,21 @@ func leaveRoom(nc *nats.Conn, term *terminal.Terminal) {
 	}
 }
 
+func proposeFunc(nc *nats.Conn, term *terminal.Terminal, funcName string) {
+	term.SetPrompt(fmt.Sprintf("%s [%s]> ", MyRoom.Name, funcName))
+	err := nc.Publish(MyRoom.Name, encode(FuncRequest{MyParty, funcName}))
+	checkError(err)
+}
+
 func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
 	leaveRoom(nc, term)
-	MyRoom = &RoomState{roomName, nil, nil, nil}
+	MyRoom = &RoomState{roomName, nil, nil, nil, ""}
 	term.SetPrompt(fmt.Sprintf("%s> ", roomName))
 	err := nc.Publish(fmt.Sprintf("secretary.%s", roomName), encode(JoinRequest{MyParty}))
 	checkError(err)
 	Tprintf(term, "You have joined room %s\n", roomName)
 	sub, err := nc.Subscribe(roomName, func(m *nats.Msg) {
+		// Tprintf(term, "Received\n")
 		dec := gob.NewDecoder(bytes.NewBuffer(m.Data))
 		var p interface{}
 		err := dec.Decode(&p)
@@ -710,6 +748,11 @@ func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
 				io.WriteString(h, member.Key)
 			}
 			MyRoom.Hash = h.Sum(nil)
+		case FuncRequest:
+			MyRoom.MpcFunc = r.FunctionName
+			if r.Party != MyParty {
+				Tprintf(term, "%s: Function proposed: %s -- (%s)\n", roomName, MyRoom.MpcFunc, r.Party.Nick)
+			}
 		}
 	})
 	checkError(err)
