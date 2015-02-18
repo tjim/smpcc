@@ -311,8 +311,14 @@ func initialize() {
 	MyNick = "AnonymousCoward"
 	MyParty = Party{MyNick, MyPublicKey}
 
-	flag.StringVar(&natsOptions.Url, "server", nats.DefaultURL, "nats address (default nats://localhost:4222)")
+	var serverAddress string
+	flag.StringVar(&serverAddress, "server", "localhost:4222", "NATS server address (default localhost:4222)")
 	flag.Parse()
+	if strings.Contains(serverAddress, ":") {
+		natsOptions.Url = "nats://" + serverAddress
+	} else {
+		natsOptions.Url = "nats://" + serverAddress + ":4222"
+	}
 	args = flag.Args()
 }
 
