@@ -433,7 +433,9 @@ func client() {
 			}
 		case "run":
 			Tprintf(term, "Starting computation\n")
-			session(nc, words[1:])
+			session(nc, term, words[1:])
+			MyRoom.MpcFunc = ""
+			term.SetPrompt(fmt.Sprintf("%s> ", MyRoom.Name))
 		case "test_crypto":
 			Tprintf(term, "Testing crypto\n")
 			// test crypto here
@@ -532,7 +534,7 @@ func barrier(nc *nats.Conn) bool {
 	return result
 }
 
-func session(nc *nats.Conn, args []string) {
+func session(nc *nats.Conn, term *terminal.Terminal, args []string) {
 	inputs := make([]uint32, len(args))
 	for i, v := range args {
 		input := 0
@@ -546,6 +548,12 @@ func session(nc *nats.Conn, args []string) {
 		Handle = max.Handle
 	case "vickrey":
 		Handle = vickrey.Handle
+	case "":
+		Tprintf(term, "Before running a computation you must specify a function (use the 'func' command)\n")
+		return
+	default:
+		Tprintf(term, "Unknown function '%s'\n", MyRoom.MpcFunc)
+		return
 	}
 
 	numBlocks := Handle.NumBlocks
@@ -721,7 +729,6 @@ func leaveRoom(nc *nats.Conn, term *terminal.Terminal) {
 }
 
 func proposeFunc(nc *nats.Conn, term *terminal.Terminal, funcName string) {
-	term.SetPrompt(fmt.Sprintf("%s [%s]> ", MyRoom.Name, funcName))
 	err := nc.Publish(MyRoom.Name, encode(FuncRequest{MyParty, funcName}))
 	checkError(err)
 }
@@ -755,9 +762,8 @@ func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
 			MyRoom.Hash = h.Sum(nil)
 		case FuncRequest:
 			MyRoom.MpcFunc = r.FunctionName
-			if r.Party != MyParty {
-				Tprintf(term, "%s: Function proposed: %s -- (%s)\n", roomName, MyRoom.MpcFunc, r.Party.Nick)
-			}
+			term.SetPrompt(fmt.Sprintf("%s [%s]> ", MyRoom.Name, MyRoom.MpcFunc))
+			Tprintf(term, "%s: Function proposed: %s -- (%s)\n", roomName, MyRoom.MpcFunc, r.Party.Nick)
 		}
 	})
 	checkError(err)
