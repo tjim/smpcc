@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"time"
 )
 
 var p2pAuth bool = true // temporary debugging flag, set to false to disable authentication and encryption
@@ -838,6 +839,15 @@ func secretary() {
 	if err != nil {
 		panic("unable to connect to NATS server")
 	}
+
+	// Go routine to ping room members to see if they're still there.
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			// pinging code will go here
+		}
+	}()
+
 	nc.Subscribe("secretary.>", func(m *nats.Msg) {
 		dec := gob.NewDecoder(bytes.NewBuffer(m.Data))
 		var p interface{}
