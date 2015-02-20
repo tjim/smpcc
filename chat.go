@@ -297,6 +297,31 @@ func handleError(c *nats.Conn, s *nats.Subscription, err error) {
 	log.Println("Nats error:", err)
 }
 
+var names []string = []string{
+	"Alice",
+	"Archie",
+	"Bailey",
+	"Bella",
+	"Bob",
+	"Buddy",
+	"Charlie",
+	"Coco",
+	"Daisy",
+	"Harry",
+	"Jack",
+	"Lucy",
+	"Max",
+	"Millie",
+	"Milo",
+	"Molly",
+	"Oscar",
+	"Poppy",
+	"Rosie",
+	"Roxy",
+	"Ruby",
+	"Toby",
+}
+
 func initialize() {
 	Init()
 
@@ -309,7 +334,11 @@ func initialize() {
 	rawPublicKey, rawPrivateKey, _ := box.GenerateKey(rand.Reader)
 	MyPrivateKey = rawPrivateKey
 	MyPublicKey = MarshalPublicKey(rawPublicKey)
-	MyNick = "AnonymousCoward"
+	nameIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(names))))
+	if err != nil {
+		log.Fatal(err)
+	}
+	MyNick = names[int(nameIndex.Int64())]
 	MyParty = Party{MyNick, MyPublicKey}
 
 	var serverAddress string
