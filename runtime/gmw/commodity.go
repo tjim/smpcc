@@ -61,9 +61,8 @@ func (s *CommodityServerState) TripleCorrection() []byte {
 // A designated party generates a random share of (a,B,C) but also receives a **correction** from the commodity server
 // The server can calculate the correction because it knows the randomness of each party
 // The correction is XORed by the designated party with their c component, resulting in a true mask triple
-
+//
 // NB we use the same CommodityServerState for mask triples and multiplication triples
-
 func (s *CommodityServerState) MaskTripleCorrection(numTriples, numBytesTriple int) []byte {
 	A := make([]byte, numTriples/8)
 	B := make([]byte, numTriples*numBytesTriple)

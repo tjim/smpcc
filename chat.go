@@ -757,6 +757,191 @@ func session(nc *nats.Conn, term *terminal.Terminal, args []string) {
 	<-Handle.Done
 }
 
+func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
+	inputs := make([]uint32, len(args))
+	for i, v := range args {
+		input := 0
+		fmt.Sscanf(v, "%d", &input)
+		inputs[i] = uint32(input)
+	}
+	var Handle gmw.MPC
+	switch MyRoom.MpcFunc {
+	case "max":
+		Handle = max.Handle
+	case "vickrey":
+		Handle = vickrey.Handle
+	case "":
+		Tprintf(term, "Before running a computation you must specify a function (use the 'func' command)\n")
+		return
+	default:
+		Tprintf(term, "Unknown function '%s'\n", MyRoom.MpcFunc)
+		return
+	}
+
+	numBlocks := Handle.NumBlocks
+	id := -1
+
+	//	log.Printf("Starting session. Members=\n%+v\n", MyRoom.Members)
+
+	for i, v := range MyRoom.Members {
+		if v == MyParty {
+			id = i
+			break
+		}
+	}
+	if id == -1 {
+		panic("Non-member trying to start a computation in a room")
+	}
+
+	numParties := len(MyRoom.Members)
+	io := gmw.NewPeerIO(numBlocks, numParties, id)
+	io.Inputs = inputs
+	blocks := io.Blocks
+	numBlocks = len(blocks) // increased by one by NewPeerIo
+
+	recvChans := make([]chan []byte, numParties)
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		notMe := MyRoom.Members[p]
+		recvChans[p] = pairSubscribe(nc, notMe)
+	}
+	if !barrier(nc) {
+		log.Println("Computation halted on error")
+		return
+	}
+	pcs := make([]*PairConn, numParties)
+	done := make(chan bool)
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		notMe := MyRoom.Members[p]
+		pc := &PairConn{nc, nil, 0, notMe}
+		pcs[p] = pc
+		go pairInit(pc, notMe, recvChans[p], done)
+	}
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		<-done
+	}
+
+//	ec.BindRecvChan(fmt.Sprintf("commodity.%s.%s", offerHash, MyKey), ch)
+
+	xs := make([]*gmw.PerNodePair, numParties)
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		x := gmw.NewPerNodePair(io)
+		xs[p] = x
+
+		pc := pcs[p]
+
+		if io.Leads(p) {
+			// leader is server
+			// that means it receives in the fatchan sense
+			// also it is going to act as sender for the base OT
+			pc.bindSend(x.ParamChan)
+			s1 := pc.bindRecv(x.NpRecvPk)
+			pc.bindSend(x.NpSendEncs)
+
+			defer close(x.ParamChan)
+			defer close(x.NpRecvPk)
+			defer close(x.NpSendEncs)
+			defer s1.Unsubscribe()
+
+			for i := 0; i < numBlocks; i++ {
+				pc.bindSend(x.BlockChans[i].SAS.Rwchannel)
+				s2 := pc.bindRecv(x.BlockChans[i].CAS.Rwchannel)
+				s3 := pc.bindRecv(x.BlockChans[i].CAS.S2R)
+				pc.bindSend(x.BlockChans[i].CAS.R2S)
+				s4 := pc.bindRecv(x.BlockChans[i].SAS.R2S)
+				pc.bindSend(x.BlockChans[i].SAS.S2R)
+
+				defer close(x.BlockChans[i].SAS.Rwchannel)
+				defer close(x.BlockChans[i].CAS.Rwchannel)
+				defer close(x.BlockChans[i].CAS.S2R)
+				defer close(x.BlockChans[i].CAS.R2S)
+				defer close(x.BlockChans[i].SAS.R2S)
+				defer close(x.BlockChans[i].SAS.S2R)
+				defer s2.Unsubscribe()
+				defer s3.Unsubscribe()
+				defer s4.Unsubscribe()
+			}
+		} else {
+			s1 := pc.bindRecv(x.ParamChan)
+			pc.bindSend(x.NpRecvPk)
+			s2 := pc.bindRecv(x.NpSendEncs)
+
+			defer close(x.ParamChan)
+			defer close(x.NpRecvPk)
+			defer close(x.NpSendEncs)
+			defer s1.Unsubscribe()
+			defer s2.Unsubscribe()
+
+			for i := 0; i < numBlocks; i++ {
+				s3 := pc.bindRecv(x.BlockChans[i].SAS.Rwchannel)
+				pc.bindSend(x.BlockChans[i].CAS.Rwchannel)
+				pc.bindSend(x.BlockChans[i].CAS.S2R)
+				s4 := pc.bindRecv(x.BlockChans[i].CAS.R2S)
+				pc.bindSend(x.BlockChans[i].SAS.R2S)
+				s5 := pc.bindRecv(x.BlockChans[i].SAS.S2R)
+
+				defer close(x.BlockChans[i].SAS.Rwchannel)
+				defer close(x.BlockChans[i].CAS.Rwchannel)
+				defer close(x.BlockChans[i].CAS.S2R)
+				defer close(x.BlockChans[i].CAS.R2S)
+				defer close(x.BlockChans[i].SAS.R2S)
+				defer close(x.BlockChans[i].SAS.S2R)
+				defer s3.Unsubscribe()
+				defer s4.Unsubscribe()
+				defer s5.Unsubscribe()
+			}
+		}
+	}
+	if !barrier(nc) {
+		log.Println("Computation halted on error")
+		return
+	}
+
+	//	log.Printf("I am party %d of %d\n", id, numParties)
+	//	log.Printf("%s (%s)\n", MyParty.Key, MyParty.Nick)
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		//log.Printf("Working on party %d\n", p)
+		x := xs[p]
+		if io.Leads(p) {
+			//log.Println("Starting server side for", p)
+			go gmw.ServerSideIOSetup(io, p, x, done)
+		} else {
+			//log.Println("Starting client side for", p)
+			go gmw.ClientSideIOSetup(io, p, x, false, done)
+		}
+	}
+	for p := 0; p < numParties; p++ {
+		if p == id {
+			continue
+		}
+		<-done
+	}
+	//	log.Println("Done setup")
+
+	numBlocks = Handle.NumBlocks // make sure we have the right numBlocks
+	// copy io.blocks[1:] to make an []Io; []BlockIO is not []Io
+	x := make([]gmw.Io, numBlocks)
+	for j := 0; j < numBlocks; j++ {
+		x[j] = io.Blocks[j+1]
+	}
+	go Handle.Main(io.Blocks[0], x)
+	<-Handle.Done
+}
+
 func leaveRoom(nc *nats.Conn, term *terminal.Terminal) {
 	if MyRoom != nil { // leave current room; can be nil on startup only
 		Tprintf(term, "You are leaving room %s\n", MyRoom.Name)
@@ -809,22 +994,25 @@ func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
 	MyRoom.Sub = sub
 }
 
+// The GMW commodity server
 func commodity() {
 	// TODO: how to authenticate commodity server to chat participants
 	initialize()
-	states := make(map[string]*gmw.CommodityServerState)
 	nc, err := natsOptions.Connect()
 	if err != nil {
 		panic("unable to connect to NATS server")
 	}
+	states := make(map[string]*gmw.CommodityServerState) // maintain one state per computation hash
 	nc.Subscribe("commodity.>", func(m *nats.Msg) {
 		dec := gob.NewDecoder(bytes.NewBuffer(m.Data))
 		var p interface{}
 		err := dec.Decode(&p)
 		if err != nil {
-			log.Fatal("decode:", err)
+			log.Println("decode:", err)
+			return
 		}
 		offerHash := m.Subject[len("commodity."):] // NEED BLOCK NUMBER
+		// TODO: all messages should be from party 0
 		switch r := p.(type) {
 		case StartCommodity:
 			_, ok := states[offerHash]
@@ -974,6 +1162,8 @@ func main() {
 	initialize()
 	if len(args) > 0 && args[0] == "secretary" {
 		secretary()
+	} else if len(args) > 0 && args[0] == "commodity" {
+		commodity()
 	} else {
 		client()
 	}
