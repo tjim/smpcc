@@ -133,6 +133,9 @@ func (p *PairConn) CryptoFromTag(tag string) ChannelCrypto {
 	hashedTagPrg := sha3.Sum256([]byte("PRG_" + tag))
 	prgSeed := make([]byte, 32)
 	key := make([]byte, 32)
+
+	// Create two separate stream ciphers: one for generating pseudorandom values,
+	// and one for encrypting payloads
 	p.ChanMasterPRF.Encrypt(key, hashedTagKey[:])
 	p.ChanMasterPRF.Encrypt(prgSeed, hashedTagPrg[:])
 	cc.PRG = ot.NewPRG(prgSeed)
