@@ -22,6 +22,7 @@ func NewCommodityServerState(partyCh []chan []byte) *CommodityServerState {
 		s.RandomStreams[i] = ot.NewPRG(seed)
 		partyCh[i] <- seed
 	}
+	// close channels to all but the distinguished (first) party
 	partyCh = partyCh[1:]
 	for _, ch := range partyCh {
 		close(ch)
@@ -90,18 +91,21 @@ type CommodityClientState struct {
 	CorrectionCh chan []byte
 }
 
-func NewCommodityClientState(ch chan []byte, distinguished bool) *CommodityClientState {
-	seed := <-ch
-	s := &CommodityClientState{ot.NewPRG(seed), nil}
-	if distinguished {
-		s.CorrectionCh = ch
-	} else {
-		close(ch) // in NATS this will be a subscription channel, we must unsubscribe as well
-	}
+func NewCommodityClientState(ch chan []byte) *CommodityClientState {
+	s := &CommodityClientState{nil, ch}
 	return s
 }
 
-func (s *CommodityClientState) triple32(id int) []Triple {
+func InitCommodityClientState(s *CommodityClientState, distinguished bool) {
+	seed := <-s.CorrectionCh
+	s.RandomStream = ot.NewPRG(seed)
+	if !distinguished {
+		s.CorrectionCh = nil
+		// we do not close the channel, in NATS this will be a subscription channel, we must unsubscribe as well, so caller closes
+	}
+}
+
+func (s *CommodityClientState) triple32() []Triple {
 	numBytes := NUM_TRIPLES * 4
 	a := make([]byte, numBytes)
 	b := make([]byte, numBytes)
@@ -123,7 +127,7 @@ func (s *CommodityClientState) triple32(id int) []Triple {
 	return result
 }
 
-func (s *CommodityClientState) maskTriple(id, numTriples, numBytesTriple int) []MaskTriple {
+func (s *CommodityClientState) maskTriple(numTriples, numBytesTriple int) []MaskTriple {
 	a := make([]byte, numTriples/8)
 	b := make([]byte, numTriples*numBytesTriple)
 	c := make([]byte, numTriples*numBytesTriple)

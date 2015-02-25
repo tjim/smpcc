@@ -100,7 +100,6 @@ type Members struct {
 
 // messages from clients to commodity server
 type StartCommodity struct {
-	Hash    string
 	Parties []Party
 }
 
@@ -829,101 +828,71 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 		<-done
 	}
 
-//	ec.BindRecvChan(fmt.Sprintf("commodity.%s.%s", offerHash, MyKey), ch)
-
-	xs := make([]*gmw.PerNodePair, numParties)
-	for p := 0; p < numParties; p++ {
-		if p == id {
-			continue
-		}
-		x := gmw.NewPerNodePair(io)
-		xs[p] = x
-
-		pc := pcs[p]
-
-		if io.Leads(p) {
-			// leader is server
-			// that means it receives in the fatchan sense
-			// also it is going to act as sender for the base OT
-			pc.bindSend(x.ParamChan)
-			s1 := pc.bindRecv(x.NpRecvPk)
-			pc.bindSend(x.NpSendEncs)
-
-			defer close(x.ParamChan)
-			defer close(x.NpRecvPk)
-			defer close(x.NpSendEncs)
-			defer s1.Unsubscribe()
-
-			for i := 0; i < numBlocks; i++ {
-				pc.bindSend(x.BlockChans[i].SAS.Rwchannel)
-				s2 := pc.bindRecv(x.BlockChans[i].CAS.Rwchannel)
-				s3 := pc.bindRecv(x.BlockChans[i].CAS.S2R)
-				pc.bindSend(x.BlockChans[i].CAS.R2S)
-				s4 := pc.bindRecv(x.BlockChans[i].SAS.R2S)
-				pc.bindSend(x.BlockChans[i].SAS.S2R)
-
-				defer close(x.BlockChans[i].SAS.Rwchannel)
-				defer close(x.BlockChans[i].CAS.Rwchannel)
-				defer close(x.BlockChans[i].CAS.S2R)
-				defer close(x.BlockChans[i].CAS.R2S)
-				defer close(x.BlockChans[i].SAS.R2S)
-				defer close(x.BlockChans[i].SAS.S2R)
-				defer s2.Unsubscribe()
-				defer s3.Unsubscribe()
-				defer s4.Unsubscribe()
+	for _, block := range blocks {
+		for p := 0; p < numParties; p++ {
+			if p == id {
+				continue
 			}
-		} else {
-			s1 := pc.bindRecv(x.ParamChan)
-			pc.bindSend(x.NpRecvPk)
-			s2 := pc.bindRecv(x.NpSendEncs)
+			block.Rchannels[p] = make(chan uint32)
+			block.Wchannels[p] = make(chan uint32)
 
-			defer close(x.ParamChan)
-			defer close(x.NpRecvPk)
-			defer close(x.NpSendEncs)
-			defer s1.Unsubscribe()
-			defer s2.Unsubscribe()
+			pc := pcs[p]
+			sub := pc.bindRecv(block.Rchannels[p])
+			pc.bindSend(block.Wchannels[p])
 
-			for i := 0; i < numBlocks; i++ {
-				s3 := pc.bindRecv(x.BlockChans[i].SAS.Rwchannel)
-				pc.bindSend(x.BlockChans[i].CAS.Rwchannel)
-				pc.bindSend(x.BlockChans[i].CAS.S2R)
-				s4 := pc.bindRecv(x.BlockChans[i].CAS.R2S)
-				pc.bindSend(x.BlockChans[i].SAS.R2S)
-				s5 := pc.bindRecv(x.BlockChans[i].SAS.S2R)
-
-				defer close(x.BlockChans[i].SAS.Rwchannel)
-				defer close(x.BlockChans[i].CAS.Rwchannel)
-				defer close(x.BlockChans[i].CAS.S2R)
-				defer close(x.BlockChans[i].CAS.R2S)
-				defer close(x.BlockChans[i].SAS.R2S)
-				defer close(x.BlockChans[i].SAS.S2R)
-				defer s3.Unsubscribe()
-				defer s4.Unsubscribe()
-				defer s5.Unsubscribe()
-			}
+			defer close(block.Rchannels[p])
+			defer close(block.Wchannels[p])
+			defer sub.Unsubscribe()
 		}
 	}
+
+	for i, block := range blocks {
+		for p := 0; p < numParties; p++ {
+			if p == id {
+				continue
+			}
+			correctionCh := make(chan []byte)
+			block.Source = gmw.NewCommodityClientState(correctionCh)
+
+			ec, err := nats.NewEncodedConn(nc, "gob")
+			if err != nil {
+				panic(err)
+			}
+			offerHash := MyRoom.Hash // TODO: Hash needs to be improved
+			sub, err := ec.BindRecvChan(fmt.Sprintf("commodity.%s.%d", offerHash, i), correctionCh)
+			if err != nil {
+				panic(err)
+			}
+
+			// non-distinguished parties could close earlier
+			defer close(correctionCh)
+			defer sub.Unsubscribe()
+		}
+	}
+
 	if !barrier(nc) {
 		log.Println("Computation halted on error")
 		return
 	}
 
-	//	log.Printf("I am party %d of %d\n", id, numParties)
-	//	log.Printf("%s (%s)\n", MyParty.Key, MyParty.Nick)
-	for p := 0; p < numParties; p++ {
-		if p == id {
-			continue
-		}
-		//log.Printf("Working on party %d\n", p)
-		x := xs[p]
-		if io.Leads(p) {
-			//log.Println("Starting server side for", p)
-			go gmw.ServerSideIOSetup(io, p, x, done)
-		} else {
-			//log.Println("Starting client side for", p)
-			go gmw.ClientSideIOSetup(io, p, x, false, done)
+	// Distinguished party sends StartCommodity message
+	if id == 0 {
+		for i, _ := range blocks {
+			err := nc.Publish(fmt.Sprintf("commodity.%s.%d", MyRoom.Hash, i), encode(StartCommodity{MyRoom.Members}))
+			checkError(err)
 		}
 	}
+
+	for _, block := range blocks {
+		for p := 0; p < numParties; p++ {
+			if p == id {
+				continue
+			}
+			distinguished := p == 0
+			gmw.InitCommodityClientState(block.Source.(*gmw.CommodityClientState), distinguished)
+		}
+	}
+
 	for p := 0; p < numParties; p++ {
 		if p == id {
 			continue
@@ -940,6 +909,13 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 	}
 	go Handle.Main(io.Blocks[0], x)
 	<-Handle.Done
+	// Distinguished party sends EndCommodity message
+	if id == 0 {
+		for i, _ := range blocks {
+			err := nc.Publish(fmt.Sprintf("commodity.%s.%d", MyRoom.Hash, i), encode(EndCommodity{}))
+			checkError(err)
+		}
+	}
 }
 
 func leaveRoom(nc *nats.Conn, term *terminal.Terminal) {
@@ -1019,10 +995,6 @@ func commodity() {
 			if ok {
 				// more than one offer for hash, something is wrong, halt that computation
 				delete(states, offerHash)
-				break
-			}
-			if r.Hash != offerHash {
-				// hashes don't match, ignore it
 				break
 			}
 			chs := make([]chan []byte, len(r.Parties))

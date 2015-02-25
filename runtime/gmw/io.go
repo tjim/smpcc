@@ -93,9 +93,9 @@ type BlockIO struct {
 	triples8    []struct{ a, b, c uint8 }
 	triples1    []struct{ a, b, c bool }
 	maskTriples []MaskTriple
-	rchannels   []chan uint32
-	wchannels   []chan uint32
-	source      TripleSource
+	Rchannels   []chan uint32
+	Wchannels   []chan uint32
+	Source      TripleSource
 }
 
 type PeerIO struct {
@@ -191,22 +191,22 @@ func ClientSideIOSetup(peer *PeerIO, party int, x *PerNodePair, wait bool, done 
 		time.Sleep(3 * time.Second) // wait for fatchan channel setup at server to complete
 	}
 	for i := 0; i < numBlocks; i++ {
-		blocks[i].rchannels[party] = x.BlockChans[i].SAS.Rwchannel
-		blocks[i].wchannels[party] = x.BlockChans[i].CAS.Rwchannel
+		blocks[i].Rchannels[party] = x.BlockChans[i].SAS.Rwchannel
+		blocks[i].Wchannels[party] = x.BlockChans[i].CAS.Rwchannel
 	}
 
 	baseReceiver := ot.NewNPReceiver(ParamChan, NpRecvPk, NpSendEncs)
 	sender0 := ot.NewStreamSender(baseReceiver, x.BlockChans[0].CAS.S2R, x.BlockChans[0].CAS.R2S)
 	receiver0 := ot.NewStreamReceiver(sender0, x.BlockChans[0].SAS.R2S, x.BlockChans[0].SAS.S2R)
 
-	source := blocks[0].source.(*OtState)
+	source := blocks[0].Source.(*OtState)
 	source.senders[party] = sender0
 	source.receivers[party] = receiver0
 
 	for i := 1; i < numBlocks; i++ {
 		sender := sender0.Fork(x.BlockChans[i].CAS.S2R, x.BlockChans[i].CAS.R2S)
 		receiver := receiver0.Fork(x.BlockChans[i].SAS.R2S, x.BlockChans[i].SAS.S2R)
-		source := blocks[i].source.(*OtState)
+		source := blocks[i].Source.(*OtState)
 		source.senders[party] = sender
 		source.receivers[party] = receiver
 	}
@@ -242,22 +242,22 @@ func ServerSideIOSetup(peer *PeerIO, party int, x *PerNodePair, done chan bool) 
 	}
 
 	for i := 0; i < numBlocks; i++ {
-		blocks[i].wchannels[party] = x.BlockChans[i].SAS.Rwchannel
-		blocks[i].rchannels[party] = x.BlockChans[i].CAS.Rwchannel
+		blocks[i].Wchannels[party] = x.BlockChans[i].SAS.Rwchannel
+		blocks[i].Rchannels[party] = x.BlockChans[i].CAS.Rwchannel
 	}
 
 	baseSender := ot.NewNPSender(x.NPChans.ParamChan, x.NPChans.NpRecvPk, x.NPChans.NpSendEncs)
 	receiver0 := ot.NewStreamReceiver(baseSender, x.BlockChans[0].CAS.R2S, x.BlockChans[0].CAS.S2R)
 	sender0 := ot.NewStreamSender(receiver0, x.BlockChans[0].SAS.S2R, x.BlockChans[0].SAS.R2S)
 
-	source := blocks[0].source.(*OtState)
+	source := blocks[0].Source.(*OtState)
 	source.senders[party] = sender0
 	source.receivers[party] = receiver0
 
 	for i := 1; i < numBlocks; i++ {
 		sender := sender0.Fork(x.BlockChans[i].SAS.S2R, x.BlockChans[i].SAS.R2S)
 		receiver := receiver0.Fork(x.BlockChans[i].CAS.R2S, x.BlockChans[i].CAS.S2R)
-		source := blocks[i].source.(*OtState)
+		source := blocks[i].Source.(*OtState)
 		source.senders[party] = sender
 		source.receivers[party] = receiver
 	}
@@ -478,7 +478,7 @@ func combine(arr []byte) uint32 {
 
 func (x *BlockIO) MaskTriple32() (a byte, B uint32, C uint32) {
 	if len(x.maskTriples) == 0 {
-		x.maskTriples = x.source.maskTriple(32, 4) // 32 triples, 4 bytes each
+		x.maskTriples = x.Source.maskTriple(32, 4) // 32 triples, 4 bytes each
 	}
 	result := x.maskTriples[0]
 	x.maskTriples = x.maskTriples[1:]
@@ -487,7 +487,7 @@ func (x *BlockIO) MaskTriple32() (a byte, B uint32, C uint32) {
 
 func (x *BlockIO) Triple32() (a, b, c uint32) {
 	if len(x.triples32) == 0 {
-		x.triples32 = x.source.triple32()
+		x.triples32 = x.Source.triple32()
 		if log_triples && x.Id() == 0 {
 			stats_triple_chan <- true
 		}
@@ -589,7 +589,7 @@ func (x *BlockIO) Send32(party int, n32 uint32) {
 	if party == id {
 		return
 	}
-	ch := x.wchannels[party]
+	ch := x.Wchannels[party]
 	ch <- n32
 	if log_communication {
 		fmt.Printf("%d -- 0x%1x -> %d\n", id, n32, party)
@@ -621,14 +621,14 @@ func (x *BlockIO) Receive32(party int) uint32 {
 	switch { // temporary debugging measure
 	case x == nil:
 		fmt.Printf("x == nil, party == %d\n", party)
-	case x.rchannels == nil:
-		fmt.Printf("x.rchannels == nil, party == %d\n", party)
+	case x.Rchannels == nil:
+		fmt.Printf("x.Rchannels == nil, party == %d\n", party)
 	case party < 0:
 		fmt.Printf("party == %d\n", party)
-	case party >= len(x.rchannels):
-		fmt.Printf("len(x.rchannels) == %d, party == %d\n", len(x.rchannels), party)
+	case party >= len(x.Rchannels):
+		fmt.Printf("len(x.Rchannels) == %d, party == %d\n", len(x.Rchannels), party)
 	}
-	ch := x.rchannels[party]
+	ch := x.Rchannels[party]
 	result, ok := <-ch
 	if !ok {
 		panic("channel closed")
