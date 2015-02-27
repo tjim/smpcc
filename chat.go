@@ -54,9 +54,7 @@ func UnmarshalPublicKey(s string) *[32]byte {
 	}
 	var result [32]byte
 	byteVal, err := hex.DecodeString(s)
-	if err != nil {
-		panic(err)
-	}
+	checkError(err)
 	copy(result[:], byteVal)
 	return &result
 }
@@ -139,14 +137,10 @@ func (p *PairConn) CryptoFromTag(tag string) ChannelCrypto {
 	p.ChanMasterPRF.Encrypt(prgSeed, hashedTagPrg[:])
 	cc.PRG = ot.NewPRG(prgSeed)
 	aesPrf, err := aes.NewCipher(key)
-	if err != nil {
-		panic(err)
-	}
+	checkError(err)
 
 	cc.BlockCipher, err = cipher.NewGCM(aesPrf)
-	if err != nil {
-		panic(err)
-	}
+	checkError(err)
 
 	return cc
 }
@@ -162,9 +156,8 @@ func (c *ChannelCrypto) Decrypt(ciphertext []byte) []byte {
 	nonce := make([]byte, c.BlockCipher.NonceSize())
 	c.PRG.XORKeyStream(nonce, nonce)
 	plaintext, err := c.BlockCipher.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		panic(err)
-	}
+	checkError(err)
+
 	return plaintext
 }
 
@@ -180,9 +173,8 @@ func xorBytes(a, b, c []byte) {
 func pairSubscribe(nc *nats.Conn, notMe Party) chan []byte {
 	recvChan := make(chan []byte)
 	ec, err := nats.NewEncodedConn(nc, "gob")
-	if err != nil {
-		panic(err)
-	}
+	checkError(err)
+
 	ec.BindRecvChan(fmt.Sprintf("KEY-AGREEMENT-%s-%s", MyPublicKey, notMe.Key), recvChan)
 	return recvChan
 }
@@ -202,9 +194,7 @@ func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
 	//log.Printf("Out:\n%v\n%v\n%v\n%v\n\n", ciphertext, &nonce, peerPk, MyPrivateKey)
 
 	ec, err := nats.NewEncodedConn(pc.Nc, "gob")
-	if err != nil {
-		panic(err)
-	}
+	checkError(err)
 
 	sendChan := make(chan []byte)
 	ec.BindSendChan(fmt.Sprintf("KEY-AGREEMENT-%s-%s", notMe.Key, MyPublicKey), sendChan)
@@ -232,9 +222,8 @@ func pairInit(pc *PairConn, notMe Party, recvChan chan []byte, done chan bool) {
 	seedBytes := make([]byte, 32)
 	xorBytes(encapsulatedKey, oEncapsulatedKey, seedBytes)
 	pc.ChanMasterPRF, err = aes.NewCipher(seedBytes)
-	if err != nil {
-		panic(err)
-	}
+	checkError(err)
+
 	done <- true
 }
 
@@ -385,9 +374,8 @@ func Tprintf(term *terminal.Terminal, format string, v ...interface{}) {
 
 func client() {
 	oldState, err := terminal.MakeRaw(0)
-	if err != nil {
-		panic(err.Error())
-	}
+	checkError(err)
+
 	defer terminal.Restore(0, oldState)
 
 	sigChan := make(chan os.Signal)
@@ -472,6 +460,11 @@ func client() {
 		case "run":
 			Tprintf(term, "Starting computation\n")
 			session(nc, term, words[1:])
+			MyRoom.MpcFunc = ""
+			term.SetPrompt(fmt.Sprintf("%s> ", MyRoom.Name))
+		case "run-commodity":
+			Tprintf(term, "Starting commodity computation\n")
+			commoditySession(nc, term, words[1:])
 			MyRoom.MpcFunc = ""
 			term.SetPrompt(fmt.Sprintf("%s> ", MyRoom.Name))
 		case "test_crypto":
@@ -825,6 +818,7 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 		log.Println("Computation halted on error")
 		return
 	}
+	log.Println("commodity 1")
 	pcs := make([]*PairConn, numParties)
 	done := make(chan bool)
 	for p := 0; p < numParties; p++ {
@@ -842,6 +836,7 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 		}
 		<-done
 	}
+	log.Println("commodity 2")
 
 	for _, block := range blocks {
 		for p := 0; p < numParties; p++ {
@@ -866,21 +861,17 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 			if p == id {
 				continue
 			}
-			offerHash := MyRoom.Hash // TODO: Hash needs to be improved
-			natsSubject := fmt.Sprintf("commodity.%s.%d", offerHash, i)
+			natsSubjectFrom := fmt.Sprintf("commodity.%s.%d.%s", MyRoom.Hash, i, MyPublicKey)
+			natsSubjectTo := fmt.Sprintf("commodity.%s.%d", MyRoom.Hash, i)
 
 			correctionCh := make(chan []byte)
-			ncr := &natsCommodityRequester{nc, natsSubject}
+			ncr := &natsCommodityRequester{nc, natsSubjectTo}
 			block.Source = gmw.NewCommodityClientState(correctionCh, ncr)
 
 			ec, err := nats.NewEncodedConn(nc, "gob")
-			if err != nil {
-				panic(err)
-			}
-			sub, err := ec.BindRecvChan(natsSubject, correctionCh)
-			if err != nil {
-				panic(err)
-			}
+			checkError(err)
+			sub, err := ec.BindRecvChan(natsSubjectFrom, correctionCh)
+			checkError(err)
 
 			// non-distinguished parties could close earlier
 			defer close(correctionCh)
@@ -892,6 +883,7 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 		log.Println("Computation halted on error")
 		return
 	}
+	log.Println("commodity 3")
 
 	// Distinguished party sends StartCommodity message
 	if id == 0 {
@@ -989,14 +981,35 @@ func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
 }
 
 // The GMW commodity server
+//
+// Commodity Protocol Specification:
+//
+// CS == commodity server
+// CHASH == computation hash
+//
+//        MESSAGE                            NATS SUBJECT
+//
+// P[0]   >-- (StartCommodity) ------> CS    commodity.CHASH.BLOCKNUM
+// P[0]   <----------------- SEED ---< CS    commodity.CHASH.BLOCKNUM.P[0]
+//        ...
+// P[n-1] <----------------- SEED ---< CS    commodity.CHASH.BLOCKNUM.P[n-1]
+//
+// P[0]   >-- (TripleRequest) -------> CS    commodity.CHASH.BLOCKNUM
+// P[0]   <------ (TripleMaterial) --< CS    commodity.CHASH.BLOCKNUM.P[0]
+//
+// P[0]   >-- (MaskTripleRequest) ---> CS    commodity.CHASH.BLOCKNUM
+// P[0]   <-- (MaskTripleMaterial) --< CS    commodity.CHASH.BLOCKNUM.P[0]
+//
+// P[0]   >-- (EndCommodity) --------> CS    commodity.CHASH.BLOCKNUM
 func commodity() {
+	log.Println("Starting commodity server")
 	// TODO: how to authenticate commodity server to chat participants
-	initialize()
+//	initialize()
 	nc, err := natsOptions.Connect()
 	if err != nil {
 		panic("unable to connect to NATS server")
 	}
-	states := make(map[string]*gmw.CommodityServerState) // maintain one state per computation hash
+	states := make(map[string]*gmw.CommodityServerState) // maintain one state computation hash + blocknum
 	nc.Subscribe("commodity.>", func(m *nats.Msg) {
 		dec := gob.NewDecoder(bytes.NewBuffer(m.Data))
 		var p interface{}
@@ -1005,38 +1018,45 @@ func commodity() {
 			log.Println("decode:", err)
 			return
 		}
-		offerHash := m.Subject[len("commodity."):] // NEED BLOCK NUMBER
-		// TODO: all messages should be from party 0
+		hashAndBlocknum := m.Subject[len("commodity."):]
+		// TODO: check that all messages are from party 0
 		switch r := p.(type) {
 		case StartCommodity:
-			_, ok := states[offerHash]
+			log.Println("StartCommodity", r)
+			_, ok := states[hashAndBlocknum]
 			if ok {
-				// more than one offer for hash, something is wrong, halt that computation
-				delete(states, offerHash)
+				// more than one StartCommodity message for a hashAndBlocknum; error, stop the computation
+				delete(states, hashAndBlocknum)
 				break
 			}
 			chs := make([]chan []byte, len(r.Parties))
 			ec, _ := nats.NewEncodedConn(nc, "gob")
 			for i, ch := range chs {
-				ec.BindSendChan(fmt.Sprintf("commodity.%s.%s", offerHash, r.Parties[i].Key), ch)
+				// TODO: all channels need authenticated encryption,
+				// first channel needs secure session
+				ec.BindSendChan(fmt.Sprintf("commodity.%s.%s", hashAndBlocknum, r.Parties[i].Key), ch)
 			}
-			// ALL CHANNELS NEED AUTHENTICATED ENCRYPTION
-			// FIRST CHANNEL NEEDS SECURE SESSION
-			states[offerHash] = gmw.NewCommodityServerState(chs)
+			states[hashAndBlocknum] = gmw.NewCommodityServerState(chs)
 		case EndCommodity:
-			delete(states, offerHash)
+			log.Println("EndCommodity", r)
+			delete(states, hashAndBlocknum)
 		case TripleCommodity:
-			s, ok := states[offerHash]
+			log.Println("TripleCommodity", r)
+			s, ok := states[hashAndBlocknum]
 			if ok {
 				s.TripleCorrection()
 			}
 		case MaskTripleCommodity:
-			s, ok := states[offerHash]
+			log.Println("MaskTripleCommodity", r)
+			s, ok := states[hashAndBlocknum]
 			if ok {
 				s.MaskTripleCorrection(r.numTriples, r.numBytesTriple)
 			}
+		default:
+			log.Println("Error: unknown message", p)
 		}
 	})
+	runtime.Goexit()
 }
 
 func secretary() {
