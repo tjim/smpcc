@@ -86,13 +86,19 @@ func (s *CommodityServerState) MaskTripleCorrection(numTriples, numBytesTriple i
 	return correction
 }
 
+type CommodityRequest interface {
+	RequestTripleCorrection()
+	RequestMaskTripleCorrection(numTriples, numBytesTriple int)
+}
+
 type CommodityClientState struct {
 	RandomStream cipher.Stream
 	CorrectionCh chan []byte
+	Requester    CommodityRequest
 }
 
-func NewCommodityClientState(ch chan []byte) *CommodityClientState {
-	s := &CommodityClientState{nil, ch}
+func NewCommodityClientState(ch chan []byte, requester CommodityRequest) *CommodityClientState {
+	s := &CommodityClientState{nil, ch, requester}
 	return s
 }
 
@@ -114,6 +120,7 @@ func (s *CommodityClientState) triple32() []Triple {
 	s.RandomStream.XORKeyStream(b, b)
 	s.RandomStream.XORKeyStream(c, c)
 	if s.CorrectionCh != nil {
+		s.Requester.RequestTripleCorrection()
 		correction := <-s.CorrectionCh
 		c = ot.XorBytes(c, correction)
 	}
@@ -135,6 +142,7 @@ func (s *CommodityClientState) maskTriple(numTriples, numBytesTriple int) []Mask
 	s.RandomStream.XORKeyStream(b, b)
 	s.RandomStream.XORKeyStream(c, c)
 	if s.CorrectionCh != nil {
+		s.Requester.RequestMaskTripleCorrection(numTriples, numBytesTriple)
 		correction := <-s.CorrectionCh
 		c = ot.XorBytes(c, correction)
 	}

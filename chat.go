@@ -756,6 +756,21 @@ func session(nc *nats.Conn, term *terminal.Terminal, args []string) {
 	<-Handle.Done
 }
 
+type natsCommodityRequester struct {
+	nc          *nats.Conn
+	natsSubject string
+}
+
+func (ncr *natsCommodityRequester) RequestTripleCorrection() {
+	err := ncr.nc.Publish(ncr.natsSubject, encode(TripleCommodity{}))
+	checkError(err)
+}
+
+func (ncr *natsCommodityRequester) RequestMaskTripleCorrection(numTriples, numBytesTriple int) {
+	err := ncr.nc.Publish(ncr.natsSubject, encode(MaskTripleCommodity{numTriples, numBytesTriple}))
+	checkError(err)
+}
+
 func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 	inputs := make([]uint32, len(args))
 	for i, v := range args {
@@ -851,15 +866,18 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 			if p == id {
 				continue
 			}
+			offerHash := MyRoom.Hash // TODO: Hash needs to be improved
+			natsSubject := fmt.Sprintf("commodity.%s.%d", offerHash, i)
+
 			correctionCh := make(chan []byte)
-			block.Source = gmw.NewCommodityClientState(correctionCh)
+			ncr := &natsCommodityRequester{nc, natsSubject}
+			block.Source = gmw.NewCommodityClientState(correctionCh, ncr)
 
 			ec, err := nats.NewEncodedConn(nc, "gob")
 			if err != nil {
 				panic(err)
 			}
-			offerHash := MyRoom.Hash // TODO: Hash needs to be improved
-			sub, err := ec.BindRecvChan(fmt.Sprintf("commodity.%s.%d", offerHash, i), correctionCh)
+			sub, err := ec.BindRecvChan(natsSubject, correctionCh)
 			if err != nil {
 				panic(err)
 			}
