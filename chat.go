@@ -108,8 +108,8 @@ type TripleCommodity struct {
 }
 
 type MaskTripleCommodity struct {
-	numTriples     int
-	numBytesTriple int
+	NumTriples     int
+	NumBytesTriple int
 }
 
 type PairConn struct {
@@ -462,7 +462,7 @@ func client() {
 			session(nc, term, words[1:])
 			MyRoom.MpcFunc = ""
 			term.SetPrompt(fmt.Sprintf("%s> ", MyRoom.Name))
-		case "run-commodity":
+		case "runco":
 			Tprintf(term, "Starting commodity computation\n")
 			commoditySession(nc, term, words[1:])
 			MyRoom.MpcFunc = ""
@@ -818,7 +818,6 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 		log.Println("Computation halted on error")
 		return
 	}
-	log.Println("commodity 1")
 	pcs := make([]*PairConn, numParties)
 	done := make(chan bool)
 	for p := 0; p < numParties; p++ {
@@ -836,7 +835,6 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 		}
 		<-done
 	}
-	log.Println("commodity 2")
 
 	for _, block := range blocks {
 		for p := 0; p < numParties; p++ {
@@ -861,8 +859,8 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 			if p == id {
 				continue
 			}
-			natsSubjectFrom := fmt.Sprintf("commodity.%s.%d.%s", MyRoom.Hash, i, MyPublicKey)
-			natsSubjectTo := fmt.Sprintf("commodity.%s.%d", MyRoom.Hash, i)
+			natsSubjectFrom := fmt.Sprintf("%s.commodity.%x.%d", MyPublicKey, MyRoom.Hash, i)
+			natsSubjectTo := fmt.Sprintf("commodity.%x.%d", MyRoom.Hash, i)
 
 			correctionCh := make(chan []byte)
 			ncr := &natsCommodityRequester{nc, natsSubjectTo}
@@ -883,16 +881,16 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 		log.Println("Computation halted on error")
 		return
 	}
-	log.Println("commodity 3")
 
 	// Distinguished party sends StartCommodity message
 	if id == 0 {
 		for i, _ := range blocks {
-			err := nc.Publish(fmt.Sprintf("commodity.%s.%d", MyRoom.Hash, i), encode(StartCommodity{MyRoom.Members}))
+			err := nc.Publish(fmt.Sprintf("commodity.%x.%d", MyRoom.Hash, i), encode(StartCommodity{MyRoom.Members}))
 			checkError(err)
 		}
 	}
 
+	log.Println("commodity 1")
 	for _, block := range blocks {
 		for p := 0; p < numParties; p++ {
 			if p == id {
@@ -902,13 +900,14 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 			gmw.InitCommodityClientState(block.Source.(*gmw.CommodityClientState), distinguished)
 		}
 	}
+	log.Println("commodity 2")
 
-	for p := 0; p < numParties; p++ {
-		if p == id {
-			continue
-		}
-		<-done
-	}
+//	for p := 0; p < numParties; p++ {
+//		if p == id {
+//			continue
+//		}
+//		<-done
+//	}
 	//	log.Println("Done setup")
 
 	numBlocks = Handle.NumBlocks // make sure we have the right numBlocks
@@ -922,7 +921,7 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 	// Distinguished party sends EndCommodity message
 	if id == 0 {
 		for i, _ := range blocks {
-			err := nc.Publish(fmt.Sprintf("commodity.%s.%d", MyRoom.Hash, i), encode(EndCommodity{}))
+			err := nc.Publish(fmt.Sprintf("commodity.%x.%d", MyRoom.Hash, i), encode(EndCommodity{}))
 			checkError(err)
 		}
 	}
@@ -990,21 +989,21 @@ func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
 //        MESSAGE                            NATS SUBJECT
 //
 // P[0]   >-- (StartCommodity) ------> CS    commodity.CHASH.BLOCKNUM
-// P[0]   <----------------- SEED ---< CS    commodity.CHASH.BLOCKNUM.P[0]
+// P[0]   <----------------- SEED ---< CS    P[0].commodity.CHASH.BLOCKNUM
 //        ...
-// P[n-1] <----------------- SEED ---< CS    commodity.CHASH.BLOCKNUM.P[n-1]
+// P[n-1] <----------------- SEED ---< CS    P[n-1].commodity.CHASH.BLOCKNUM
 //
 // P[0]   >-- (TripleRequest) -------> CS    commodity.CHASH.BLOCKNUM
-// P[0]   <------ (TripleMaterial) --< CS    commodity.CHASH.BLOCKNUM.P[0]
+// P[0]   <------ (TripleMaterial) --< CS    P[0].commodity.CHASH.BLOCKNUM
 //
 // P[0]   >-- (MaskTripleRequest) ---> CS    commodity.CHASH.BLOCKNUM
-// P[0]   <-- (MaskTripleMaterial) --< CS    commodity.CHASH.BLOCKNUM.P[0]
+// P[0]   <-- (MaskTripleMaterial) --< CS    P[0].commodity.CHASH.BLOCKNUM
 //
 // P[0]   >-- (EndCommodity) --------> CS    commodity.CHASH.BLOCKNUM
 func commodity() {
 	log.Println("Starting commodity server")
 	// TODO: how to authenticate commodity server to chat participants
-//	initialize()
+	//	initialize()
 	nc, err := natsOptions.Connect()
 	if err != nil {
 		panic("unable to connect to NATS server")
@@ -1026,17 +1025,22 @@ func commodity() {
 			_, ok := states[hashAndBlocknum]
 			if ok {
 				// more than one StartCommodity message for a hashAndBlocknum; error, stop the computation
+				log.Println("Error: multiple StartCommodity messages for", hashAndBlocknum) 
 				delete(states, hashAndBlocknum)
 				break
 			}
 			chs := make([]chan []byte, len(r.Parties))
+			for i, _ := range chs {
+				chs[i] = make(chan []byte)
+			}
 			ec, _ := nats.NewEncodedConn(nc, "gob")
 			for i, ch := range chs {
 				// TODO: all channels need authenticated encryption,
 				// first channel needs secure session
-				ec.BindSendChan(fmt.Sprintf("commodity.%s.%s", hashAndBlocknum, r.Parties[i].Key), ch)
+				ec.BindSendChan(fmt.Sprintf("%s.commodity.%s", r.Parties[i].Key, hashAndBlocknum), ch)
 			}
 			states[hashAndBlocknum] = gmw.NewCommodityServerState(chs)
+			log.Println("END StartCommodity")
 		case EndCommodity:
 			log.Println("EndCommodity", r)
 			delete(states, hashAndBlocknum)
@@ -1050,7 +1054,7 @@ func commodity() {
 			log.Println("MaskTripleCommodity", r)
 			s, ok := states[hashAndBlocknum]
 			if ok {
-				s.MaskTripleCorrection(r.numTriples, r.numBytesTriple)
+				s.MaskTripleCorrection(r.NumTriples, r.NumBytesTriple)
 			}
 		default:
 			log.Println("Error: unknown message", p)
