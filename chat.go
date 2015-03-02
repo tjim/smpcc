@@ -845,12 +845,20 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 			block.Wchannels[p] = make(chan uint32)
 
 			pc := pcs[p]
-			sub := pc.bindRecv(block.Rchannels[p])
-			pc.bindSend(block.Wchannels[p])
-
+			if io.Leads(p) {
+				// Leader binds Recv then Send
+				sub := pc.bindRecv(block.Rchannels[p])
+				pc.bindSend(block.Wchannels[p])
+				defer sub.Unsubscribe()
+			} else {
+				// Follower binds Send then Recv
+				// This means NATS subjects will match up
+				pc.bindSend(block.Wchannels[p])
+				sub := pc.bindRecv(block.Rchannels[p])
+				defer sub.Unsubscribe()
+			}
 			defer close(block.Rchannels[p])
 			defer close(block.Wchannels[p])
-			defer sub.Unsubscribe()
 		}
 	}
 
@@ -892,22 +900,17 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 
 	log.Println("commodity 1")
 	for _, block := range blocks {
-		for p := 0; p < numParties; p++ {
-			if p == id {
-				continue
-			}
-			distinguished := p == 0
-			gmw.InitCommodityClientState(block.Source.(*gmw.CommodityClientState), distinguished)
-		}
+		distinguished := id == 0
+		gmw.InitCommodityClientState(block.Source.(*gmw.CommodityClientState), distinguished)
 	}
 	log.Println("commodity 2")
 
-//	for p := 0; p < numParties; p++ {
-//		if p == id {
-//			continue
-//		}
-//		<-done
-//	}
+	//	for p := 0; p < numParties; p++ {
+	//		if p == id {
+	//			continue
+	//		}
+	//		<-done
+	//	}
 	//	log.Println("Done setup")
 
 	numBlocks = Handle.NumBlocks // make sure we have the right numBlocks
@@ -1025,7 +1028,7 @@ func commodity() {
 			_, ok := states[hashAndBlocknum]
 			if ok {
 				// more than one StartCommodity message for a hashAndBlocknum; error, stop the computation
-				log.Println("Error: multiple StartCommodity messages for", hashAndBlocknum) 
+				log.Println("Error: multiple StartCommodity messages for", hashAndBlocknum)
 				delete(states, hashAndBlocknum)
 				break
 			}
@@ -1040,20 +1043,23 @@ func commodity() {
 				ec.BindSendChan(fmt.Sprintf("%s.commodity.%s", r.Parties[i].Key, hashAndBlocknum), ch)
 			}
 			states[hashAndBlocknum] = gmw.NewCommodityServerState(chs)
-			log.Println("END StartCommodity")
 		case EndCommodity:
 			log.Println("EndCommodity", r)
 			delete(states, hashAndBlocknum)
 		case TripleCommodity:
 			log.Println("TripleCommodity", r)
 			s, ok := states[hashAndBlocknum]
-			if ok {
+			if !ok {
+				log.Println("Error: TripleCommodity without StartCommodity,", hashAndBlocknum)
+			} else {
 				s.TripleCorrection()
 			}
 		case MaskTripleCommodity:
 			log.Println("MaskTripleCommodity", r)
 			s, ok := states[hashAndBlocknum]
-			if ok {
+			if !ok {
+				log.Println("Error: MaskTripleCommodity without StartCommodity,", hashAndBlocknum)
+			} else {
 				s.MaskTripleCorrection(r.NumTriples, r.NumBytesTriple)
 			}
 		default:
