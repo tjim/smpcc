@@ -1,11 +1,11 @@
 package eval
 
 import (
+	"github.com/tjim/smpcc/runtime/bit"
 	"github.com/tjim/smpcc/runtime/gc"
 	baseeval "github.com/tjim/smpcc/runtime/gc/eval"
 	"github.com/tjim/smpcc/runtime/gc/yao/gen"
 	"github.com/tjim/smpcc/runtime/ot"
-	"github.com/tjim/smpcc/runtime/bit"
 )
 
 type vm struct {
@@ -125,7 +125,7 @@ func (y vm) Random(bits int) []gc.Key {
 	}
 	result := make([]gc.Key, bits)
 	numBytes := bits / 8
-	if bits % 8 != 0 {
+	if bits%8 != 0 {
 		numBytes++
 	}
 	random := make([]byte, numBytes)

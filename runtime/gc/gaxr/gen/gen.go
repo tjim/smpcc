@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/tjim/smpcc/runtime/base"
+	"github.com/tjim/smpcc/runtime/bit"
 	"github.com/tjim/smpcc/runtime/gc"
 	basegen "github.com/tjim/smpcc/runtime/gc/gen"
 	"github.com/tjim/smpcc/runtime/ot"
-	"github.com/tjim/smpcc/runtime/bit"
 )
 
 type vm struct {
@@ -290,7 +290,7 @@ func (y vm) Random(bits int) []gc.Wire {
 	}
 	result := make([]gc.Wire, bits)
 	numBytes := bits / 8
-	if bits % 8 != 0 {
+	if bits%8 != 0 {
 		numBytes++
 	}
 	random := make([]byte, numBytes)

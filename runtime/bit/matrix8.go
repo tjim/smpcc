@@ -142,4 +142,3 @@ func (self Matrix8) XorFrom(other *Matrix8) {
 		self.Data[i] ^= v
 	}
 }
-

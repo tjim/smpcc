@@ -19,11 +19,11 @@ type SendRequest struct {
 // In gc case, generator is client and sender, evaluator is server and receiver
 // We send an MplexChans from client to server, so fatchan notations are relative to generator/client/sender
 type PerNodePairMplexChans struct {
-	RefreshCh chan int         `fatchan:"reply"`   // One per SET of multiplexed sender/receiver, receiver->sender
+	RefreshCh chan int `fatchan:"reply"` // One per SET of multiplexed sender/receiver, receiver->sender
 }
 type PerBlockMplexChans struct {
-	RepCh     chan []byte      `fatchan:"request"` // One per sender/receiver pair, sender->receiver
-	ReqCh     chan SendRequest `fatchan:"reply"`   // One per sender/receiver pair, receiver->sender
+	RepCh chan []byte      `fatchan:"request"` // One per sender/receiver pair, sender->receiver
+	ReqCh chan SendRequest `fatchan:"reply"`   // One per sender/receiver pair, receiver->sender
 }
 
 type MplexSender struct {
@@ -212,7 +212,7 @@ func (R *MplexReceiver) ReceiveM(r []byte) []Message { // r is a packed vector o
 	result := make([]Message, 8*len(r))
 	for i := range r {
 		for bit := 0; bit < 8; bit++ {
-			selector := Selector((r[i] >> uint(7 - bit)) & 1)
+			selector := Selector((r[i] >> uint(7-bit)) & 1)
 			result[i+bit] = R.Receive(selector)
 		}
 	}
@@ -228,7 +228,7 @@ func (S *MplexSender) SendMBits(a, b []byte) { // messages are packed in bytes
 	for i := range a {
 		for bit := 0; bit < 8; bit++ {
 			mask := byte(0x80 >> uint(bit))
-			S.Send([]byte{a[i]&mask}, []byte{b[i]&mask})
+			S.Send([]byte{a[i] & mask}, []byte{b[i] & mask})
 		}
 	}
 }
@@ -237,7 +237,7 @@ func (R *MplexReceiver) ReceiveMBits(r []byte) []byte { // r is a packed vector 
 	for i := range r {
 		for bit := 0; bit < 8; bit++ {
 			mask := byte(0x80 >> uint(bit))
-			selector := Selector((r[i] >> uint(7 - bit)) & 1)
+			selector := Selector((r[i] >> uint(7-bit)) & 1)
 			result[i] |= mask & R.Receive(selector)[0]
 		}
 	}

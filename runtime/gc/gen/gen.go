@@ -546,7 +546,7 @@ func unaryB(io VM, A []base.Wire) []base.Wire {
 	for i := range A {
 		leftmost := (1 << uint(i)) * 2
 		for j := leftmost; j < leftmost*2; j++ {
-			k := len(A)-i-1
+			k := len(A) - i - 1
 			switch j % 2 {
 			case 0:
 				phi[j] = And(io, phi[j/2:j/2+1], Not(io, A[k:k+1]))[0]
