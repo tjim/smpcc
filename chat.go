@@ -385,11 +385,7 @@ func client() {
 		panic(fmt.Sprintf("Signal: %v", s))
 	}()
 
-	nc, err := natsOptions.Connect()
-	if err != nil {
-		panic("unable to connect to NATS server")
-	}
-
+	nc := connectNats()
 	term := terminal.NewTerminal(os.Stdin, "> ")
 
 	Tprintf(term, "Greetings, %s!\n", MyNick)
@@ -554,9 +550,7 @@ func (pc *PairConn) bindRecv(channel interface{}) *nats.Subscription {
 func barrier(nc *nats.Conn) bool {
 	okChan := make(chan bool)
 	ec, err := nats.NewEncodedConn(nc, "gob")
-	if err != nil {
-		panic("2")
-	}
+	checkError(err)
 	ec.BindRecvChan(fmt.Sprintf("%s.secretary.barrier", MyRoom.Name), okChan)
 	err = nc.Publish(fmt.Sprintf("secretary.%s", MyRoom.Name), encode(StartRequest{MyParty}))
 	checkError(err)
@@ -898,20 +892,10 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 		}
 	}
 
-	log.Println("commodity 1")
 	for _, block := range blocks {
 		distinguished := id == 0
 		gmw.InitCommodityClientState(block.Source.(*gmw.CommodityClientState), distinguished)
 	}
-	log.Println("commodity 2")
-
-	//	for p := 0; p < numParties; p++ {
-	//		if p == id {
-	//			continue
-	//		}
-	//		<-done
-	//	}
-	//	log.Println("Done setup")
 
 	numBlocks = Handle.NumBlocks // make sure we have the right numBlocks
 	// copy io.blocks[1:] to make an []Io; []BlockIO is not []Io
@@ -1007,10 +991,7 @@ func commodity() {
 	log.Println("Starting commodity server")
 	// TODO: how to authenticate commodity server to chat participants
 	//	initialize()
-	nc, err := natsOptions.Connect()
-	if err != nil {
-		panic("unable to connect to NATS server")
-	}
+	nc := connectNats()
 	states := make(map[string]*gmw.CommodityServerState) // maintain one state computation hash + blocknum
 	nc.Subscribe("commodity.>", func(m *nats.Msg) {
 		dec := gob.NewDecoder(bytes.NewBuffer(m.Data))
@@ -1069,16 +1050,25 @@ func commodity() {
 	runtime.Goexit()
 }
 
+func connectNats() *nats.Conn {
+	nc, err := natsOptions.Connect()
+	for i := 0; err != nil && i < 3; i++ {
+		log.Printf("Error connecting to NATS server: %s\n", err)
+		time.Sleep(5 * time.Second)
+		log.Printf("Retrying...\n")
+		nc, err = natsOptions.Connect()
+	}
+	checkError(err)
+	return nc
+}
+
 func secretary() {
 	log.Println("starting secretary")
 	changeNick("ChatAdministrator")
 	rooms := make(map[string]bool)
 	members := make(map[string](map[Party]bool))
 	starters := make(map[string](map[Party]bool))
-	nc, err := natsOptions.Connect()
-	if err != nil {
-		panic("unable to connect to NATS server")
-	}
+	nc := connectNats()
 
 	// Go routine to ping room members to see if they're still there.
 	go func() {
