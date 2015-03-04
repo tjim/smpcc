@@ -30,13 +30,6 @@ import (
 
 var p2pAuth bool = true // temporary debugging flag, set to false to disable authentication and encryption
 
-func shortKey(s string) string {
-	if len(s) != 64 {
-		panic("Malformed public key (wrong length)")
-	}
-	return s[:3]
-}
-
 func MarshalPublicKey(c *[32]byte) string {
 	return hex.EncodeToString((*c)[:])
 }
@@ -495,7 +488,6 @@ func (pc *PairConn) bindSend(channel interface{}) {
 		counter := 0
 		for {
 			val, ok := chVal.Recv()
-			//			log.Printf("%s.%s[%d] %v\n", shortKey(pc.notMe.Key), tag, counter, val.Type())
 			if !ok {
 				return // channel closed so we don't need goroutine any more
 			}
@@ -510,7 +502,6 @@ func (pc *PairConn) bindSend(channel interface{}) {
 				msg = plaintext
 			}
 			nc.Publish(subject, msg)
-			//			log.Printf("%s.%s[%d].\n", shortKey(pc.notMe.Key), tag, counter)
 			counter++
 		}
 	}()
