@@ -183,7 +183,6 @@ func blocks_main(io Io, ios []Io) {
 	}
 	answer := Reveal32(io, _vAnswer)
 	fmt.Printf("%d: %v\n", io.Id(), answer)
-	_main_done <- true
 }
 
 // <label>:0
@@ -495,6 +494,4 @@ func block10(io Io, ch chan uint64, mask bool, ___main_penultimate_0 uint32, __m
 	}
 }
 
-var _main_done = make(chan bool, 1)
-
-var Handle = MPC{11, blocks_main, _main_done}
+var Handle = MPC{11, blocks_main}

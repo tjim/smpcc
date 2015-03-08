@@ -299,8 +299,7 @@ func session(nc *nats.Conn, term *terminal.Terminal, args []string) {
 	for j := 0; j < numBlocks; j++ {
 		x[j] = io.Blocks[j+1]
 	}
-	go Handle.Main(io.Blocks[0], x)
-	<-Handle.Done
+	Handle.Main(io.Blocks[0], x)
 }
 
 type natsCommodityRequester struct {
@@ -463,8 +462,7 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 	for j := 0; j < numBlocks; j++ {
 		x[j] = io.Blocks[j+1]
 	}
-	go Handle.Main(io.Blocks[0], x)
-	<-Handle.Done
+	Handle.Main(io.Blocks[0], x)
 	// Distinguished party sends EndCommodity message
 	if id == 0 {
 		for i, _ := range blocks {

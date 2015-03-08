@@ -381,7 +381,6 @@ let bpr_main b f =
   bprintf b "\t}\n";
   bprintf b "\tanswer := Reveal32(io, _vAnswer)\n";
   bprintf b "\tfmt.Printf(\"%%d: %%v\\n\", io.Id(), answer)\n";
-  bprintf b "\t%s_done <- true\n" (Gc.govar f.fname);
   bprintf b "}\n";
   bprintf b "\n"
 
@@ -466,9 +465,7 @@ let print_function_circuit m f =
   let blocks_fv = List.fold_left VSet.union VSet.empty (* TODO: eliminate duplicate code *)
       (List.map free_of_block f.fblocks) in
   List.iter (bpr_gmw_block b blocks_fv) f.fblocks;
-  bprintf b "var %s_done = make(chan bool, 1)\n" (Gc.govar f.fname);
-  bprintf b "\n";
   bprintf b "func main() {\n";
-  bprintf b "\tRun(%d, blocks_main, _main_done)\n" (List.length f.fblocks);
+  bprintf b "\tRun(%d, blocks_main)\n" (List.length f.fblocks);
   bprintf b "}\n";
   pr_output_file ".go" (Buffer.contents b)

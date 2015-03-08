@@ -12,7 +12,6 @@ import (
 type MPC struct {
 	NumBlocks int
 	Main      func(io Io, ios []Io)
-	Done      chan bool
 }
 
 var Hosts map[int]string = make(map[int]string)
@@ -51,7 +50,7 @@ func SetupHostsPorts(parties int) {
 	}
 }
 
-func Run(numBlocks int, runPeer func(Io, []Io), peerDone <-chan bool) {
+func Run(numBlocks int, runPeer func(Io, []Io)) {
 	var do_pprof bool
 	var id int
 	var parties int
@@ -79,12 +78,12 @@ func Run(numBlocks int, runPeer func(Io, []Io), peerDone <-chan bool) {
 	}
 	if ReadConfig(config) {
 		parties = len(Hosts)
-		SetupPeer(inputs, numBlocks, parties, id, runPeer, peerDone)
+		SetupPeer(inputs, numBlocks, parties, id, runPeer)
 	} else if parties == 0 {
-		Simulation(inputs, numBlocks, runPeer, peerDone)
+		Simulation(inputs, numBlocks, runPeer)
 	} else {
 		SetupHostsPorts(parties)
-		SetupPeer(inputs, numBlocks, parties, id, runPeer, peerDone)
+		SetupPeer(inputs, numBlocks, parties, id, runPeer)
 	}
 
 }

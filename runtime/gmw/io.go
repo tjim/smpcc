@@ -284,7 +284,7 @@ func NewPeerIO(numBlocks int, numParties int, id int) *PeerIO {
 	return &io
 }
 
-func SetupPeer(inputs []uint32, numBlocks int, numParties int, id int, runPeer func(Io, []Io), peerDone <-chan bool) {
+func SetupPeer(inputs []uint32, numBlocks int, numParties int, id int, runPeer func(Io, []Io)) {
 	io := NewPeerIO(numBlocks, numParties, id)
 	io.Inputs = inputs
 	done := make(chan bool)
@@ -311,11 +311,10 @@ func SetupPeer(inputs []uint32, numBlocks int, numParties int, id int, runPeer f
 	for j := 0; j < numBlocks; j++ {
 		x[j] = io.Blocks[j+1]
 	}
-	go runPeer(io.Blocks[0], x)
-	<-peerDone
+	runPeer(io.Blocks[0], x)
 }
 
-func Simulation(inputs []uint32, numBlocks int, runPeer func(Io, []Io), peerDone <-chan bool) {
+func Simulation(inputs []uint32, numBlocks int, runPeer func(Io, []Io)) {
 	if log_triples {
 		go log_triple_goroutine()
 	}
@@ -358,13 +357,17 @@ func Simulation(inputs []uint32, numBlocks int, runPeer func(Io, []Io), peerDone
 		}
 	}
 	// all setup clients and servers have finished
+	peerDone := make(chan bool)
 	for i := 0; i < numParties; i++ {
 		// copy ios[i].blocks[1:] to make an []Io; []BlockIO is not []Io
 		x := make([]Io, numBlocks)
 		for j := 0; j < numBlocks; j++ {
 			x[j] = ios[i].Blocks[j+1]
 		}
-		go runPeer(ios[i].Blocks[0], x)
+		go func(i int, x []Io) {
+			runPeer(ios[i].Blocks[0], x)
+			peerDone <- true
+		}(i, x)
 	}
 	for i := 0; i < numParties; i++ {
 		<-peerDone // wait for all peers to complete
