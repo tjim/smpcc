@@ -932,7 +932,6 @@ extern unsigned int input(unsigned int);
 extern unsigned int num_peers();
 
 int main() {
-  unsigned int cur_max = input(0);
   unsigned char private_key[32] = {0};
   uint8_t p_hash[32] = {0};
   uint8_t p_signature[32*2];
