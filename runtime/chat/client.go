@@ -103,7 +103,7 @@ func ClientChannels(userTyping, msgReceiving chan string) {
 	}
 }
 
-func client() {
+func Client() {
 	oldState, err := terminal.MakeRaw(0)
 	checkError(err)
 
