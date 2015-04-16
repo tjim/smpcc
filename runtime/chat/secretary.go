@@ -1,4 +1,4 @@
-package main
+package chat
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func secretary() {
+func Secretary() {
 	log.Println("starting secretary")
 	changeNick("ChatAdministrator")
 	rooms := make(map[string]bool)

@@ -1,4 +1,4 @@
-package main
+package chat
 
 import (
 	"bytes"
@@ -254,7 +254,7 @@ var MyParty Party
 var MyRoom *RoomState
 var MyNick string
 var natsOptions nats.Options
-var args []string // holds command line arguments after flag parsing
+var Args []string // holds command line arguments after flag parsing
 
 func handleNats(condition string) func(*nats.Conn) {
 	return func(c *nats.Conn) {
@@ -291,7 +291,7 @@ var names []string = []string{
 	"Toby",
 }
 
-func initialize() {
+func Initialize() {
 	Init()
 
 	natsOptions = nats.DefaultOptions
@@ -318,7 +318,7 @@ func initialize() {
 	} else {
 		natsOptions.Url = "nats://" + serverAddress + ":4222"
 	}
-	args = flag.Args()
+	Args = flag.Args()
 }
 
 func InitializeExternal() {
@@ -470,16 +470,5 @@ func connectNats() *nats.Conn {
 func checkError(err error) {
 	if err != nil {
 		log.Fatal("Error:", err)
-	}
-}
-
-func main() {
-	initialize()
-	if len(args) > 0 && args[0] == "secretary" {
-		secretary()
-	} else if len(args) > 0 && args[0] == "commodity" {
-		commodity()
-	} else {
-		client()
 	}
 }
