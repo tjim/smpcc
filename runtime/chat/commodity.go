@@ -1,4 +1,4 @@
-package main
+package chat
 
 import (
 	"bytes"
@@ -31,7 +31,7 @@ import (
 // P[0]   <-- (MaskTripleMaterial) --< CS    P[0].commodity.CHASH.BLOCKNUM
 //
 // P[0]   >-- (EndCommodity) --------> CS    commodity.CHASH.BLOCKNUM
-func commodity() {
+func Commodity() {
 	log.Println("Starting commodity server")
 	// TODO: how to authenticate commodity server to chat participants
 	//	initialize()

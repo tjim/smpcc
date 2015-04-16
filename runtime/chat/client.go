@@ -1,4 +1,4 @@
-package main
+package chat
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ import (
 	"strings"
 )
 
-func client() {
+func Client() {
 	oldState, err := terminal.MakeRaw(0)
 	checkError(err)
 
