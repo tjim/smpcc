@@ -17,6 +17,92 @@ import (
 	"strings"
 )
 
+func ClientChannels(userTyping, msgReceiving chan string) {
+
+	nc := connectNats()
+
+	msgReceiving <- fmt.Sprintf("Greetings, %s!\n", MyNick)
+	msgReceiving <- fmt.Sprintf("Commands:\n")
+	msgReceiving <- fmt.Sprintf("join foo      	(join the chatroom named foo)\n")
+	msgReceiving <- fmt.Sprintf("nick foo      	(change your nickname to foo)\n")
+	msgReceiving <- fmt.Sprintf("members       	(list the parties in the current room)\n")
+	msgReceiving <- fmt.Sprintf("func <function>  (propose a function for computation)\n")
+	msgReceiving <- fmt.Sprintf("run <number>  	(run max with input <number>)\n")
+	msgReceiving <- fmt.Sprintf("^D            	(buh-bye)\n")
+	msgReceiving <- fmt.Sprintf("anything else 	(send anything else to your current chatroom)\n")
+
+	joinRoomChannels(nc, msgReceiving, "#general")
+
+	for {
+		line := <-userTyping
+		if line == "END" {
+			log.Println("Goodbye!")
+			leaveRoom(nc, msgReceiving)
+			nc.Close()
+			return // exit
+		}
+		words := strings.Fields(line)
+		if len(words) == 0 {
+			continue
+		}
+		switch words[0] {
+		case "noauth":
+			p2pAuth = false
+			msgReceiving <- fmt.Sprintf("AUTHORIZATION DISABLED\n")
+		case "nick":
+			if len(words) == 2 {
+				changeNick(words[1])
+				msgReceiving <- fmt.Sprintf("Your nickname is now %s\n", MyNick)
+
+			} else {
+				msgReceiving <- fmt.Sprintf("Nicknames must be one word\n")
+			}
+		case "join":
+			switch {
+			case len(words) == 1:
+				msgReceiving <- fmt.Sprintf("You must say what room to join\n")
+			case len(words) == 2:
+				roomName := words[1]
+				joinRoomChannels(nc, msgReceiving, roomName)
+			default:
+				msgReceiving <- fmt.Sprintf("You can only join one room at once\n")
+			}
+		case "members":
+			for _, member := range MyRoom.Members {
+				msgReceiving <- fmt.Sprintf("%s (%s)\n", member.Key, member.Nick)
+			}
+			msgReceiving <- fmt.Sprintf("Hash: %x\n", MyRoom.Hash)
+		case "func":
+			switch {
+			case len(words) == 1:
+				msgReceiving <- fmt.Sprintf("You must say what function you want to compute\n")
+			case len(words) == 2:
+				funcName := words[1]
+				proposeFunc(nc, funcName)
+			default:
+				msgReceiving <- fmt.Sprintf("You can only propose one function at once\n")
+			}
+		case "run":
+			msgReceiving <- fmt.Sprintf("Starting computation\n")
+			session(nc, msgReceiving, words[1:])
+			MyRoom.MpcFunc = ""
+			// term.SetPrompt(fmt.Sprintf("%s> ", MyRoom.Name))
+		case "runco":
+			msgReceiving <- fmt.Sprintf("Starting commodity computation\n")
+			commoditySession(nc, msgReceiving, words[1:])
+			MyRoom.MpcFunc = ""
+			// term.SetPrompt(fmt.Sprintf("%s> ", MyRoom.Name))
+		case "test_crypto":
+			msgReceiving <- fmt.Sprintf("Testing crypto\n")
+			// test crypto here
+		default:
+			msg := strings.TrimSpace(line)
+			err := nc.Publish(MyRoom.Name, encode(Message{MyParty, msg}))
+			checkError(err)
+		}
+	}
+}
+
 func client() {
 	oldState, err := terminal.MakeRaw(0)
 	checkError(err)
@@ -43,7 +129,14 @@ func client() {
 	Tprintf(term, "^D            	(buh-bye)\n")
 	Tprintf(term, "anything else 	(send anything else to your current chatroom)\n")
 
-	joinRoom(nc, term, "#general")
+	printToTermChan := make(chan string)
+	go func() {
+		for {
+			msg := <-printToTermChan
+			Tprintf(term, msg)
+		}
+	}()
+	joinRoomChannels(nc, printToTermChan, "#general")
 
 	for {
 		line, err := term.ReadLine()
@@ -53,7 +146,7 @@ func client() {
 			} else {
 				log.Println("Goodbye!")
 			}
-			leaveRoom(nc, term)
+			leaveRoom(nc, printToTermChan)
 			nc.Close()
 			return // exit
 		}
@@ -79,7 +172,7 @@ func client() {
 				Tprintf(term, "You must say what room to join\n")
 			case len(words) == 2:
 				roomName := words[1]
-				joinRoom(nc, term, roomName)
+				joinRoomChannels(nc, printToTermChan, roomName)
 			default:
 				Tprintf(term, "You can only join one room at once\n")
 			}
@@ -94,18 +187,18 @@ func client() {
 				Tprintf(term, "You must say what function you want to compute\n")
 			case len(words) == 2:
 				funcName := words[1]
-				proposeFunc(nc, term, funcName)
+				proposeFunc(nc, funcName)
 			default:
 				Tprintf(term, "You can only propose one function at once\n")
 			}
 		case "run":
 			Tprintf(term, "Starting computation\n")
-			session(nc, term, words[1:])
+			session(nc, printToTermChan, words[1:])
 			MyRoom.MpcFunc = ""
 			term.SetPrompt(fmt.Sprintf("%s> ", MyRoom.Name))
 		case "runco":
 			Tprintf(term, "Starting commodity computation\n")
-			commoditySession(nc, term, words[1:])
+			commoditySession(nc, printToTermChan, words[1:])
 			MyRoom.MpcFunc = ""
 			term.SetPrompt(fmt.Sprintf("%s> ", MyRoom.Name))
 		case "test_crypto":
@@ -119,7 +212,7 @@ func client() {
 	}
 }
 
-func session(nc *nats.Conn, term *terminal.Terminal, args []string) {
+func session(nc *nats.Conn, msgReceived chan string, args []string) {
 	inputs := make([]uint32, len(args))
 	for i, v := range args {
 		input := 0
@@ -134,10 +227,10 @@ func session(nc *nats.Conn, term *terminal.Terminal, args []string) {
 	case "vickrey":
 		Handle = vickrey.Handle
 	case "":
-		Tprintf(term, "Before running a computation you must specify a function (use the 'func' command)\n")
+		msgReceived <- fmt.Sprintf("Before running a computation you must specify a function (use the 'func' command)\n")
 		return
 	default:
-		Tprintf(term, "Unknown function '%s'\n", MyRoom.MpcFunc)
+		msgReceived <- fmt.Sprintf("Unknown function '%s'\n", MyRoom.MpcFunc)
 		return
 	}
 
@@ -317,7 +410,7 @@ func (ncr *natsCommodityRequester) RequestMaskTripleCorrection(numTriples, numBy
 	checkError(err)
 }
 
-func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
+func commoditySession(nc *nats.Conn, msgReceived chan string, args []string) {
 	inputs := make([]uint32, len(args))
 	for i, v := range args {
 		input := 0
@@ -331,10 +424,10 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 	case "vickrey":
 		Handle = vickrey.Handle
 	case "":
-		Tprintf(term, "Before running a computation you must specify a function (use the 'func' command)\n")
+		msgReceived <- fmt.Sprintf("Before running a computation you must specify a function (use the 'func' command)\n")
 		return
 	default:
-		Tprintf(term, "Unknown function '%s'\n", MyRoom.MpcFunc)
+		msgReceived <- fmt.Sprintf("Unknown function '%s'\n", MyRoom.MpcFunc)
 		return
 	}
 
@@ -472,9 +565,9 @@ func commoditySession(nc *nats.Conn, term *terminal.Terminal, args []string) {
 	}
 }
 
-func leaveRoom(nc *nats.Conn, term *terminal.Terminal) {
+func leaveRoom(nc *nats.Conn, msgReceived chan string) {
 	if MyRoom != nil { // leave current room; can be nil on startup only
-		Tprintf(term, "You are leaving room %s\n", MyRoom.Name)
+		msgReceived <- fmt.Sprintf("You are leaving room %s\n", MyRoom.Name)
 		err := nc.Publish(fmt.Sprintf("secretary.%s", MyRoom.Name), encode(LeaveRequest{MyParty}))
 		checkError(err)
 		err = MyRoom.Sub.Unsubscribe()
@@ -482,18 +575,18 @@ func leaveRoom(nc *nats.Conn, term *terminal.Terminal) {
 	}
 }
 
-func proposeFunc(nc *nats.Conn, term *terminal.Terminal, funcName string) {
+func proposeFunc(nc *nats.Conn, funcName string) {
 	err := nc.Publish(MyRoom.Name, encode(FuncRequest{MyParty, funcName}))
 	checkError(err)
 }
 
-func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
-	leaveRoom(nc, term)
+func joinRoomChannels(nc *nats.Conn, msgReceiveing chan string, roomName string) {
+	leaveRoom(nc, msgReceiveing)
 	MyRoom = &RoomState{roomName, nil, nil, nil, ""}
-	term.SetPrompt(fmt.Sprintf("%s> ", roomName))
+	// term.SetPrompt(fmt.Sprintf("%s> ", roomName))
 	err := nc.Publish(fmt.Sprintf("secretary.%s", roomName), encode(JoinRequest{MyParty}))
 	checkError(err)
-	Tprintf(term, "You have joined room %s\n", roomName)
+	msgReceiveing <- fmt.Sprintf("You have joined room %s\n", roomName)
 	sub, err := nc.Subscribe(roomName, func(m *nats.Msg) {
 		// Tprintf(term, "Received\n")
 		dec := gob.NewDecoder(bytes.NewBuffer(m.Data))
@@ -505,7 +598,7 @@ func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
 		switch r := p.(type) {
 		case Message:
 			if r.Party != MyParty {
-				Tprintf(term, "%s: %s -- (%s)\n", roomName, r.Message, r.Party.Nick)
+				msgReceiveing <- fmt.Sprintf("%s: %s -- (%s)\n", roomName, r.Message, r.Party.Nick)
 			}
 		case Members:
 			MyRoom.Members = r.Parties
@@ -516,8 +609,8 @@ func joinRoom(nc *nats.Conn, term *terminal.Terminal, roomName string) {
 			MyRoom.Hash = h.Sum(nil)
 		case FuncRequest:
 			MyRoom.MpcFunc = r.FunctionName
-			term.SetPrompt(fmt.Sprintf("%s [%s]> ", MyRoom.Name, MyRoom.MpcFunc))
-			Tprintf(term, "%s: Function proposed: %s -- (%s)\n", roomName, MyRoom.MpcFunc, r.Party.Nick)
+			// term.SetPrompt(fmt.Sprintf("%s [%s]> ", MyRoom.Name, MyRoom.MpcFunc))
+			msgReceiveing <- fmt.Sprintf("%s: Function proposed: %s -- (%s)\n", roomName, MyRoom.MpcFunc, r.Party.Nick)
 		}
 	})
 	checkError(err)

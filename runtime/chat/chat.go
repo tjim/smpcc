@@ -321,6 +321,28 @@ func initialize() {
 	args = flag.Args()
 }
 
+func InitializeExternal() {
+	Init()
+
+	natsOptions = nats.DefaultOptions
+	natsOptions.ClosedCB = handleNats("Close")
+	natsOptions.DisconnectedCB = handleNats("Disconnect")
+	natsOptions.ReconnectedCB = handleNats("Reconnect")
+	natsOptions.AsyncErrorCB = handleError
+
+	rawPublicKey, rawPrivateKey, _ := box.GenerateKey(rand.Reader)
+	MyPrivateKey = rawPrivateKey
+	MyPublicKey = MarshalPublicKey(rawPublicKey)
+	nameIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(names))))
+	if err != nil {
+		log.Fatal(err)
+	}
+	MyNick = names[int(nameIndex.Int64())]
+	MyParty = Party{MyNick, MyPublicKey}
+
+	natsOptions.Url = "nats://10.0.1.54:4222"
+}
+
 func changeNick(nick string) {
 	MyNick = nick
 	MyParty = Party{MyNick, MyPublicKey}
