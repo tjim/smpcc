@@ -611,8 +611,18 @@ let branch_elimination f =
       let elim (nopt,instr) =
         match instr with
         | Switch((ty,e),(Label, Basicblock switchDefault),branches,md) ->
+            (* Usually the branches are sorted but not always *)
+            let sort_branches x y =
+              match (x,y) with
+              | ((_,Int xn),_),((_,Int yn),_) -> Big_int.compare_big_int xn yn
+              | _ -> failwith "Non-integer case in switch" in
+            let branches = List.sort sort_branches branches in
+            let max_branch =
+              match List.nth branches (List.length branches - 1) with 
+              | ((_,Int max_branch),_) -> Big_int.int_of_big_int max_branch
+              | _ -> List.length branches in
             let x = Name(false, State.fresh()) in
-            [(Some x, Call(false, None, [], Integer(List.length(branches)+1),
+            [(Some x, Call(false, None, [], Integer(max_branch+1),
                            (Var(Util.Name(true, "unary"))),
                            [(ty,[],e);(Integer 32, [], big(List.length(branches)))],
                            [],[]))]@
@@ -624,9 +634,10 @@ let branch_elimination f =
                                 [],[]) in
                 function
                   | [] -> [(Some(State.bl_mask(State.bl_num switchDefault)), call)]
-                  | ((Integer _, Int j),(Label, Basicblock target))::tl ->
+                  | (((Integer _, Int j),(Label, Basicblock target)) as hd)::tl ->
                       if Big_int.int_of_big_int j <> i then
-                        failwith "unexpected switch in branch elimination"
+                        (* There is a gap in the explicit switch cases, go to default *)
+                        (Some(State.bl_mask(State.bl_num switchDefault)), call)::(loop (i+1) (hd::tl))
                       else
                         (Some(State.bl_mask(State.bl_num target)), call)::(loop (i+1) tl)
                   | _ -> failwith "unexpected switch in branch elimination"

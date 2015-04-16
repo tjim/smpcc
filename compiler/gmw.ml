@@ -388,7 +388,7 @@ let rec bytes_of_value b bytes = function
   | typ, Int x ->
       let bytes2 = roundup_bitwidth typ / 8 in
       let ff = Int64.of_int 255 in
-      let y = ref(Int64.of_int(Big_int.int_of_big_int x)) in
+      let y = ref(Big_int.int64_of_big_int x) in
       for i = 1 to bytes2 do
         let lowbyte = Char.chr(Int64.to_int(Int64.logand !y ff)) in
         bprintf b "%c" lowbyte;
