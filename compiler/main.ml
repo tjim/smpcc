@@ -296,8 +296,8 @@ and repl_instr var replacement x =
       Load(x, y, rtv z, w, v, md)
   | Store(x, y, z, w, v, u, md) ->
       Store(x, y, rtv z, rtv w, v, u, md)
-  | Cmpxchg(x, y, z, w, v, u, t, md) ->
-      Cmpxchg(x, rtv y, rtv z, rtv w, v, u, t, md)
+  | Cmpxchg(a, x, y, z, w, v, u, t, md) ->
+      Cmpxchg(a, x, rtv y, rtv z, rtv w, v, u, t, md)
   | Atomicrmw(x, y, z, w, v, u, md) ->
       Atomicrmw(x, y, rtv z, rtv w, v, u, md)
   | Fence(x, y, md) -> Fence(x, y, md)

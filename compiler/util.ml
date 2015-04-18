@@ -301,7 +301,7 @@ type instr =
   | Alloca         of bool * typ * (typ * value) option * int option * instr_metadata
   | Load           of bool * bool * (typ * value) * (bool * ordering) option * int option * instr_metadata
   | Store          of bool * bool * (typ * value) * (typ * value) * (bool * ordering) option * int option * instr_metadata
-  | Cmpxchg        of bool * (typ * value) * (typ * value) * (typ * value) * bool * ordering * ordering * instr_metadata
+  | Cmpxchg        of bool * bool * (typ * value) * (typ * value) * (typ * value) * bool * ordering * ordering * instr_metadata
   | Atomicrmw      of bool * binop * (typ * value) * (typ * value) * bool * ordering * instr_metadata
   | Fence          of bool * ordering * instr_metadata
   | Extractvalue   of (typ * value) * int list * instr_metadata
@@ -970,8 +970,9 @@ let bpr_instr b (nopt, i) =
       (match v with None -> () | Some(q, r) -> if q then bprintf b " singlethread"; bprintf b " %a" bpr_ordering r);
       (match u with None -> () | Some q -> bprintf b ", align %d" q);
       bpr_instr_metadata b md
-  | Cmpxchg(x, y, z, w, v, u, t, md) ->
-      bprintf b "cmpxchg %a%a, %a, %a%a %a %a%a"
+  | Cmpxchg(a, x, y, z, w, v, u, t, md) ->
+      bprintf b "cmpxchg %a%a%a, %a, %a%a %a %a%a"
+        (yes "weak ") a
         (yes "volatile ") x bpr_typ_value y bpr_typ_value z bpr_typ_value w
         (yes " singlthread") v
         bpr_ordering u
@@ -1291,7 +1292,7 @@ let free_of_instruction = function
 | Load(_,_,(_,v),_,_,_) -> free_of_value v
 | Store(_,_,(_,v1),(_,v2),_,_,_)
 | Atomicrmw(_,_,(_,v1),(_,v2),_,_,_) -> VSet.union (free_of_value v1) (free_of_value v2)
-| Cmpxchg(_,(_,v1),(_,v2),(_,v3),_,_,_,_) -> VSet.union (VSet.union (free_of_value v1) (free_of_value v2)) (free_of_value v3)
+| Cmpxchg(_,_,(_,v1),(_,v2),(_,v3),_,_,_,_) -> VSet.union (VSet.union (free_of_value v1) (free_of_value v2)) (free_of_value v3)
 | Fence(_,_,_)
 | Unreachable _
 | Return(None,_) -> VSet.empty
@@ -1388,7 +1389,7 @@ let value_map g f =
     | Load           (a,b,(t,v),c,d,md) -> Load(a,b,(t,g v),c,d,md)
     | Store          (a,b,(t1,v1),(t2,v2),c,d,md) -> Store(a,b,(t1,g v1),(t2,g v2),c,d,md)
     | Atomicrmw      (a,b,(t1,v1),(t2,v2),c,d,md) -> Atomicrmw(a,b,(t1,g v1),(t2,g v2),c,d,md)
-    | Cmpxchg        (a,(t1,v1),(t2,v2),(t3,v3),b,c,d,md) -> Cmpxchg(a,(t1,g v1),(t2,g v2),(t3,g v3),b,c,d,md)
+    | Cmpxchg        (e,a,(t1,v1),(t2,v2),(t3,v3),b,c,d,md) -> Cmpxchg(e,a,(t1,g v1),(t2,g v2),(t3,g v3),b,c,d,md)
     | Fence          (a,b,md) -> Fence(a,b,md)
     | Unreachable    md -> Unreachable md
     | Return         (None,md) -> Return(None,md)

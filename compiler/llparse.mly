@@ -532,6 +532,10 @@ opt_atomic:
 | /* empty */ { false }
 | Kw_atomic   { true }
 ;
+opt_weak:
+| /* empty */ { false }
+| Kw_weak     { true }
+;
 opt_volatile:
 | /* empty */ { false }
 | Kw_volatile { true }
@@ -732,8 +736,8 @@ instruction:
                                                                 align_metadata { Some $1, Util.Load($3, $4, $5, $6, fst $7, snd $7) }
 | Kw_store opt_atomic opt_volatile type_value Comma type_value scopeandordering
                                                                 align_metadata { None, Util.Store($2, $3, $4, $6, $7, fst $8, snd $8) }
-| Kw_cmpxchg opt_volatile type_value Comma type_value Comma type_value opt_singlethread ordering ordering
-                                                          instruction_metadata { None, Util.Cmpxchg($2, $3, $5, $7, $8, $9, $10, $11) }
+| Kw_cmpxchg opt_weak opt_volatile type_value Comma type_value Comma type_value opt_singlethread ordering ordering
+                                                          instruction_metadata { None, Util.Cmpxchg($2, $3, $4, $6, $8, $9, $10, $11, $12) }
 | Kw_atomicrmw opt_volatile binop type_value Comma type_value opt_singlethread ordering
                                                           instruction_metadata { None, Util.Atomicrmw($2, $3, $4, $6, $7, $8, $9) }
 | Kw_fence opt_singlethread ordering                      instruction_metadata { None, Util.Fence($2, $3, $4) }

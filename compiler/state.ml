@@ -199,7 +199,7 @@ let assign_vartyps_instr ctyps (nopt, i) =
     | Util.Alloca(x, y, z, w, md) -> y
     | Util.Load(x, y, (Util.Pointer(typ,_), z), w, v, md) -> typ
     | Util.Store(x, y, z, w, v, u, md) -> typ_of z
-    | Util.Cmpxchg(x, y, z, w, v, u, t, md) -> typ_of z
+    | Util.Cmpxchg(a, x, y, z, w, v, u, t, md) -> typ_of z
     | Util.Atomicrmw(x, y, z, w, v, u, md) -> typ_of w
     | Util.Fence(x, y, md) -> Util.Void
     | Util.Extractvalue((typ,_), y, md) ->
