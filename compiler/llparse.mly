@@ -207,6 +207,7 @@ let process_toplevels t =
 %token Kw_cold
 %token Kw_inlinehint
 %token Kw_inreg
+%token Kw_jumptable
 %token Kw_minsize
 %token Kw_naked
 %token Kw_nest
@@ -832,6 +833,7 @@ function_attribute:
 | Kw_builtin                               { Util.Builtin          }
 | Kw_cold                                  { Util.Cold             }
 | Kw_inlinehint                            { Util.Inlinehint       }
+| Kw_jumptable                             { Util.Jumptable        }
 | Kw_minsize                               { Util.Minsize          }
 | Kw_naked                                 { Util.Naked            }
 | Kw_nobuiltin                             { Util.Nobuiltin        }
@@ -868,6 +870,7 @@ group_attribute:
 | Kw_builtin                          { Util.Builtin         }
 | Kw_cold                             { Util.Cold            }
 | Kw_inlinehint                       { Util.Inlinehint      }
+| Kw_jumptable                        { Util.Jumptable        }
 | Kw_minsize                          { Util.Minsize         }
 | Kw_naked                            { Util.Naked           }
 | Kw_nobuiltin                        { Util.Nobuiltin       }

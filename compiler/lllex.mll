@@ -110,6 +110,7 @@ let _ =
      "cold"                   ,Kw_cold;
      "inlinehint"             ,Kw_inlinehint;
      "inreg"                  ,Kw_inreg;
+     "jumptable"              ,Kw_jumptable;
      "minsize"                ,Kw_minsize;
      "naked"                  ,Kw_naked;
      "nest"                   ,Kw_nest;

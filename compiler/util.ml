@@ -24,6 +24,7 @@ type attribute =
   | Builtin                        (* function_attribute *)
   | Cold                           (* function_attribute *)
   | Inlinehint                     (* function_attribute *)
+  | Jumptable                      (* function_attribute *)
   | Minsize                        (* function_attribute *)
   | Naked                          (* function_attribute *)
   | Nobuiltin                      (* function_attribute *)
@@ -488,6 +489,7 @@ let bpr_attribute b = function
   | Builtin          -> bprintf b "builtin"
   | Cold             -> bprintf b "cold"
   | Inlinehint       -> bprintf b "inlinehint"
+  | Jumptable        -> bprintf b "jumptable"
   | Minsize          -> bprintf b "minsize"
   | Naked            -> bprintf b "naked"
   | Nobuiltin        -> bprintf b "nobuiltin"
