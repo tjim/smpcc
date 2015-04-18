@@ -1,4 +1,6 @@
 {
+(* Lexer for LLVM IR.  Needs to be kept up to date with the LLVM equivalent, see: *)
+(*  https://github.com/llvm-mirror/llvm/commits/master/lib/AsmParser/LLLexer.cpp  *)
 open Util
 open Llparse
 let keyword_table = Hashtbl.create 53
@@ -14,6 +16,8 @@ let _ =
      "constant"               ,Kw_constant;
      "private"                ,Kw_private;
      "internal"               ,Kw_internal;
+     "linker_private"         ,Kw_linker_private;
+     "linker_private_weak"    ,Kw_linker_private_weak;
      "available_externally"   ,Kw_available_externally;
      "linkonce"               ,Kw_linkonce;
      "linkonce_odr"           ,Kw_linkonce_odr;

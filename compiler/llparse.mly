@@ -1,5 +1,8 @@
 %{
 
+(* Parser for LLVM IR.  Needs to be kept up to date with the LLVM equivalent, see: *)
+(*  https://github.com/llvm-mirror/llvm/commits/master/lib/AsmParser/LLParser.cpp  *)
+
 type toplevel =
   | Fun of Util.finfo
   | Asm of string
@@ -110,6 +113,8 @@ let process_toplevels t =
 %token Kw_constant
 %token Kw_private
 %token Kw_internal
+%token Kw_linker_private
+%token Kw_linker_private_weak
 %token Kw_available_externally
 %token Kw_linkonce
 %token Kw_linkonce_odr
@@ -975,6 +980,8 @@ non_external_linkage:
 | /* empty */             { None }
 | Kw_private              { Some Util.Private }
 | Kw_internal             { Some Util.Internal }
+| Kw_linker_private       { Some Util.Linker_private }
+| Kw_linker_private_weak  { Some Util.Linker_private_weak }
 | Kw_weak                 { Some Util.Weak }
 | Kw_weak_odr             { Some Util.Weak_odr }
 | Kw_linkonce             { Some Util.Linkonce }

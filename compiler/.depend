@@ -1,5 +1,7 @@
 echo.cmo : util.cmx lllex.cmx
 echo.cmx : util.cmx lllex.cmx
+front.cmo :
+front.cmx :
 gc.cmo : util.cmx state.cmx options.cmx
 gc.cmx : util.cmx state.cmx options.cmx
 gmw.cmo : util.cmx state.cmx options.cmx gc.cmx

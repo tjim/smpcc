@@ -165,6 +165,8 @@ type linkage =
   | External
   | Private
   | Internal
+  | Linker_private
+  | Linker_private_weak
   | Weak
   | Weak_odr
   | Linkonce
@@ -638,6 +640,8 @@ let bpr_linkage b = function
   | Private              -> bprintf b "private"
   | Extern_weak          -> bprintf b "extern_weak"
   | Internal             -> bprintf b "internal"
+  | Linker_private       -> bprintf b "linker_private"
+  | Linker_private_weak  -> bprintf b "linker_private_weak"
   | Weak                 -> bprintf b "weak"
   | Weak_odr             -> bprintf b "weak_odr"
   | Linkonce             -> bprintf b "linkonce"
@@ -824,7 +828,7 @@ let bpr_instr_metadata b md =
     (function
       | (s, Mdnode i) ->
           bprintf b ", !%s !%d" s i
-      | (s, Mdnodevector x) -> 
+      | (s, Mdnodevector x) ->
           bprintf b ", !%s !{%a}" s bpr_mdnodevector x
       | _ -> failwith "bpr_instr_metadata")
     md
@@ -1404,4 +1408,3 @@ let value_map g f =
         {bname=bl.bname; binstrs=List.map (fun (nopt,i) -> (nopt, imap i)) bl.binstrs})
       f.fblocks));
   ()
-
