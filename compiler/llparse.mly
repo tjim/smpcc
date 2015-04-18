@@ -217,6 +217,7 @@ let process_toplevels t =
 %token Kw_noimplicitfloat
 %token Kw_noinline
 %token Kw_nonlazybind
+%token Kw_nonnull
 %token Kw_noredzone
 %token Kw_noreturn
 %token Kw_nounwind
@@ -909,6 +910,7 @@ param_attribute:
 | Kw_nest         { Util.Nest      }
 | Kw_noalias      { Util.Noalias   }
 | Kw_nocapture    { Util.Nocapture }
+| Kw_nonnull      { Util.Nonnull   }
 | Kw_readnone     { Util.Readnone  }
 | Kw_readonly     { Util.Readonly  }
 | Kw_returned     { Util.Returned  }
@@ -1029,8 +1031,9 @@ return_attributes:
 | return_attribute return_attributes { $1::$2 }
 ;
 return_attribute:
-| Kw_inreg   { Util.Inreg  }
-| Kw_noalias { Util.Noalias}
-| Kw_signext { Util.Signext}
-| Kw_zeroext { Util.Zeroext}
+| Kw_inreg   { Util.Inreg   }
+| Kw_noalias { Util.Noalias }
+| Kw_nonnull { Util.Nonnull }
+| Kw_signext { Util.Signext }
+| Kw_zeroext { Util.Zeroext }
 ;

@@ -10,6 +10,7 @@ type attribute =
   | Nest                           (* param_attribute *)
   | Noalias                        (* param_attribute *) (* return_attribute *)
   | Nocapture                      (* param_attribute *)
+  | Nonnull                        (* param_attribute *) (* return_attribute *)
   | Readnone                       (* param_attribute *) (* function_attribute *) (* call_attribute *)
   | Readonly                       (* param_attribute *) (* function_attribute *) (* call_attribute *)
   | Returned                       (* param_attribute *)
@@ -472,6 +473,7 @@ let bpr_attribute b = function
   | Nest             -> bprintf b "nest"
   | Noalias          -> bprintf b "noalias"
   | Nocapture        -> bprintf b "nocapture"
+  | Nonnull          -> bprintf b "nonnull"
   | Readnone         -> bprintf b "readnone"
   | Readonly         -> bprintf b "readonly"
   | Returned         -> bprintf b "returned"

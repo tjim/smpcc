@@ -120,6 +120,7 @@ let _ =
      "noimplicitfloat"        ,Kw_noimplicitfloat;
      "noinline"               ,Kw_noinline;
      "nonlazybind"            ,Kw_nonlazybind;
+     "nonnull"                ,Kw_nonnull;
      "noredzone"              ,Kw_noredzone;
      "noreturn"               ,Kw_noreturn;
      "nounwind"               ,Kw_nounwind;
