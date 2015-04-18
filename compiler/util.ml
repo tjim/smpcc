@@ -246,6 +246,11 @@ type binop =
   | Umax
   | Umin
 
+type tailcallkind =
+  | TCK_None
+  | TCK_Tail
+  | TCK_MustTail
+
 type instr_metadata = (string * value) list
 
 type instr =
@@ -290,7 +295,7 @@ type instr =
   | Select         of (typ * value) list * instr_metadata
   | Phi            of typ * (value * value) list * instr_metadata
   | Landingpad     of typ * (typ * value) * bool * landingpad list * instr_metadata
-  | Call           of bool * callingconv option * return_attribute list * typ * value * (typ * param_attribute list * value) list * call_attribute list * instr_metadata
+  | Call           of tailcallkind * callingconv option * return_attribute list * typ * value * (typ * param_attribute list * value) list * call_attribute list * instr_metadata
   | Alloca         of bool * typ * (typ * value) option * int option * instr_metadata
   | Load           of bool * bool * (typ * value) * (bool * ordering) option * int option * instr_metadata
   | Store          of bool * bool * (typ * value) * (typ * value) * (bool * ordering) option * int option * instr_metadata
@@ -935,8 +940,10 @@ let bpr_instr b (nopt, i) =
         | hd::tl -> bprintf b " %a" bpr_landingpad hd; bpr b tl in
       bprintf b "landingpad %a personality %a%a%a%a" bpr_typ x bpr_typ_value y (yes " cleanup") z bpr w
         bpr_instr_metadata md
-  | Call(is_tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs, md) ->
-      if is_tail_call then bprintf b "tail ";
+  | Call(tail_call, callconv, retattrs, callee_ty, callee_name, operands, callattrs, md) ->
+      (match tail_call with TCK_None -> ()
+      | TCK_Tail -> bprintf b "tail "
+      | TCK_MustTail ->  bprintf b "musttail ");
       bprintf b "call ";
       (opt bpr_callingconv) b callconv;
       bprintf b "%a %a(%a)%a%a"

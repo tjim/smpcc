@@ -622,13 +622,13 @@ let branch_elimination f =
               | ((_,Int max_branch),_) -> Big_int.int_of_big_int max_branch
               | _ -> List.length branches in
             let x = Name(false, State.fresh()) in
-            [(Some x, Call(false, None, [], Integer(max_branch+1),
+            [(Some x, Call(Util.TCK_None, None, [], Integer(max_branch+1),
                            (Var(Util.Name(true, "unary"))),
                            [(ty,[],e);(Integer 32, [], big(List.length(branches)))],
                            [],[]))]@
               [(assign_instr (State.bl_mask(my_block)) (Integer 1) (Integer 1) (big 0))]@ (* NB my_block could be an explicit branch target *)
               (let rec loop i =
-                let call = Call(false, None, [], Integer 1,
+                let call = Call(Util.TCK_None, None, [], Integer 1,
                                 (Var(Util.Name(true, "selectbit"))),
                                 [(Integer(List.length(branches)+1), [], Var x);(Integer 32, [], big i)],
                                 [],[]) in

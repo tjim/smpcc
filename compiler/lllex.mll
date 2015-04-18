@@ -43,6 +43,7 @@ let _ =
      "null"                   ,Kw_null;
      "to"                     ,Kw_to;
      "tail"                   ,Kw_tail;
+     "musttail"               ,Kw_musttail;
      "target"                 ,Kw_target;
      "triple"                 ,Kw_triple;
      "unwind"                 ,Kw_unwind;

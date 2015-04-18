@@ -140,6 +140,7 @@ let process_toplevels t =
 %token Kw_null
 %token Kw_to
 %token Kw_tail
+%token Kw_musttail
 %token Kw_target
 %token Kw_triple
 %token Kw_unwind
@@ -499,8 +500,9 @@ opt_inbounds:
 | Kw_inbounds { true }
 ;
 opt_tail:
-| /* empty */ { false }
-| Kw_tail     { true }
+| /* empty */ { Util.TCK_None }
+| Kw_tail     { Util.TCK_Tail }
+| Kw_musttail { Util.TCK_MustTail }
 ;
 opt_cleanup:
 | /* empty */ { false }
