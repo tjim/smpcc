@@ -253,6 +253,13 @@ type tailcallkind =
   | TCK_Tail
   | TCK_MustTail
 
+type selectionkind =
+  | SK_any   
+  | SK_exactmatch 
+  | SK_largest     
+  | SK_noduplicates 
+  | SK_samesize     
+
 type instr_metadata = (string * value) list
 
 type instr =
@@ -334,6 +341,7 @@ type finfo = {
     mutable funnamed_addr: bool;
     mutable fattrs: function_attribute list;
     mutable fsection: string option;
+    mutable fcomdat: string option;
     mutable falign: int option;
     mutable fgc: string option;
     mutable fprefix: (typ * value) option;
@@ -360,6 +368,7 @@ type ginfo = {
     mutable gvalue: value option;
     mutable gsection: string option;
     mutable galign: int option;
+    mutable gcomdat: string option;
   }
 
 (* aliases *)
@@ -781,7 +790,7 @@ and bpr_mdnodevector b x =
   bprintf b "{%a}" (between ", " bpr) x
 
 let bpr_global b g =
-  bprintf b "%a = %a%a%a%a%a%a%a%a%a%a%a%a\n"
+  bprintf b "%a = %a%a%a%a%a%a%a%a%a%a%a%a%a\n"
     bpr_var g.gname
     (opt_after " " bpr_linkage) g.glinkage
     (opt_after " " bpr_visibility) g.gvisibility
@@ -795,6 +804,7 @@ let bpr_global b g =
     (opt_before " " bpr_value) g.gvalue
     (opt (fun b -> bprintf b ", section %s")) g.gsection
     (opt (fun b -> bprintf b ", align %d")) g.galign
+    (opt (fun b -> bprintf b ", comdat %s")) g.gcomdat
 
 let bpr_alias b a =
   bprintf b "%a = " bpr_var a.aname;

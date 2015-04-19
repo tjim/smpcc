@@ -143,6 +143,12 @@ let _ =
      "zeroext"                ,Kw_zeroext;
      "type"                   ,Kw_type;
      "opaque"                 ,Kw_opaque;
+     "comdat"                 ,Kw_comdat;
+     "any"                    ,Kw_any;
+     "exactmatch"             ,Kw_exactmatch;
+     "largest"                ,Kw_largest;
+     "noduplicates"           ,Kw_noduplicates;
+     "samesize"               ,Kw_samesize;
      "eq"                     ,Kw_eq;
      "ne"                     ,Kw_ne;
      "slt"                    ,Kw_slt;
@@ -272,6 +278,8 @@ parse eof                                                    { Eof }
 | (dquote notdquote+ dquote as x) ':'                        { LabelStr x }
 | dquote notdquote* dquote                                   { StringConstant(Lexing.lexeme lexbuf) }
 | (idchar+ as x) ':'                                         { LabelStr x }
+| '$' (dquote notdquote* dquote as x)                        { ComdatVar x }
+| '$' (idchar0 idchar* as x)                                 { ComdatVar x }
 | "..."                                                      { DotDotDot }
 | 'i' (digit+ as numbits)                                    { I(int_of_string numbits) }
 | ['u' 's'] "0x" hexdigit+                                   { APSint(Lexing.lexeme lexbuf) }

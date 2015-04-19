@@ -14,6 +14,7 @@ type toplevel =
   | Alias of Util.ainfo
   | MDNodeDefn of Util.mdinfo
   | MDVarDefn of string * int list
+  | ComdatVarDefn of string * Util.selectionkind
   | Attrgrp of int * Util.attribute list
 
 let list_of_string s =
@@ -62,6 +63,7 @@ let process_toplevels t =
     | Alias x -> cu.Util.caliases <- x::cu.Util.caliases
     | MDNodeDefn x -> cu.Util.cmdnodes <- x::cu.Util.cmdnodes
     | MDVarDefn(x,y) -> cu.Util.cmdvars <- (x,y)::cu.Util.cmdvars
+    | ComdatVarDefn(x,y) -> () (* ignored for now *)
     | Attrgrp(x,y) -> cu.Util.cattrgrps <- (x,y)::cu.Util.cattrgrps in
   List.iter proc (List.rev t);
   cu
@@ -83,6 +85,7 @@ let process_toplevels t =
 %token <Util.var> LocalVarID
 %token Greater
 %token <string> LabelStr
+%token <string> ComdatVar
 %token Lbrace
 %token Less
 %token Lparen
@@ -240,6 +243,12 @@ let process_toplevels t =
 %token Kw_zeroext
 %token Kw_type
 %token Kw_opaque
+%token Kw_comdat;
+%token Kw_any;
+%token Kw_exactmatch;
+%token Kw_largest;
+%token Kw_noduplicates;
+%token Kw_samesize;
 %token Kw_eq
 %token Kw_ne
 %token Kw_slt
@@ -352,7 +361,7 @@ toplevel:
 | LocalVar Equal Kw_type typ                   { Typ($1, Some $4) }
 | global_eq external_linkage opt_visibility opt_dll_storageclass opt_thread_local
     opt_addrspace opt_unnamed_addr opt_externally_initialized
-    constant_or_global typ opt_section_align
+    constant_or_global typ opt_section_align_comdat
                                                { Global {Util.gname = $1;
                                                          Util.glinkage = Some $2;
                                                          Util.gvisibility = $3;
@@ -364,12 +373,13 @@ toplevel:
                                                          Util.gconstant = $9;
                                                          Util.gtyp = $10;
                                                          Util.gvalue = None;
-                                                         Util.gsection = fst $11;
-                                                         Util.galign = snd $11;}
+                                                         Util.gsection = (match $11 with (x, _, _) -> x);
+                                                         Util.galign = (match $11 with (_, x, _) -> x);
+                                                         Util.gcomdat = (match $11 with (_, _, x) -> x);}
                                                }
 | global_eq non_external_linkage opt_visibility opt_dll_storageclass opt_thread_local
     opt_addrspace opt_unnamed_addr opt_externally_initialized
-    constant_or_global typ value opt_section_align
+    constant_or_global typ value opt_section_align_comdat
                                                { Global {Util.gname = $1;
                                                          Util.glinkage = $2;
                                                          Util.gvisibility = $3;
@@ -381,17 +391,27 @@ toplevel:
                                                          Util.gconstant = $9;
                                                          Util.gtyp = $10;
                                                          Util.gvalue = Some $11;
-                                                         Util.gsection = fst $12;
-                                                         Util.galign = snd $12;}
+                                                         Util.gsection = (match $12 with (x, _, _) -> x);
+                                                         Util.galign = (match $12 with (_, x, _) -> x);
+                                                         Util.gcomdat = (match $12 with (_, _, x) -> x);}
                                                }
 | global_eq external_linkage opt_visibility Kw_alias opt_linkage aliasee
     { Alias({Util.aname=$1; Util.avisibility=$3; Util.alinkage=$5; Util.aaliasee=$6}) }
 | global_eq non_external_linkage opt_visibility Kw_alias opt_linkage aliasee
     { Alias({Util.aname=$1; Util.avisibility=$3; Util.alinkage=$5; Util.aaliasee=$6}) }
+| ComdatVar Equal Kw_comdat selection_kind
+    { ComdatVarDefn($1, $4) }
 | Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace
     { MDNodeDefn({Util.mdid=int_of_string $2; Util.mdtyp=$4; Util.mdcontents=$7}) }
 | MetadataVar Equal Exclaim Lbrace mdlist Rbrace                             { MDVarDefn($1, $5) }
 | Kw_attributes AttrGrpID Equal Lbrace group_attributes Rbrace               { Attrgrp($2, $5) }
+;
+selection_kind:
+| Kw_any          { Util.SK_any }
+| Kw_exactmatch   { Util.SK_exactmatch }
+| Kw_largest      { Util.SK_largest }
+| Kw_noduplicates { Util.SK_noduplicates }
+| Kw_samesize     { Util.SK_samesize }
 ;
 global_eq: /* may want to allow empty here (per llvm parser) but haven't seen it yet and it causes grammar conflicts */
 | GlobalID Equal  { $1 }
@@ -423,7 +443,7 @@ constant_or_global:
 function_header:
 | opt_linkage opt_visibility opt_dll_storageclass opt_callingconv return_attributes
  typ global_name argument_list opt_unnamed_addr function_attributes opt_section
- opt_align opt_gc opt_prefix
+ opt_comdat opt_align opt_gc opt_prefix
                              {
                                {Util.flinkage = $1;
                                 Util.fvisibility = $2;
@@ -436,9 +456,10 @@ function_header:
                                 Util.funnamed_addr = $9;
                                 Util.fattrs = $10;
                                 Util.fsection = $11;
-                                Util.falign = $12;
-                                Util.fgc = $13;
-                                Util.fprefix = $14;
+                                Util.fcomdat = $12;
+                                Util.falign = $13;
+                                Util.fgc = $14;
+                                Util.fprefix = $15;
                                 Util.fblocks = [];}
                              }
 ;
@@ -510,11 +531,16 @@ opt_cleanup:
 | /* empty */ { false }
 | Kw_cleanup  { true }
 ;
-opt_section_align:
-| /* empty */                                          { (None    , None) }
-| Comma Kw_section StringConstant                      { (Some $3 , None) }
-| Comma Kw_align APInt                                 { (None    , Some(int_of_string $3)) }
-| Comma Kw_section StringConstant Comma Kw_align APInt { (Some $3 , Some(int_of_string $6)) }
+opt_comdat:
+| /* empty */         { None }
+| Kw_comdat ComdatVar { Some $2 }
+;
+opt_section_align_comdat:
+| /* empty */                                          { (None    , None                  , None) }
+| Comma Kw_section StringConstant                      { (Some $3 , None                  , None) }
+| Comma Kw_align APInt                                 { (None    , Some(int_of_string $3), None) }
+| Comma Kw_section StringConstant Comma Kw_align APInt { (Some $3 , Some(int_of_string $6), None) }
+| Comma Kw_comdat ComdatVar                            { (None    , None                  , Some $3) }
 ;
 align_metadata:
 | instruction_metadata { (None, $1) }
