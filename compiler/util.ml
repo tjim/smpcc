@@ -5,6 +5,7 @@ type var =
 type attribute =
   | Align of int                   (* param_attribute *)
   | Byval                          (* param_attribute *)
+  | Dereferenceable of int         (* param_attribute *) (* return_attribute *)
   | Inalloca                       (* param_attribute *)
   | Inreg                          (* param_attribute *) (* return_attribute *)
   | Nest                           (* param_attribute *)
@@ -476,49 +477,50 @@ let bpr_fast_math_flag b = function
 let bpr_fast_math_flags = between " " bpr_fast_math_flag
 
 let bpr_attribute b = function
-  | Align x          -> bprintf b "align %d" x
-  | Byval            -> bprintf b "byval"
-  | Inalloca         -> bprintf b "inalloca"
-  | Inreg            -> bprintf b "inreg"
-  | Nest             -> bprintf b "nest"
-  | Noalias          -> bprintf b "noalias"
-  | Nocapture        -> bprintf b "nocapture"
-  | Nonnull          -> bprintf b "nonnull"
-  | Readnone         -> bprintf b "readnone"
-  | Readonly         -> bprintf b "readonly"
-  | Returned         -> bprintf b "returned"
-  | Signext          -> bprintf b "signext"
-  | Sret             -> bprintf b "sret"
-  | Zeroext          -> bprintf b "zeroext"
-  | Attrgrp x        -> bprintf b "#%d" x
-  | Attr(x, None)    -> bprintf b "%s" x
-  | Attr(x, Some y)  -> bprintf b "%s=%s" x y
-  | Alignstack x     -> bprintf b "alignstack = (%d)" x
-  | Alwaysinline     -> bprintf b "alwaysinline"
-  | Builtin          -> bprintf b "builtin"
-  | Cold             -> bprintf b "cold"
-  | Inlinehint       -> bprintf b "inlinehint"
-  | Jumptable        -> bprintf b "jumptable"
-  | Minsize          -> bprintf b "minsize"
-  | Naked            -> bprintf b "naked"
-  | Nobuiltin        -> bprintf b "nobuiltin"
-  | Noduplicate      -> bprintf b "noduplicate"
-  | Noimplicitfloat  -> bprintf b "noimplicitfloat"
-  | Noinline         -> bprintf b "noinline"
-  | Nonlazybind      -> bprintf b "nonlazybind"
-  | Noredzone        -> bprintf b "noredzone"
-  | Noreturn         -> bprintf b "noreturn"
-  | Nounwind         -> bprintf b "nounwind"
-  | Optnone          -> bprintf b "optnone"
-  | Optsize          -> bprintf b "optsize"
-  | Returns_twice    -> bprintf b "returns_twice"
-  | Ssp              -> bprintf b "ssp"
-  | Sspreq           -> bprintf b "sspreq"
-  | Sspstrong        -> bprintf b "sspstrong"
-  | Sanitize_address -> bprintf b "sanitize_address"
-  | Sanitize_thread  -> bprintf b "sanitize_thread"
-  | Sanitize_memory  -> bprintf b "sanitize_memory"
-  | Uwtable          -> bprintf b "uwtable"
+  | Align x           -> bprintf b "align %d" x
+  | Byval             -> bprintf b "byval"
+  | Dereferenceable x -> bprintf b "dereferenceable(%d)" x
+  | Inalloca          -> bprintf b "inalloca"
+  | Inreg             -> bprintf b "inreg"
+  | Nest              -> bprintf b "nest"
+  | Noalias           -> bprintf b "noalias"
+  | Nocapture         -> bprintf b "nocapture"
+  | Nonnull           -> bprintf b "nonnull"
+  | Readnone          -> bprintf b "readnone"
+  | Readonly          -> bprintf b "readonly"
+  | Returned          -> bprintf b "returned"
+  | Signext           -> bprintf b "signext"
+  | Sret              -> bprintf b "sret"
+  | Zeroext           -> bprintf b "zeroext"
+  | Attrgrp x         -> bprintf b "#%d" x
+  | Attr(x, None)     -> bprintf b "%s" x
+  | Attr(x, Some y)   -> bprintf b "%s=%s" x y
+  | Alignstack x      -> bprintf b "alignstack = (%d)" x
+  | Alwaysinline      -> bprintf b "alwaysinline"
+  | Builtin           -> bprintf b "builtin"
+  | Cold              -> bprintf b "cold"
+  | Inlinehint        -> bprintf b "inlinehint"
+  | Jumptable         -> bprintf b "jumptable"
+  | Minsize           -> bprintf b "minsize"
+  | Naked             -> bprintf b "naked"
+  | Nobuiltin         -> bprintf b "nobuiltin"
+  | Noduplicate       -> bprintf b "noduplicate"
+  | Noimplicitfloat   -> bprintf b "noimplicitfloat"
+  | Noinline          -> bprintf b "noinline"
+  | Nonlazybind       -> bprintf b "nonlazybind"
+  | Noredzone         -> bprintf b "noredzone"
+  | Noreturn          -> bprintf b "noreturn"
+  | Nounwind          -> bprintf b "nounwind"
+  | Optnone           -> bprintf b "optnone"
+  | Optsize           -> bprintf b "optsize"
+  | Returns_twice     -> bprintf b "returns_twice"
+  | Ssp               -> bprintf b "ssp"
+  | Sspreq            -> bprintf b "sspreq"
+  | Sspstrong         -> bprintf b "sspstrong"
+  | Sanitize_address  -> bprintf b "sanitize_address"
+  | Sanitize_thread   -> bprintf b "sanitize_thread"
+  | Sanitize_memory   -> bprintf b "sanitize_memory"
+  | Uwtable           -> bprintf b "uwtable"
 
 let bpr_attributes =
   between " " bpr_attribute

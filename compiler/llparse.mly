@@ -206,6 +206,7 @@ let process_toplevels t =
 %token Kw_alwaysinline
 %token Kw_builtin
 %token Kw_byval
+%token Kw_dereferenceable
 %token Kw_inalloca
 %token Kw_cold
 %token Kw_inlinehint
@@ -936,20 +937,21 @@ param_attribute_list:
 | /* empty */                          { [] }
 | param_attribute param_attribute_list { $1::$2 }
 param_attribute:
-| Kw_align APInt  { Util.Align(int_of_string $2) }
-| Kw_byval        { Util.Byval     }
-| Kw_inalloca     { Util.Inalloca  }
-| Kw_inreg        { Util.Inreg     }
-| Kw_nest         { Util.Nest      }
-| Kw_noalias      { Util.Noalias   }
-| Kw_nocapture    { Util.Nocapture }
-| Kw_nonnull      { Util.Nonnull   }
-| Kw_readnone     { Util.Readnone  }
-| Kw_readonly     { Util.Readonly  }
-| Kw_returned     { Util.Returned  }
-| Kw_signext      { Util.Signext   }
-| Kw_sret         { Util.Sret      }
-| Kw_zeroext      { Util.Zeroext   }
+| Kw_align APInt                         { Util.Align(int_of_string $2)           }
+| Kw_byval                               { Util.Byval                             }
+| Kw_dereferenceable Lparen APInt Rparen { Util.Dereferenceable(int_of_string $3) }
+| Kw_inalloca                            { Util.Inalloca                          }
+| Kw_inreg                               { Util.Inreg                             }
+| Kw_nest                                { Util.Nest                              }
+| Kw_noalias                             { Util.Noalias                           }
+| Kw_nocapture                           { Util.Nocapture                         }
+| Kw_nonnull                             { Util.Nonnull                           }
+| Kw_readnone                            { Util.Readnone                          }
+| Kw_readonly                            { Util.Readonly                          }
+| Kw_returned                            { Util.Returned                          }
+| Kw_signext                             { Util.Signext                           }
+| Kw_sret                                { Util.Sret                              }
+| Kw_zeroext                             { Util.Zeroext                           }
 ;
 jump_table:
 | /* empty */                            { [] }
@@ -1064,9 +1066,10 @@ return_attributes:
 | return_attribute return_attributes { $1::$2 }
 ;
 return_attribute:
-| Kw_inreg   { Util.Inreg   }
-| Kw_noalias { Util.Noalias }
-| Kw_nonnull { Util.Nonnull }
-| Kw_signext { Util.Signext }
-| Kw_zeroext { Util.Zeroext }
+| Kw_dereferenceable Lparen APInt Rparen { Util.Dereferenceable(int_of_string $3) }
+| Kw_inreg                               { Util.Inreg                             }
+| Kw_noalias                             { Util.Noalias                           }
+| Kw_nonnull                             { Util.Nonnull                           }
+| Kw_signext                             { Util.Signext                           }
+| Kw_zeroext                             { Util.Zeroext                           }
 ;

@@ -106,6 +106,7 @@ let _ =
      "alwaysinline"           ,Kw_alwaysinline;
      "builtin"                ,Kw_builtin;
      "byval"                  ,Kw_byval;
+     "dereferenceable"        ,Kw_dereferenceable;
      "inalloca"               ,Kw_inalloca;
      "cold"                   ,Kw_cold;
      "inlinehint"             ,Kw_inlinehint;
