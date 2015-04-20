@@ -187,11 +187,6 @@ type dll_storageclass =
   | Dllimport
   | Dllexport
 
-type aliasee =
-  | A_bitcast       of (typ * value) * typ
-  | A_getelementptr of bool * (typ * value) list
-  | A_typ_value     of (typ * value)
-
 type callingconv =
   | Ccc
   | Fastcc
@@ -377,7 +372,7 @@ type ainfo = {
     aname: var;
     avisibility: visibility option;
     alinkage: linkage option;
-    aaliasee: aliasee
+    aaliasee: (int * typ) option * (typ * value);
   }
 
 (* metadata *)
@@ -809,14 +804,12 @@ let bpr_global b g =
     (opt (fun b -> bprintf b ", comdat %s")) g.gcomdat
 
 let bpr_alias b a =
-  bprintf b "%a = " bpr_var a.aname;
-  (match a.avisibility with None -> () | Some x -> bprintf b "%a " bpr_visibility x);
-  bprintf b "alias ";
-  (match a.alinkage with None -> () | Some x -> bprintf b "%a " bpr_linkage x);
-  (match a.aaliasee with
-  | A_bitcast(x, y) -> bprintf b "bitcast(%a to %a)\n" bpr_typ_value x bpr_typ y
-  | A_getelementptr(inbounds, x) -> bprintf b "getelementptr%a(%a)\n" (yes " inbounds ") inbounds bpr_typ_value_list x
-  | A_typ_value x -> bprintf b "%a\n" bpr_typ_value x)
+  bprintf b "%a = %aalias %a%a%a"
+    bpr_var a.aname
+    (opt_after " " bpr_visibility) a.avisibility
+    (opt_after " " bpr_linkage) a.alinkage
+    (opt_after " " (fun b (x,typ) -> bprintf b "addrspace %d, %a" x bpr_typ typ)) (fst a.aaliasee)
+    bpr_typ_value (snd a.aaliasee)
 
 let pad_to_column b n =
   let rec column i =

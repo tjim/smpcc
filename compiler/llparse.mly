@@ -407,6 +407,10 @@ toplevel:
 | MetadataVar Equal Exclaim Lbrace mdlist Rbrace                             { MDVarDefn($1, $5) }
 | Kw_attributes AttrGrpID Equal Lbrace group_attributes Rbrace               { Attrgrp($2, $5) }
 ;
+aliasee:
+| type_value { (None, $1) }
+| Kw_addrspace Lparen APInt Rparen typ Comma type_value { (Some(int_of_string $3, $5) , $7) }
+;
 selection_kind:
 | Kw_any          { Util.SK_any }
 | Kw_exactmatch   { Util.SK_exactmatch }
@@ -417,11 +421,6 @@ selection_kind:
 global_eq: /* may want to allow empty here (per llvm parser) but haven't seen it yet and it causes grammar conflicts */
 | GlobalID Equal  { $1 }
 | GlobalVar Equal { $1 }
-;
-aliasee:
-| Kw_bitcast       Lparen type_value Kw_to typ Rparen         { Util.A_bitcast($3, $5) }
-| Kw_getelementptr opt_inbounds Lparen type_value_list Rparen { Util.A_getelementptr($2, $4) }
-| type_value                                                  { Util.A_typ_value $1 }
 ;
 string_list:
 | /* empty */                { [] }
