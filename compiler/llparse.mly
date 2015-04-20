@@ -396,10 +396,10 @@ toplevel:
                                                          Util.galign = (match $12 with (_, x, _) -> x);
                                                          Util.gcomdat = (match $12 with (_, _, x) -> x);}
                                                }
-| global_eq external_linkage opt_visibility Kw_alias opt_linkage aliasee
-    { Alias({Util.aname=$1; Util.avisibility=$3; Util.alinkage=$5; Util.aaliasee=$6}) }
-| global_eq non_external_linkage opt_visibility Kw_alias opt_linkage aliasee
-    { Alias({Util.aname=$1; Util.avisibility=$3; Util.alinkage=$5; Util.aaliasee=$6}) }
+| global_eq external_linkage opt_visibility opt_thread_local Kw_alias opt_linkage aliasee
+    { Alias({Util.aname=$1; Util.avisibility=$3; Util.athread_local=$4; Util.alinkage=$6; Util.aaliasee=$7}) }
+| global_eq non_external_linkage opt_visibility opt_thread_local Kw_alias opt_linkage aliasee
+    { Alias({Util.aname=$1; Util.avisibility=$3; Util.athread_local=$4; Util.alinkage=$6; Util.aaliasee=$7}) }
 | ComdatVar Equal Kw_comdat selection_kind
     { ComdatVarDefn($1, $4) }
 | Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace

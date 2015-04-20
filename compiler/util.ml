@@ -372,6 +372,7 @@ type ainfo = {
     aname: var;
     avisibility: visibility option;
     alinkage: linkage option;
+    athread_local: thread_local option option;
     aaliasee: (int * typ) option * (typ * value);
   }
 
@@ -804,9 +805,10 @@ let bpr_global b g =
     (opt (fun b -> bprintf b ", comdat %s")) g.gcomdat
 
 let bpr_alias b a =
-  bprintf b "%a = %aalias %a%a%a"
+  bprintf b "%a = %a%aalias %a%a%a"
     bpr_var a.aname
     (opt_after " " bpr_visibility) a.avisibility
+    (opt_after " " bpr_thread_local) a.athread_local
     (opt_after " " bpr_linkage) a.alinkage
     (opt_after " " (fun b (x,typ) -> bprintf b "addrspace %d, %a" x bpr_typ typ)) (fst a.aaliasee)
     bpr_typ_value (snd a.aaliasee)
