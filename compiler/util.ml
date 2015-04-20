@@ -109,7 +109,7 @@ type value =
   | Basicblock     of var
   | Mdnode         of int
   | Mdstring       of string
-  | Mdnodevector   of (typ * value) option list
+  | Mdnodevector   of value list
   | Undef
   | Zero
   | Null
@@ -379,8 +379,7 @@ type ainfo = {
 (* metadata *)
 type mdinfo = {
     mdid: int;
-    mdtyp: typ;
-    mdcontents: (typ * value) option list;
+    mdcontents: value list;
   }
 
 (* compilation unit *)
@@ -782,10 +781,7 @@ and bpr_typ_value_list b l =
         between ", " (fun b (ty, op) -> bprintf b "%a %a" bpr_typ ty bpr_value op) b l)
 
 and bpr_mdnodevector b x =
-  let bpr b = function
-    | None -> bprintf b "null"
-    | Some y -> bpr_typ_value b y in
-  bprintf b "{%a}" (between ", " bpr) x
+  bprintf b "{%a}" (between ", " bpr_value) x
 
 let bpr_global b g =
   bprintf b "%a = %a%a%a%a%a%a%a%a%a%a%a%a%a\n"
@@ -1103,7 +1099,8 @@ let bpr_function b f =
   end
 
 let bpr_mdnode b x =
-  bprintf b "!%d = %a !%a\n" x.mdid bpr_typ x.mdtyp
+  bprintf b "!%d = !%a\n"
+    x.mdid
     bpr_mdnodevector x.mdcontents
 
 module ASet = Set.Make(

@@ -187,7 +187,7 @@ and repl_value var replacement x =
   | Int _                      -> x
   | Float _                    -> x
   | Asm _                      -> x
-  | Mdnodevector l             -> Mdnodevector (List.map (function None -> None | Some(typ, value) -> Some(typ, rv value)) l)
+  | Mdnodevector l             -> Mdnodevector (List.map rv l)
   | Blockaddress(x, y)         -> Blockaddress(rv x, rv y)
   | Array ops                  -> Array(List.map rtv ops)
   | Vector ops                 -> Vector(List.map rtv ops)

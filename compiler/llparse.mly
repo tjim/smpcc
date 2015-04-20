@@ -402,8 +402,8 @@ toplevel:
     { Alias({Util.aname=$1; Util.avisibility=$3; Util.athread_local=$4; Util.alinkage=$6; Util.aaliasee=$7}) }
 | ComdatVar Equal Kw_comdat selection_kind
     { ComdatVarDefn($1, $4) }
-| Exclaim APInt Equal typ Exclaim Lbrace mdnodevector Rbrace
-    { MDNodeDefn({Util.mdid=int_of_string $2; Util.mdtyp=$4; Util.mdcontents=$7}) }
+| Exclaim APInt Equal Exclaim Lbrace mdnodevector Rbrace
+    { MDNodeDefn({Util.mdid=int_of_string $2; Util.mdcontents=$6}) }
 | MetadataVar Equal Exclaim Lbrace mdlist Rbrace                             { MDVarDefn($1, $5) }
 | Kw_attributes AttrGrpID Equal Lbrace group_attributes Rbrace               { Attrgrp($2, $5) }
 ;
@@ -431,10 +431,8 @@ mdlist:
 | Exclaim APInt mdlist { (int_of_string $2)::$3 }
 ;
 mdnodevector:
-| Kw_null                       { [None] }
-| Kw_null Comma mdnodevector    { None::$3 }
-| type_value                    { [Some $1] }
-| type_value Comma mdnodevector { (Some $1)::$3 }
+| value                         { [$1] }
+| value Comma mdnodevector      { ($1)::$3 }
 ;
 constant_or_global:
 | Kw_constant { true }
