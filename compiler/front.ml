@@ -436,7 +436,6 @@ let opportunistic_flattening f cg s =
 	List.fold_left
 	  (fun acc vi ->
 	    let newname = "_" ^ fd.svar.vname ^ "_" ^ vi.vname in
-            Printf.printf "<%s>\n" newname;
 	    let newvi = makeLocalVar destination newname vi.vtype in
 	    ignore(visitCilStmt
 		     (new variableReplaceVisitor vi newvi)
@@ -453,14 +452,12 @@ let opportunistic_flattening f cg s =
 
       (* Was uintType but is now a char *)
       (* has a check elsewhere *)
-      Printf.printf "<%s>\n" retsitename;
       let retsite = makeLocalVar destination retsitename charType in
 
       (* create the return value storage thing *)
       let retvalname = "_" ^ fd.svar.vname ^ "_ret_val" in
       let retvaltype,_,_,_ = splitFunctionTypeVI fd.svar in
       let retval = makeLocalVar destination retvalname retvaltype in
-      Printf.printf "<%s>\n" retvalname;
 
       (* replace and count all the calls *)
       let count = ref 0 in (* pascal numbering *)
