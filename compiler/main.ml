@@ -689,6 +689,26 @@ let run_phases ctyps f =
           optional_print f options.gep (fun () ->
             ())))))
 
+let keep_ll file ll_file =
+  let ll_basename =
+    (* ex: foo/bar.c --> bar.cil.ll *)
+    Filename.chop_suffix (Filename.basename file) ".c" ^ ".cil.ll" in
+  let ret =
+    (* Use mv instead of Unix.rename because rename fails on cross-device move *)
+    Sys.command(sprintf "mv %s %s" (Filename.quote ll_file) (Filename.quote ll_basename)) in
+  if ret <> 0 then
+    failwith(sprintf "Error: mv failure %s -> %s" (Filename.quote ll_file) (Filename.quote ll_basename))
+
+let keep_cil file src_file =
+  let cil_basename =
+    (* ex: foo/bar.c --> bar.cil.c *)
+    Filename.chop_suffix (Filename.basename file) ".c" ^ ".cil.c" in
+  let ret =
+    (* Use mv instead of Unix.rename because rename fails on cross-device move *)
+    Sys.command(sprintf "mv %s %s" (Filename.quote src_file) (Filename.quote cil_basename)) in
+  if ret <> 0 then
+    failwith(sprintf "Error: mv failure %s -> %s" (Filename.quote src_file) (Filename.quote cil_basename))
+
 let file2cu cil_extra_args file =
   if Filename.check_suffix file ".ll" then
     let ch = open_in file in
@@ -701,59 +721,37 @@ let file2cu cil_extra_args file =
     (close_in ch; cu)
   else if Filename.check_suffix file ".c" then
     let src_file =
-      if not options.cil then
+      if options.no_cil then
         file
       else
         let cil_file, outch = Filename.open_temp_file "smpcc" ".cil.c" in
         Front.doit_outch file outch;
         close_out outch;
         cil_file in
-    (* Run clang *)
+    (* Run clang to obtain LLVM IR (.ll) *)
     let ll_file = Filename.temp_file "smpcc" ".ll" in
     let cmd =
       sprintf "clang -S %s -emit-llvm %s -o %s" options.optflag (Filename.quote src_file) (Filename.quote ll_file) in
     if options.verbose then
       eprintf "%s\n" cmd;
     let ret = Sys.command(cmd) in
-    if ret <> 0 then
+    if ret <> 0 then begin
+      if options.no_cil then () else if options.keep_cil then keep_cil file src_file else Sys.remove src_file;
       failwith(sprintf "Error: clang failed with exit code %d" ret);
-    (* Obtain clang output *)
+    end;
+    (* Parse LLVM IR (.ll) *)
     let ch = open_in ll_file in
     let cu =
       try
         Lllex.parse ch
       with e ->
         close_in ch;
-        if not options.keep_ll then
-          Sys.remove ll_file;
+        if options.no_cil then () else if options.keep_cil then keep_cil file src_file else Sys.remove src_file;
+        if options.keep_ll then keep_ll file ll_file else Sys.remove ll_file;
         raise e in
     close_in ch;
-    if options.keep_ll then begin
-        let ll_basename =
-          (* ex: foo/bar.c --> bar.cil.ll *)
-          Filename.chop_suffix (Filename.basename file) ".c" ^ ".cil.ll" in
-        let ret =
-          (* Use mv instead of Unix.rename because rename fails on cross-device move *)
-          Sys.command(sprintf "mv %s %s" (Filename.quote ll_file) (Filename.quote ll_basename)) in
-        if ret <> 0 then
-          failwith(sprintf "Error: mv failure %s -> %s" (Filename.quote ll_file) (Filename.quote ll_basename))
-    end
-    else
-      Sys.remove ll_file;
-    if options.cil then begin
-      if options.keep_cil then begin
-        let cil_basename =
-          (* ex: foo/bar.c --> bar.cil.c *)
-          Filename.chop_suffix (Filename.basename file) ".c" ^ ".cil.c" in
-        let ret =
-          (* Use mv instead of Unix.rename because rename fails on cross-device move *)
-          Sys.command(sprintf "mv %s %s" (Filename.quote src_file) (Filename.quote cil_basename)) in
-        if ret <> 0 then
-          failwith(sprintf "Error: mv failure %s -> %s" (Filename.quote src_file) (Filename.quote cil_basename))
-      end
-      else
-        Sys.remove src_file
-    end;
+    if options.keep_ll then keep_ll file ll_file else Sys.remove ll_file;
+    if options.no_cil then () else if options.keep_cil then keep_cil file src_file else Sys.remove src_file;
     cu
   else
     failwith(sprintf "Error: unrecognized file extension (%s)" file)
@@ -782,7 +780,7 @@ begin
   let (x,args) = getopt "-help" args             in options.help <- x;
   let (x,args) = getopt "-debug-blocks" args     in options.debug_blocks <- x;
   let (x,args) = getopt "-debug-load-store" args in options.debug_load_store <- x;
-  let (x,args) = getopt "-no-cil" args           in options.cil <- not x;
+  let (x,args) = getopt "-no-cil" args           in options.no_cil <- x;
   let (x,args) = getopt "-keep-ll" args          in options.keep_ll <- x;
   let (x,args) = getopt "-keep-cil" args         in options.keep_cil <- x;
   let (x,args) = getopt "-delta" args            in options.delta <- x;

@@ -2,7 +2,7 @@ type options = {
     mutable help: bool;
     mutable debug_blocks: bool;
     mutable debug_load_store: bool;
-    mutable cil: bool;
+    mutable no_cil: bool;
     mutable keep_ll: bool;
     mutable keep_cil: bool;
     mutable delta: bool;
@@ -26,7 +26,7 @@ let options = {
   help = false;
   debug_blocks = false;
   debug_load_store = false;
-  cil = true;
+  no_cil = false;
   keep_ll = false;
   keep_cil = false;
   delta = false;
