@@ -1,4 +1,4 @@
-FROM l3iggs/archlinux
+FROM dock0/arch
 
 RUN curl "https://www.archlinux.org/mirrorlist/?country=CA&country=US&protocol=http&ip_version=4&use_mirror_status=on" | sed 's/#//' > /etc/pacman.d/mirrorlist
 
