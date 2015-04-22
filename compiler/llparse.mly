@@ -432,7 +432,9 @@ mdlist:
 ;
 mdnodevector:
 | value                         { [$1] }
+| typ value                     { [$2] }     /* This is obsolete but still supported in 3.6 :-( */
 | value Comma mdnodevector      { ($1)::$3 }
+| typ value Comma mdnodevector  { ($2)::$4 } /* This is obsolete but still supported in 3.6 :-( */
 ;
 constant_or_global:
 | Kw_constant { true }
