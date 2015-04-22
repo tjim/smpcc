@@ -1,13 +1,12 @@
 BIN=/usr/local/bin
 CXXFLAGS=-I/usr/lib/ocaml
 CFLAGS=-I/usr/lib/ocaml
-LIBS=nums.cmxa unix.cmxa str.cmxa
 
-smpcc: util.cmx state.cmx llparse.cmx lllex.cmx options.cmx gc.cmx gmw.cmx main.cmx
-	ocamlopt $(LIBS) $^ -o $@
+smpcc: llabs.cmx state.cmx llparse.cmx lllex.cmx options.cmx garbled.cmx gmw.cmx front.cmx main.cmx
+	ocamlfind ocamlopt -package findlib,cil callgraph.cmxa oneret.cmxa $^ -linkpkg -o $@
 
-parse: util.cmx state.cmx llparse.cmx lllex.cmx echo.cmx
-	ocamlopt $(LIBS) $^ -o $@
+parse: llabs.cmx state.cmx llparse.cmx lllex.cmx echo.cmx
+	ocamlfind ocamlopt str.cmxa nums.cmxa $^ -linkpkg -o $@
 
 clean:
 	$(RM) *.cmx *.cmi *.o llparse.mli llparse.mli lllex.ml
@@ -17,6 +16,9 @@ install: smpcc
 
 uninstall:
 	$(RM) $(BIN)/smpcc
+
+front.cmx: front.ml
+	ocamlfind ocamlopt -c -package findlib,cil $< -o $@
 
 %.cmi: %.mli
 	ocamlc -c $<

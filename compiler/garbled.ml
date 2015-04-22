@@ -1,6 +1,6 @@
 (* garbled circuit back end *)
 
-open Util
+open Llabs
 open Printf
 open Options
 

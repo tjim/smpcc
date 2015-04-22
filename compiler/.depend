@@ -1,23 +1,23 @@
-echo.cmo : util.cmx lllex.cmx
-echo.cmx : util.cmx lllex.cmx
+echo.cmo : lllex.cmx llabs.cmx
+echo.cmx : lllex.cmx llabs.cmx
 front.cmo :
 front.cmx :
-gc.cmo : util.cmx state.cmx options.cmx
-gc.cmx : util.cmx state.cmx options.cmx
-gmw.cmo : util.cmx state.cmx options.cmx gc.cmx
-gmw.cmx : util.cmx state.cmx options.cmx gc.cmx
-lllex.cmo : util.cmx state.cmx llparse.cmi
-lllex.cmx : util.cmx state.cmx llparse.cmx
-llparse.cmo : util.cmx llparse.cmi
-llparse.cmx : util.cmx llparse.cmi
-main.cmo : util.cmx state.cmx options.cmx lllex.cmx gmw.cmx gc.cmx
-main.cmx : util.cmx state.cmx options.cmx lllex.cmx gmw.cmx gc.cmx
-oli.cmo :
-oli.cmx :
+garbled.cmo : state.cmx options.cmx llabs.cmx
+garbled.cmx : state.cmx options.cmx llabs.cmx
+gmw.cmo : state.cmx options.cmx llabs.cmx garbled.cmx
+gmw.cmx : state.cmx options.cmx llabs.cmx garbled.cmx
+llabs.cmo :
+llabs.cmx :
+lllex.cmo : state.cmx llparse.cmi llabs.cmx
+lllex.cmx : state.cmx llparse.cmx llabs.cmx
+llparse.cmo : llabs.cmx llparse.cmi
+llparse.cmx : llabs.cmx llparse.cmi
+main.cmo : state.cmx options.cmx lllex.cmx llabs.cmx gmw.cmx garbled.cmx \
+    front.cmx
+main.cmx : state.cmx options.cmx lllex.cmx llabs.cmx gmw.cmx garbled.cmx \
+    front.cmx
 options.cmo :
 options.cmx :
-state.cmo : util.cmx
-state.cmx : util.cmx
-util.cmo :
-util.cmx :
-llparse.cmi : util.cmx
+state.cmo : llabs.cmx
+state.cmx : llabs.cmx
+llparse.cmi : llabs.cmx

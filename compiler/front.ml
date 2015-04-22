@@ -816,50 +816,8 @@ let vars_to_main f =
   main.sbody.bstmts  <- (mkStmt (Instr(newinstrs))) :: main.sbody.bstmts ;
   setMaxId main;
   ()
-(*****************************************************************************)
 
- let feature : Feature.t =
-  { fd_name = "flattener";
-    fd_enabled = false;
-    fd_description = "Flattens C code into main for Xuejun's work.";
-    fd_extraopt = [
-    ("--no_main_entry",
-     Arg.Unit (fun _ ->
-       Entries.entry_points := StringSet.remove "main" !Entries.entry_points ),
-     "Do not consider main to be an entry point.");
-    ("--none-to-main",
-     Arg.Unit (fun _ -> none_to_main := true),
-     "Do not move globals into main.");
-    ("--add_entry",
-     Arg.String (fun s ->
-       Entries.entry_points := StringSet.add s !Entries.entry_points ),
-     "String following this is another entry point (beyond \"main\"). For now, must be of the form '--clean_entry=function_name' because of weird cil processing.");
-    ("--flatten_debug",
-     Arg.Unit (fun _ -> debug := true),
-     "Turns on debugging output for flattener");
-    ("--flatten_labels_as_values",
-     Arg.Unit (fun _ -> labelvalues := true),
-     "Makes the flattener use labels as values instead of using switches");
-    ("--flatten_no_const",
-     Arg.Unit (fun _ -> noconst := true),
-     "No longer lift constant globals into main, even if possible");
-    ("--flatten_bzero",
-     Arg.Int(fun i ->
-       bzero_threshold := i),
-     "Non-initialized variables over size specified (in bytes) initialized with bzero");
-    ("--flatten_nomain",
-     Arg.String (
-     fun (st:string) -> not_to_main := st :: !not_to_main),
-     "Flattener does not move this global into main");
-    ("--flatten_list",
-     Arg.String (
-     fun (st:string) ->
-       fcns_to_flatten := st :: !fcns_to_flatten;
-       use_flattening_list := true),
-     "Flattener does not move this global into main");  ];
-    fd_doit =
-    (function (f: file) ->
-
+let doit (f: file) =
       (* Replace all '$' in variable names with '_xx_' *)
       remove_dollars f;
 
@@ -917,13 +875,59 @@ let vars_to_main f =
 	      fd.svar.vstorage <- Static
 	  | _ -> ());
 
-      ());
+      ()
+
+(*******************************************************************************)
+(* Set up flattening as a feature in CIL.  We don't use this directly anymore, *)
+(* it is retained for possible future use.                                     *)
+(*******************************************************************************)
+
+let feature : Feature.t =
+  { fd_name = "flattener";
+    fd_enabled = false;
+    fd_description = "Flattens C code into main for Xuejun's work.";
+    fd_extraopt = [
+    ("--no_main_entry",
+     Arg.Unit (fun _ ->
+       Entries.entry_points := StringSet.remove "main" !Entries.entry_points ),
+     "Do not consider main to be an entry point.");
+    ("--none-to-main",
+     Arg.Unit (fun _ -> none_to_main := true),
+     "Do not move globals into main.");
+    ("--add_entry",
+     Arg.String (fun s ->
+       Entries.entry_points := StringSet.add s !Entries.entry_points ),
+     "String following this is another entry point (beyond \"main\"). For now, must be of the form '--clean_entry=function_name' because of weird cil processing.");
+    ("--flatten_debug",
+     Arg.Unit (fun _ -> debug := true),
+     "Turns on debugging output for flattener");
+    ("--flatten_labels_as_values",
+     Arg.Unit (fun _ -> labelvalues := true),
+     "Makes the flattener use labels as values instead of using switches");
+    ("--flatten_no_const",
+     Arg.Unit (fun _ -> noconst := true),
+     "No longer lift constant globals into main, even if possible");
+    ("--flatten_bzero",
+     Arg.Int(fun i ->
+       bzero_threshold := i),
+     "Non-initialized variables over size specified (in bytes) initialized with bzero");
+    ("--flatten_nomain",
+     Arg.String (
+     fun (st:string) -> not_to_main := st :: !not_to_main),
+     "Flattener does not move this global into main");
+    ("--flatten_list",
+     Arg.String (
+     fun (st:string) ->
+       fcns_to_flatten := st :: !fcns_to_flatten;
+       use_flattening_list := true),
+     "Flattener does not move this global into main");  ];
+    fd_doit = doit;
     fd_post_check = true;
   }
 
 let () = Feature.register feature
 
-end
+end (* module Flattener *)
 
 (* Cil printer that does not print #line directives and compiler builtins *)
 class cilPrinterClass = object
@@ -933,15 +937,25 @@ class cilPrinterClass = object
     | g -> super#pGlobal () g
   method! pLineDirective ?(forcefile=false) l = Pretty.nil
 end
-;;
 
-if Array.length(Sys.argv) <> 2 then (Printf.eprintf "Usage: %s <file>\n" (Filename.basename Sys.argv.(0)); exit 1);
-let file = Sys.argv.(1) in
-if not (Sys.file_exists file) then (Printf.eprintf "File '%s' does not exist\n" file; exit 1);
-initCIL ();
-let cil = (Frontc.parse file ()) in
-Flattener.none_to_main := true;
-Flattener.feature.fd_doit cil;
-let pr = new cilPrinterClass in
-iterGlobals cil (dumpGlobal pr stdout)
-;;
+(* Flatten to out_channel *)
+let doit_outch infile outch =
+  initCIL ();
+  let cil = (Frontc.parse infile ()) in
+  Flattener.none_to_main := true;
+  Flattener.feature.fd_doit cil;
+  let pr = new cilPrinterClass in
+  iterGlobals cil (dumpGlobal pr outch)
+
+(* Flatten to file *)
+let doit infile outfile =
+  let outch = open_out outfile in
+  doit_outch infile outch;
+  close_out outch
+
+(* Main program, useful for testing *)
+let main() =
+  if Array.length(Sys.argv) <> 2 then (Printf.eprintf "Usage: %s <file>\n" (Filename.basename Sys.argv.(0)); exit 1);
+  let file = Sys.argv.(1) in
+  if not (Sys.file_exists file) then (Printf.eprintf "File '%s' does not exist\n" file; exit 1);
+  doit_outch file stdout

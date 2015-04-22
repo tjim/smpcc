@@ -6,4 +6,4 @@ let ch, module_id =
 
 let cu = Lllex.parse ch
 ;;
-Printf.printf "; ModuleID = '%s'\n%s" module_id (Util.spr Util.bpr_cu cu);;
+Printf.printf "; ModuleID = '%s'\n%s" module_id (Llabs.spr Llabs.bpr_cu cu);;

@@ -1,4 +1,4 @@
-open Util
+open Llabs
 open Printf
 open Options
 module V = State.V
@@ -497,9 +497,9 @@ let gep_elimination ctyps f =
                   let ety' =
                     try
                       match List.assoc v ctyps with
-                      | None -> failwith ("getelementptr: opaque type "^(Util.string_of_var v))
+                      | None -> failwith ("getelementptr: opaque type "^(Llabs.string_of_var v))
                       | Some typ -> typ
-                    with _ -> failwith ("getelementptr: unknown type "^(Util.string_of_var v)) in
+                    with _ -> failwith ("getelementptr: unknown type "^(Llabs.string_of_var v)) in
                   loop x ety' ((yty,y)::tl)
               | _ ->
                   bpr_instr buf (nopt, i);
@@ -622,14 +622,14 @@ let branch_elimination f =
               | ((_,Int max_branch),_) -> Big_int.int_of_big_int max_branch
               | _ -> List.length branches in
             let x = Name(false, State.fresh()) in
-            [(Some x, Call(Util.TCK_None, None, [], Integer(max_branch+1),
-                           (Var(Util.Name(true, "unary"))),
+            [(Some x, Call(Llabs.TCK_None, None, [], Integer(max_branch+1),
+                           (Var(Llabs.Name(true, "unary"))),
                            [(ty,[],e);(Integer 32, [], big(List.length(branches)))],
                            [],[]))]@
               [(assign_instr (State.bl_mask(my_block)) (Integer 1) (Integer 1) (big 0))]@ (* NB my_block could be an explicit branch target *)
               (let rec loop i =
-                let call = Call(Util.TCK_None, None, [], Integer 1,
-                                (Var(Util.Name(true, "selectbit"))),
+                let call = Call(Llabs.TCK_None, None, [], Integer 1,
+                                (Var(Llabs.Name(true, "selectbit"))),
                                 [(Integer(List.length(branches)+1), [], Var x);(Integer 32, [], big i)],
                                 [],[]) in
                 function
@@ -700,38 +700,14 @@ let file2cu cil_extra_args file =
         raise e in
     (close_in ch; cu)
   else if Filename.check_suffix file ".c" then
-    (* TODO: clean up temp files in case of error *)
-    let src_file, temp_dir =
+    let src_file =
       if not options.cil then
-        file, None
+        file
       else
-        (* Run cilly *)
-        let cil_basename =
-          (* ex: foo/bar.c --> bar.cil.c *)
-          Filename.chop_suffix (Filename.basename file) ".c" ^ ".cil.c" in
-        let temp_dir =
-          Filename.temp_file "smpcc" ".cil" in (* this creates a temp FILE not directory... *)
-        Unix.unlink temp_dir;                  (* ... so delete FILE *)
-        Unix.mkdir temp_dir 0o700;             (* ... and create DIR with same name *)
-        let cil_file =
-          Filename.concat temp_dir cil_basename in
-        let abs_file =
-          if String.length file > 0 && (String.get file 0 = '/' || String.get file 0 = '~')
-          then file
-          else Filename.concat (Unix.getcwd()) file in
-        let ret =
-          (* run cilly after changing to temp_dir, so cilly temp files are left there *)
-          let cmd =
-            sprintf "(cd %s; cilly -c --load=flattener %s --doflattener --none-to-main --save-temps %s)"
-              (Filename.quote temp_dir)
-              (Filename.quote abs_file)
-              (String.concat " " cil_extra_args) in
-          if options.verbose then
-            eprintf "%s\n" cmd;
-          Sys.command cmd in
-        if ret <> 0 then
-          failwith(sprintf "Error: cilly failed with exit code %d" ret);
-        cil_file, Some temp_dir in
+        let cil_file, outch = Filename.open_temp_file "smpcc" ".cil.c" in
+        Front.doit_outch file outch;
+        close_out outch;
+        cil_file in
     (* Run clang *)
     let ll_file = Filename.temp_file "smpcc" ".ll" in
     let cmd =
@@ -752,18 +728,19 @@ let file2cu cil_extra_args file =
         raise e in
     close_in ch;
     Sys.remove ll_file;
-    (match temp_dir with None -> ()
-    | Some temp_dir ->
-        if options.keep_cil then begin
-          let ret =
-            (* Use mv instead of Unix.rename because rename fails on cross-device move *)
-            Sys.command(sprintf "mv %s %s" (Filename.quote src_file) (Filename.quote (Filename.basename src_file))) in
-          if ret <> 0 then
-            failwith(sprintf "Error: mv failure %s -> %s" (Filename.quote src_file) (Filename.quote (Filename.basename src_file)))
-        end;
-        let ret = Sys.command(sprintf "rm -r %s" (Filename.quote temp_dir)) in
+    if options.cil then begin
+      if options.keep_cil then
+        let cil_basename =
+          (* ex: foo/bar.c --> bar.cil.c *)
+          Filename.chop_suffix (Filename.basename file) ".c" ^ ".cil.c" in
+        let ret =
+          (* Use mv instead of Unix.rename because rename fails on cross-device move *)
+          Sys.command(sprintf "mv %s %s" (Filename.quote src_file) (Filename.quote cil_basename)) in
         if ret <> 0 then
-          failwith(sprintf "Error: failed to remove temporary directory %s, exit code %d" (Filename.quote temp_dir) ret));
+          failwith(sprintf "Error: mv failure %s -> %s" (Filename.quote src_file) (Filename.quote (Filename.basename src_file)))
+      else
+        Unix.unlink src_file
+    end;
     cu
   else
     failwith(sprintf "Error: unrecognized file extension (%s)" file)
@@ -888,7 +865,7 @@ begin
       if options.circuitlib = Some "gmw" then
         Gmw.print_function_circuit m f
       else
-        Gc.print_function_circuit m f;
+        Garbled.print_function_circuit m f;
       if options.run then begin
         let prefix = match options.output with Some x -> x | None -> failwith "impossible" in
         if options.circuitlib = Some "gmw" then begin

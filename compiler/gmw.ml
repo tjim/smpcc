@@ -1,6 +1,6 @@
 (* GMW back end *)
 
-open Util
+open Llabs
 open Printf
 open Options
 
@@ -24,10 +24,10 @@ let rec bpr_gmw_value b (typ, value) =
           let loc = Hashtbl.find State.global_locations v in
           bprintf b "Uint64(io, %d)" loc
         with Not_found ->
-          eprintf "global not there %s\n" (Gc.govar v);
-          bprintf b "%s" (Gc.govar v))
+          eprintf "global not there %s\n" (Garbled.govar v);
+          bprintf b "%s" (Garbled.govar v))
       else
-        bprintf b "%s" (Gc.govar v)
+        bprintf b "%s" (Garbled.govar v)
   | Basicblock bl ->
       bprintf b "Uint%d(io, %d)" (State.get_bl_bits()) (State.bl_num bl)
   | Int x ->
@@ -75,9 +75,9 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
         if unused then
           bprintf b "\t" (* don't declare an unused variable *)
         else if VSet.mem v declared_vars then
-          bprintf b "\t%s = " (Gc.govar v)
+          bprintf b "\t%s = " (Garbled.govar v)
         else
-          bprintf b "\t%s := " (Gc.govar v);
+          bprintf b "\t%s := " (Garbled.govar v);
         VSet.add v declared_vars) in
   (match i with
   | Call(_,_,_,_,Var(Name(true, "printf")),(_,_,Int x)::ops,_,_) ->
@@ -108,7 +108,7 @@ let bpr_gmw_instr b declared_vars (nopt,i) =
       bprintf b "Unary(io, %a, %d)\n" bpr_gmw_value (ty, op) (Big_int.int_of_big_int l)
   | Call(_,_,_,_,Var(Name(true, "selectbit")),[(ty,_,Var v);(_,_,Int l)],_,_) ->
       let bitnum = Big_int.int_of_big_int l in
-      bprintf b "((%s >> %d) & 1) > 0\n" (Gc.govar v) bitnum
+      bprintf b "((%s >> %d) & 1) > 0\n" (Garbled.govar v) bitnum
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.start")),_,_,_) ->
       ()
   | Call(_,_,_,_,Var(Name(true, "llvm.lifetime.end")),_,_,_) ->
@@ -213,9 +213,9 @@ let bpr_sharetyp b typ =
 let bpr_gmw_block_args print_types b bl =
   let fv = free_of_block bl in
   if print_types then
-    VSet.iter (fun var -> bprintf b ", %s %a" (Gc.govar var) bpr_sharetyp (State.typ_of_var var)) fv
+    VSet.iter (fun var -> bprintf b ", %s %a" (Garbled.govar var) bpr_sharetyp (State.typ_of_var var)) fv
   else
-    VSet.iter (fun var -> bprintf b ", %s" (Gc.govar var)) fv
+    VSet.iter (fun var -> bprintf b ", %s" (Garbled.govar var)) fv
 
 let outputs_of_block blocks_fv bl =
   VSet.inter (assigned_of_block bl) (VSet.union State.V.special (VSet.union blocks_fv !State.bl_vars))
@@ -287,20 +287,20 @@ let bpr_main b f =
   bprintf b "\t/* special variables */\n";
   VSet.iter
     (fun var ->
-      bprintf b "\t%s := Uint%d(io, 0)\n" (Gc.govar var) (roundup_bitwidth (State.typ_of_var var));
+      bprintf b "\t%s := Uint%d(io, 0)\n" (Garbled.govar var) (roundup_bitwidth (State.typ_of_var var));
     )
     (VSet.inter State.V.special (assigned_of_blocks blocks));
   bprintf b "\n";
   bprintf b "\t/* block masks */\n";
   VSet.iter
-    (fun var -> bprintf b "\t%s := Uint1(io, 0)\n" (Gc.govar var))
+    (fun var -> bprintf b "\t%s := Uint1(io, 0)\n" (Garbled.govar var))
     !State.bl_vars;
-  bprintf b "\t%s = Uint1(io, 1)\n" (Gc.govar (State.bl_mask 0));
+  bprintf b "\t%s = Uint1(io, 1)\n" (Garbled.govar (State.bl_mask 0));
   bprintf b "\n";
   bprintf b "\t/* block free variables */\n";
   VSet.iter
     (fun var ->
-      bprintf b "\t%s := Uint%d(io, 0)\n" (Gc.govar var) (roundup_bitwidth (State.typ_of_var var));
+      bprintf b "\t%s := Uint%d(io, 0)\n" (Garbled.govar var) (roundup_bitwidth (State.typ_of_var var));
     )
     blocks_fv;
   bprintf b "\n";
@@ -314,7 +314,7 @@ let bpr_main b f =
         (State.bl_num bl.bname)
         (State.bl_num bl.bname)
         (State.bl_num bl.bname)
-        (Gc.govar (State.bl_mask (State.bl_num bl.bname)))
+        (Garbled.govar (State.bl_mask (State.bl_num bl.bname)))
         (bpr_gmw_block_args false) bl)
     blocks;
   bprintf b "\n";
@@ -329,12 +329,12 @@ let bpr_main b f =
           let w = (roundup_bitwidth (State.typ_of_var var)) in
           if w = 1 then
           bprintf b "\t\t%s_%d := (<-ch%d) > 0\n"
-              (Gc.govar var)
+              (Garbled.govar var)
               (State.bl_num bl.bname)
               (State.bl_num bl.bname)
           else
             bprintf b "\t\t%s_%d := uint%d(<-ch%d)\n"
-              (Gc.govar var)
+              (Garbled.govar var)
               (State.bl_num bl.bname)
               w
               (State.bl_num bl.bname))
@@ -346,18 +346,18 @@ let bpr_main b f =
       if VSet.mem var State.V.special then
         (* specials are assigned 0 unless the active block assigned them *)
         bprintf b "\t\t%s = TreeXor%d(io, %s)\n"
-          (Gc.govar var)
+          (Garbled.govar var)
           (roundup_bitwidth (State.typ_of_var var))
-          (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (Gc.govar var) (State.bl_num bl.bname)) sources))
+          (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (Garbled.govar var) (State.bl_num bl.bname)) sources))
       else
         (* non-specials keep their value from before the blocks unless the active block assigned them *)
         bprintf b "\t\t%s = TreeXor%d(io, %s, Mask%d(io, Not1(io, TreeXor1(io, %s)), %s))\n"
-          (Gc.govar var)
+          (Garbled.govar var)
           (roundup_bitwidth (State.typ_of_var var))
-          (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (Gc.govar var) (State.bl_num bl.bname)) sources))
+          (String.concat ", " (List.map (fun bl -> sprintf "%s_%d" (Garbled.govar var) (State.bl_num bl.bname)) sources))
           (roundup_bitwidth (State.typ_of_var var))
           (String.concat ", " (List.map (fun bl -> sprintf "mask_%d" (State.bl_num bl.bname)) sources))
-          (Gc.govar var))
+          (Garbled.govar var))
     (outputs_of_blocks blocks);
   if VSet.mem State.V.vMemRes blocks_fv then begin
     (* We need to load from memory iff some block uses vMemRes *)

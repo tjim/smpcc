@@ -1,7 +1,7 @@
 {
 (* Lexer for LLVM IR.  Needs to be kept up to date with the LLVM equivalent, see: *)
 (*  https://github.com/llvm-mirror/llvm/commits/master/lib/AsmParser/LLLexer.cpp  *)
-open Util
+open Llabs
 open Llparse
 let keyword_table = Hashtbl.create 53
 let keyword k = try Hashtbl.find keyword_table k with Not_found -> Error
@@ -270,12 +270,12 @@ parse eof                                                    { Eof }
 | ';' [^'\n''\r']*                                           { token lexbuf }
 | plusminus? digit+ '.' digit* (['e''E'] plusminus? digit+)? { APFloat(Lexing.lexeme lexbuf) }
 | plusminus? digit+                                          { APInt(Lexing.lexeme lexbuf) }
-| '@' (dquote notdquote* dquote as x)                        { GlobalVar(Util.Name(true,x)) }
-| '@' (idchar0 idchar* as x)                                 { GlobalVar(Util.Name(true,x)) }
-| '@' (digit+ as x)                                          { GlobalID(Util.Id(true,int_of_string x)) }
-| '%' (dquote notdquote* dquote as x)                        { LocalVar(Util.Name(false,x)) }
-| '%' (idchar0 idchar* as x)                                 { LocalVar(Util.Name(false,x)) }
-| '%' (digit+ as x)                                          { LocalVarID(Util.Id(false,int_of_string x)) }
+| '@' (dquote notdquote* dquote as x)                        { GlobalVar(Llabs.Name(true,x)) }
+| '@' (idchar0 idchar* as x)                                 { GlobalVar(Llabs.Name(true,x)) }
+| '@' (digit+ as x)                                          { GlobalID(Llabs.Id(true,int_of_string x)) }
+| '%' (dquote notdquote* dquote as x)                        { LocalVar(Llabs.Name(false,x)) }
+| '%' (idchar0 idchar* as x)                                 { LocalVar(Llabs.Name(false,x)) }
+| '%' (digit+ as x)                                          { LocalVarID(Llabs.Id(false,int_of_string x)) }
 | (dquote notdquote+ dquote as x) ':'                        { LabelStr x }
 | dquote notdquote* dquote                                   { StringConstant(Lexing.lexeme lexbuf) }
 | (idchar+ as x) ':'                                         { LabelStr x }
