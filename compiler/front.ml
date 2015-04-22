@@ -650,6 +650,8 @@ let vars_to_main f =
       aliases;
   end;
 
+  (* watch for printf declaration, which is now incompatible between *)
+
   (* pull out variables to move into main *)
   if (!debug) then
     print_endline "\nFailed to move to main:";
@@ -938,7 +940,11 @@ end
 (* Flatten to out_channel *)
 let doit_outch infile outch =
   initCIL ();
-  let cil = (Frontc.parse infile ()) in
+  let cpp_file = Filename.temp_file "smpcc" ".cpp.c" in
+  let ret = Sys.command(Printf.sprintf "gcc -E %s -o %s" infile cpp_file) in
+  if ret <> 0 then failwith "Error: preprocessor failure";
+  let cil = (Frontc.parse cpp_file ()) in
+  Sys.remove cpp_file;
   Flattener.none_to_main := true;
   Flattener.feature.fd_doit cil;
   let pr = new cilPrinterClass in
