@@ -12,10 +12,6 @@ pacman -S --needed --noconfirm base-devel git ocaml clang go colordiff mercurial
 (mkdir -p ocaml-findlib; cd ocaml-findlib; curl -o PKGBUILD https://projects.archlinux.org/svntogit/community.git/plain/trunk/PKGBUILD?h=packages/ocaml-findlib; makepkg -i --asroot --noconfirm)
 echo "git clone https://github.com/kerneis/cil; cd cil; ./configure; make; make install"
 git clone https://github.com/kerneis/cil; cd cil; ./configure; make; make install
-echo "cp -pr /vagrant/cilext /tmp/cilext"
-cp -pr /vagrant/cilext /tmp/cilext
-echo "cd /tmp/cilext; ocamlbuild -use-ocamlfind -package cil flattener.cma flattener.cmxs; ocamlfind install flattener META _build/flattener.cma _build/flattener.cmxs"
-cd /tmp/cilext; ocamlbuild -use-ocamlfind -package cil flattener.cma flattener.cmxs; ocamlfind install flattener META _build/flattener.cma _build/flattener.cmxs
 echo "cp -pr /vagrant/compiler /tmp/compiler"
 cp -pr /vagrant/compiler /tmp/compiler
 echo "cd /tmp/compiler; make; make install"
