@@ -724,12 +724,24 @@ let file2cu cil_extra_args file =
         Lllex.parse ch
       with e ->
         close_in ch;
-        Sys.remove ll_file;
+        if not options.keep_ll then
+          Sys.remove ll_file;
         raise e in
     close_in ch;
-    Sys.remove ll_file;
+    if options.keep_ll then begin
+        let ll_basename =
+          (* ex: foo/bar.c --> bar.cil.ll *)
+          Filename.chop_suffix (Filename.basename file) ".c" ^ ".cil.ll" in
+        let ret =
+          (* Use mv instead of Unix.rename because rename fails on cross-device move *)
+          Sys.command(sprintf "mv %s %s" (Filename.quote ll_file) (Filename.quote ll_basename)) in
+        if ret <> 0 then
+          failwith(sprintf "Error: mv failure %s -> %s" (Filename.quote ll_file) (Filename.quote ll_basename))
+    end
+    else
+      Sys.remove ll_file;
     if options.cil then begin
-      if options.keep_cil then
+      if options.keep_cil then begin
         let cil_basename =
           (* ex: foo/bar.c --> bar.cil.c *)
           Filename.chop_suffix (Filename.basename file) ".c" ^ ".cil.c" in
@@ -737,9 +749,10 @@ let file2cu cil_extra_args file =
           (* Use mv instead of Unix.rename because rename fails on cross-device move *)
           Sys.command(sprintf "mv %s %s" (Filename.quote src_file) (Filename.quote cil_basename)) in
         if ret <> 0 then
-          failwith(sprintf "Error: mv failure %s -> %s" (Filename.quote src_file) (Filename.quote (Filename.basename src_file)))
+          failwith(sprintf "Error: mv failure %s -> %s" (Filename.quote src_file) (Filename.quote cil_basename))
+      end
       else
-        Unix.unlink src_file
+        Sys.remove src_file
     end;
     cu
   else
@@ -770,6 +783,7 @@ begin
   let (x,args) = getopt "-debug-blocks" args     in options.debug_blocks <- x;
   let (x,args) = getopt "-debug-load-store" args in options.debug_load_store <- x;
   let (x,args) = getopt "-no-cil" args           in options.cil <- not x;
+  let (x,args) = getopt "-keep-ll" args          in options.keep_ll <- x;
   let (x,args) = getopt "-keep-cil" args         in options.keep_cil <- x;
   let (x,args) = getopt "-delta" args            in options.delta <- x;
   let (x,args) = getopt1 "-circuitlib" args      in options.circuitlib <- x;
