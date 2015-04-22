@@ -13,8 +13,6 @@ RUN pacman -S --noconfirm ocaml-findlib
 # RUN (mkdir -p /tmp/ocaml-findlib; chown -R stuff /tmp/ocaml-findlib; cd /tmp/ocaml-findlib; curl -o PKGBUILD https://projects.archlinux.org/svntogit/community.git/plain/trunk/PKGBUILD?h=packages/ocaml-findlib; su stuff -c 'makepkg --noconfirm')
 
 RUN cd /tmp; git clone https://github.com/kerneis/cil; cd cil; ./configure; make clean; make; make install
-ADD ./cilext /tmp/cilext
-RUN cd /tmp/cilext; ocamlbuild -use-ocamlfind -package cil flattener.cma flattener.cmxs; ocamlfind install flattener META _build/flattener.cma _build/flattener.cmxs
 ADD ./compiler /tmp/compiler
 RUN cd /tmp/compiler; make clean; make; make install
 WORKDIR /root
