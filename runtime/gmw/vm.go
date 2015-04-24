@@ -746,7 +746,12 @@ func Printf(io Io, mask bool, f string, args ...uint64) {
 	for i := 0; i < len(args); i++ {
 		fargs[i] = io.Open64(args[i])
 	}
-	fmt.Printf(f, fargs...)
+	stringRes := fmt.Sprintf(f, fargs...)
+	select {
+	case MpcPrintsChan <- stringRes:
+	default:
+	}
+	fmt.Printf(stringRes)
 }
 
 func Printf32(io Io, mask bool, f string, args ...uint32) {

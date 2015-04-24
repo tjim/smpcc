@@ -17,6 +17,8 @@ type MPC struct {
 var Hosts map[int]string = make(map[int]string)
 var Ports map[int]int = make(map[int]int)
 
+var MpcPrintsChan chan string = make(chan string, 100)
+
 // Read a configuration file, which consists a series lines of the form host:port, on per party, in order.
 // Return maps of hosts and ports, so hosts[i] is the host of party i and ports[i] is its base port.
 func ReadConfig(filename string) bool {

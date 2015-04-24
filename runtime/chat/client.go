@@ -137,6 +137,13 @@ func Client() {
 			Tprintf(term, msg)
 		}
 	}()
+
+	go func() {
+		for {
+			msg := <-gmw.MpcPrintsChan
+			Tprintf(term, "(Received on channel) %s", msg)
+		}
+	}()
 	joinRoomChannels(nc, printToTermChan, "#general")
 
 	for {
