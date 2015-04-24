@@ -7,6 +7,7 @@ import (
 	"github.com/apcera/nats"
 	"github.com/tjim/smpcc/runtime/gmw"
 	"github.com/tjim/smpcc/runtime/max"
+	"github.com/tjim/smpcc/runtime/sum"
 	"github.com/tjim/smpcc/runtime/vickrey"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/crypto/ssh/terminal"
@@ -226,11 +227,13 @@ func session(nc *nats.Conn, msgReceived chan string, args []string) {
 		Handle = max.Handle
 	case "vickrey":
 		Handle = vickrey.Handle
+	case "sum":
+		Handle = sum.Handle
 	case "":
 		msgReceived <- fmt.Sprintf("Before running a computation you must specify a function (use the 'func' command)\n")
 		return
 	default:
-		msgReceived <- fmt.Sprintf("Unknown function '%s'\n", MyRoom.MpcFunc)
+		msgReceived <- fmt.Sprintf("Regular: Unknown function '%s'\n", MyRoom.MpcFunc)
 		return
 	}
 
@@ -423,11 +426,13 @@ func commoditySession(nc *nats.Conn, msgReceived chan string, args []string) {
 		Handle = max.Handle
 	case "vickrey":
 		Handle = vickrey.Handle
+	case "sum":
+		Handle = sum.Handle
 	case "":
 		msgReceived <- fmt.Sprintf("Before running a computation you must specify a function (use the 'func' command)\n")
 		return
 	default:
-		msgReceived <- fmt.Sprintf("Unknown function '%s'\n", MyRoom.MpcFunc)
+		msgReceived <- fmt.Sprintf("Commodity: Unknown function '%s'\n", MyRoom.MpcFunc)
 		return
 	}
 
