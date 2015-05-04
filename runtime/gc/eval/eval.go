@@ -2,6 +2,7 @@ package eval
 
 import base "github.com/tjim/smpcc/runtime/gc"
 import "fmt"
+import "math"
 
 type VM interface {
 	And(a, b []base.Key) []base.Key
@@ -507,45 +508,59 @@ func Random(io VM, bits int) []base.Key {
 }
 
 /* commented in gmw/vm.go */
-func unaryB(io VM, A []base.Key) []base.Key {
-	phi := make([]base.Key, 2*(1<<uint(len(A))))
-	phi[1] = Uint(io, 1, 1)[0]
-	for i := range A {
-		leftmost := (1 << uint(i)) * 2
-		for j := leftmost; j < leftmost*2; j++ {
-			k := len(A) - i - 1
+func unaryB(io VM, A []base.Key, isOther []base.Key) []base.Key {
+	nodesInTree := 2 * (1 << uint(len(A))) // 2^len(A) leaves, 2*(2^len(A)) nodes in tree, throwing out position 0
+	phi := make([]base.Key, nodesInTree)
+	phi[1] = Not(io, isOther)[0] // root, will be Anded with all nodes
+	for i := range A {           // for each bit of A
+		bitposition := len(A) - 1 - i            // starting from MSB down to LSB
+		leftmost := (1 << uint(i)) * 2           // get position of leftmost node of row
+		for j := leftmost; j < leftmost*2; j++ { // for each node in row
 			switch j % 2 {
 			case 0:
-				phi[j] = And(io, phi[j/2:j/2+1], Not(io, A[k:k+1]))[0]
+				phi[j] = And(io, phi[j/2:j/2+1], Not(io, A[bitposition:bitposition+1]))[0]
 			case 1:
-				phi[j] = And(io, phi[j/2:j/2+1], A[k:k+1])[0]
+				phi[j] = And(io, phi[j/2:j/2+1], A[bitposition:bitposition+1])[0]
 			}
 		}
 	}
-	return phi[len(phi)/2:]
+	return phi[nodesInTree/2:]
 }
 
-func Unary(io VM, b []base.Key, y int) []base.Key {
-	dflt := Uint(io, 0, 1)
-	var lowbits []base.Key
-	for i := range b {
-		if (1 << uint(i)) > y {
-			dflt = Or(io, dflt, b[i:i+1])
-			if lowbits == nil {
-				lowbits = b[:i]
-			}
-		}
+func bitsForRange(y int) int {
+	switch {
+	case y <= 1:
+		return 1 // never use less than 1 bit
+	default: // y > 1
+		return 1 + int(math.Logb(float64(y-1)))
 	}
-	unary := unaryB(io, lowbits)
-	lowresult := make([]base.Key, y)
-	copy(lowresult, unary[:y])
-	for i := range unary {
-		if i >= y {
-			dflt = Or(io, dflt, unary[i:i+1])
-		}
+}
+
+func Unary0(io VM, A []base.Key, possibles int) []base.Key {
+	b := bitsForRange(possibles)
+	if len(A) < b {
+		panic("Unary: not enough possibilities")
 	}
-	result := Mask(io, Not(io, dflt), lowresult)
-	return append(result, dflt[0])
+	relevantBits, otherBits := A[:b], A[b:]
+	isOther0 := Uint(io, 0, 1) // false
+	for i := range otherBits {
+		isOther0 = Or(io, isOther0, otherBits[i:i+1])
+	}
+	unaryOfRelevant := unaryB(io, relevantBits, isOther0)
+	isOther1 := Uint(io, 0, 1) //false
+	for _, x := range unaryOfRelevant[possibles:] {
+		isOther1 = Or(io, isOther1, []base.Key{x})
+	}
+	result := make([]base.Key, possibles+1)
+	for i := 0; i < possibles; i++ {
+		result[i] = unaryOfRelevant[i]
+	}
+	result[possibles] = Or(io, isOther0, isOther1)[0]
+	return result
+}
+
+func Unary(io VM, A []base.Key, possibles int) []base.Key {
+	return Unary0(io, A, possibles)
 }
 
 /* Gen-side load */
