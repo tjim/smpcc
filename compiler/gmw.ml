@@ -245,13 +245,6 @@ let bpr_gmw_block b blocks_fv bl =
     bprintf b "\tPrintf(io, mask, \"Block %d\\n\")\n" (State.bl_num bl.bname);
   ignore(List.fold_left (bpr_gmw_instr b) (free_of_block bl) bl.binstrs);
   if not(VSet.is_empty outputs) then begin
-    if not(VSet.is_empty (VSet.diff outputs State.V.special)) then begin
-      bprintf b "\tif mask {\n";
-      bprintf b "\t\tch <- 1\n";
-      bprintf b "\t} else {\n";
-      bprintf b "\t\tch <- 0\n";
-      bprintf b "\t}\n"
-    end;
     VSet.iter
       (fun var ->
         let value = Var var in
@@ -323,7 +316,7 @@ let bpr_main b f =
     (fun bl ->
       let outputs = outputs_of_block blocks_fv bl in
       if not(VSet.is_empty (VSet.diff outputs State.V.special)) then
-        bprintf b "\t\tmask_%d := (<-ch%d) > 0\n" (State.bl_num bl.bname) (State.bl_num bl.bname);
+        bprintf b "\t\tmask_%d := _block%d\n" (State.bl_num bl.bname) (State.bl_num bl.bname);
       VSet.iter
         (fun var ->
           let w = (roundup_bitwidth (State.typ_of_var var)) in
