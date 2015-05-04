@@ -12,7 +12,7 @@
 #include <stdio.h>
 
 extern unsigned int input(unsigned int);
-extern unsigned int num_peers();
+extern unsigned int num_peers(void);
 
 /* Mergesort, adapted from http://en.wikipedia.org/wiki/Merge_sort */
 
