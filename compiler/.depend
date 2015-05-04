@@ -1,5 +1,7 @@
 echo.cmo : lllex.cmx llabs.cmx
 echo.cmx : lllex.cmx llabs.cmx
+extractir.cmo :
+extractir.cmx :
 front.cmo :
 front.cmx :
 garbled.cmo : state.cmx options.cmx llabs.cmx

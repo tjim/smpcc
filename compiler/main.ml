@@ -622,7 +622,7 @@ let branch_elimination f =
               | ((_,Int max_branch),_) -> Big_int.int_of_big_int max_branch
               | _ -> List.length branches in
             let x = Name(false, State.fresh()) in
-            [(Some x, Call(Llabs.TCK_None, None, [], Integer(max_branch+1),
+            [(Some x, Call(Llabs.TCK_None, None, [], Integer(max_branch + 2), (* unary returns 1 for other, + 1 b/c unary *)
                            (Var(Llabs.Name(true, "unary"))),
                            [(ty,[],e);(Integer 32, [], big(List.length(branches)))],
                            [],[]))]@
@@ -630,7 +630,7 @@ let branch_elimination f =
               (let rec loop i =
                 let call = Call(Llabs.TCK_None, None, [], Integer 1,
                                 (Var(Llabs.Name(true, "selectbit"))),
-                                [(Integer(List.length(branches)+1), [], Var x);(Integer 32, [], big i)],
+                                [(Integer(max_branch + 2), [], Var x);(Integer 32, [], big i)],
                                 [],[]) in
                 function
                   | [] -> [(Some(State.bl_mask(State.bl_num switchDefault)), call)]
