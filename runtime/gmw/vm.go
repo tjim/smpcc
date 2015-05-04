@@ -3,6 +3,7 @@ package gmw
 import (
 	"crypto/rand"
 	"fmt"
+	"math"
 	"math/big"
 )
 
@@ -809,12 +810,10 @@ func Reveal64(io Io, a uint64) uint64 {
 	return io.Open64(a)
 }
 
-// Convert a binary value to a unary value.
-// (Can be used to efficiently compute MUX)
-// Let A be a []bool with LSB in position 0
-// So if A = []{false, true, true} then A represents 6
-// Output should be an array B where B[i] iff A represents i
-//
+/************************************************************************/
+/* BINARY TO UNARY CONVERSION (DEMUX)                                   */
+/************************************************************************/
+
 // Label a binary tree with root as 1
 // Next level 2, 3
 // Next level 4, 5, 6, 7
@@ -823,65 +822,112 @@ func Reveal64(io Io, a uint64) uint64 {
 // So to move down right, multiply by two and add 1
 // So to move up, divide by two
 //
-// Say the root is at level 0
-// Children of root at level 1
+// Say the root==1 is at level 0
+// Children of root==2,3 at level 1
 // etc.
 //
 // Leftmost node at level x is therefore 2^x
 // Level of a node labeled x is log_2(x)
 //
 // Suppose we have N input bits A[0],A[1],..,A[N-1]
-// Define a tree with 2^N leaves, N levels
+// Define a tree with 2^N leaves, N+1 levels
 // Label edges of tree as 0 if child is on left, 1 if on right
 // Define a boolean value phi[x] for each node x in the tree
 // phi(x) iff path from x to root has labels according to ...,A[N-2],A[N-1]
 // i.e., as many high-order bits of A as necessary.
 // Then the output of phi(x) of the leaves, left to right, gives the value of A in unary.
-func unaryB(io Io, A []bool) []bool {
-	phi := make([]bool, 2*(1<<uint(len(A))))
-	phi[1] = Uint1(io, uint8(1))
-	for i := range A {
-		leftmost := (1 << uint(i)) * 2
-		for j := leftmost; j < leftmost*2; j++ {
+
+// unaryB(A, isOther): convert binary to unary, except if isOther then return all 0s
+// A is a binary number with LSB A[0]
+// Result is a unary number with exactly 2^(len(A)) bits
+func unaryB(io Io, A []bool, isOther bool) []bool {
+	nodesInTree := 2 * (1 << uint(len(A))) // 2^len(A) leaves, 2*(2^len(A)) nodes in tree, throwing out position 0
+	phi := make([]bool, nodesInTree)
+	phi[1] = Not1(io, isOther) // root, will be Anded with all nodes
+	for i := range A {         // for each bit of A
+		bitposition := len(A) - 1 - i            // starting from MSB down to LSB
+		leftmost := (1 << uint(i)) * 2           // get position of leftmost node of row
+		for j := leftmost; j < leftmost*2; j++ { // for each node in row
 			switch j % 2 {
 			case 0:
-				phi[j] = And1(io, phi[j/2], Not1(io, A[len(A)-i-1]))
+				phi[j] = And1(io, phi[j/2], Not1(io, A[bitposition]))
 			case 1:
-				phi[j] = And1(io, phi[j/2], A[len(A)-i-1])
+				phi[j] = And1(io, phi[j/2], A[bitposition])
 			}
 		}
 	}
-	return phi[len(phi)/2:]
+	return phi[nodesInTree/2:]
 }
 
+// bitsForRange(y): bits needed to represent the range [0,y)
+func bitsForRange(y int) int {
+	// Possibilities are numbered 0...(y-1)
+	// Logb(x) is number of bit positions to represent the number x AFTER the leading 1 bit
+	// So, bitsForRange(y) == 1 + Logb(y-1)
+	// example: y == 2 ==> 1 bit,  0-1 are the 2 possibilities
+	// example: y == 3 ==> 2 bits, 0-2 are the 3 possibilities (2 is a 2-bit number)
+	// example: y == 8 ==> 3 bits, 0-7 are the 8 possibilities
+	// example: y == 9 ==> 4 bits, 0-8 are the 9 possibilities (8 is a 4-bit number)
+	switch {
+	case y <= 1:
+		return 1 // never use less than 1 bit
+	default: // y > 1
+		return 1 + int(math.Logb(float64(y-1)))
+	}
+}
+
+// Unary0(A, possibles): convert binary number A into unary in the range [0,possibles)
+// A is a binary number with LSB A[0]
+// possibles is the number of possible cases we need to represent
+// So the result has possibles bits, plus 1 for the out-of-range ("other") case
+// Example: Unary0([false,true,true,false], 8) is the unary conversion of 6 with 8 possibles,
+// it should return [false,false,false,false,false,true,false,false,false]
+//                                                 ^6               ^not other case
+// Example: Unary0([false,true,true,true], 8) is the unary conversion of 14 with 8 possibles,
+// it should return [false,false,false,false,false,false,false,false,true]
+//                                                                   ^14>=8 so other case is indicated
+func Unary0(io Io, A []bool, possibles int) []bool {
+	b := bitsForRange(possibles)
+	if len(A) < b {
+		panic("Unary: not enough possibilities")
+	}
+	relevantBits, otherBits := A[:b], A[b:]
+	isOther0 := false
+	for _, x := range otherBits {
+		isOther0 = Or1(io, isOther0, x)
+	}
+	unaryOfRelevant := unaryB(io, relevantBits, isOther0)
+	// if possibles is not a power of two, upper bits can indicate out-of-range
+	isOther1 := false
+	for _, x := range unaryOfRelevant[possibles:] {
+		isOther1 = Or1(io, isOther1, x)
+	}
+	result := make([]bool, possibles+1)
+	for i := 0; i < possibles; i++ {
+		result[i] = unaryOfRelevant[i]
+	}
+	result[possibles] = Or1(io, isOther0, isOther1)
+	return result
+}
+
+// Unary(io, x, y): wrap Unary0() so that input is uint32.
+// Unfortunately output is also uint32.  This is a mismatch since a binary 32-bit number can be >32 bits in unary.
+// Would be correct to return arbitrary size int instead.
+// Interfacing with LLVM is the problem.
 func Unary(io Io, x uint32, y int) uint32 {
-	b := make([]bool, 32)
-	for i := range b {
-		b[i] = (((x >> uint(i)) & 1) > 0)
+	// convert x to slice of bools
+	A := make([]bool, 32)
+	for i := range A {
+		A[i] = (((x >> uint(i)) & 1) > 0)
 	}
-	dflt := false
-	var lowbits []bool
-	for i := range b {
-		if (1 << uint(i)) > y {
-			dflt = Or1(io, dflt, b[i])
-			if lowbits == nil {
-				lowbits = b[:i]
-			}
-		}
-	}
-	unary := unaryB(io, lowbits)
+	// convert to unary, result is slice of bools
+	unary := Unary0(io, A, y)
+	// convert result to uint32
 	result := uint32(0)
 	for i := range unary {
-		switch {
-		case i >= y:
-			dflt = Or1(io, dflt, unary[i])
-		case unary[i]:
+		if unary[i] {
 			result |= (1 << uint(i))
 		}
-	}
-	result = Mask32(io, Not1(io, dflt), result)
-	if dflt {
-		result |= (1 << uint(y))
 	}
 	return result
 }
