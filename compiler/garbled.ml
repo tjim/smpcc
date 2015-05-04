@@ -233,8 +233,6 @@ let bpr_go_block b blocks_fv is_gen bl =
     bprintf b "\t%sPrintf(vm, mask, \"Block %d\\n\")\n" pkg (State.bl_num bl.bname);
   ignore(List.fold_left (bpr_go_instr b is_gen) (free_of_block bl) bl.binstrs);
   if not(VSet.is_empty outputs) then begin
-    if not(VSet.is_empty (VSet.diff outputs State.V.special)) then
-      bprintf b "\tch <- mask\n";
     VSet.iter
       (fun var ->
         let value = Var var in
@@ -300,7 +298,7 @@ let bpr_main b f is_gen =
     (fun bl ->
       let outputs = outputs_of_block blocks_fv bl in
       if not(VSet.is_empty (VSet.diff outputs State.V.special)) then
-        bprintf b "\t\tmask_%d := <-ch%d\n" (State.bl_num bl.bname) (State.bl_num bl.bname);
+        bprintf b "\t\tmask_%d := _block%d\n" (State.bl_num bl.bname) (State.bl_num bl.bname);
       VSet.iter
         (fun var ->
           bprintf b "\t\t%s_%d := <-ch%d\n"
