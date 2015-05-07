@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 
-echo "pacman -Sy --noconfirm"
-pacman -Sy --noconfirm
-echo "pacman -S --noconfirm archlinux-keyring"
-pacman -S --noconfirm archlinux-keyring
-echo "pacman -Su --noconfirm"
-pacman -Su --noconfirm
-echo "pacman -S --needed --noconfirm base-devel git ocaml clang go colordiff mercurial"
-pacman -S --needed --noconfirm base-devel git ocaml clang go colordiff mercurial net-tools
-# FINDLIB IS OUT OF DATE SO HERE IS A WAY TO CREATE IT
-(mkdir -p ocaml-findlib; cd ocaml-findlib; curl -o PKGBUILD https://projects.archlinux.org/svntogit/community.git/plain/trunk/PKGBUILD?h=packages/ocaml-findlib; makepkg -i --asroot --noconfirm)
-echo "git clone https://github.com/kerneis/cil; cd cil; ./configure; make; make install"
+pacman -Sy --needed --noconfirm
+pacman -S --needed --noconfirm archlinux-keyring
+pacman -Su --needed --noconfirm
+pacman -S --needed --noconfirm base-devel
+pacman -S --needed --noconfirm git
+pacman -S --needed --noconfirm ocaml
+pacman -S --needed --noconfirm clang
+pacman -S --needed --noconfirm colordiff
+pacman -S --needed --noconfirm net-tools
+pacman -S --needed --noconfirm wget
+pacman -S --needed --noconfirm ocaml-findlib
+
+# IF FINDLIB IS OUT OF DATE HERE IS A WAY TO CREATE IT
+# (mkdir -p ocaml-findlib; cd ocaml-findlib; curl -o PKGBUILD https://projects.archlinux.org/svntogit/community.git/plain/trunk/PKGBUILD?h=packages/ocaml-findlib; makepkg -i --asroot --noconfirm)
+
+(cd /tmp && wget https://github.com/ocaml-batteries-team/batteries-included/archive/v2.3.0.tar.gz && echo "649eb2dca1f51bf9125ea87465e24e0ddcea9138  v2.3.0.tar.gz" | sha1sum -c --status && tar xfz v2.3.0.tar.gz && cd batteries-included-2.3.0 && make && make install)
+
 git clone https://github.com/kerneis/cil; cd cil; ./configure; make; make install
-echo "cp -pr /vagrant/compiler /tmp/compiler"
 cp -pr /vagrant/compiler /tmp/compiler
-echo "cd /tmp/compiler; make; make install"
-cd /tmp/compiler; make; make install
-echo "cd"
-cd
+(cd /tmp/compiler; make; make install)
+
 mkdir -p /home/vagrant/gowork/src/github.com/tjim
 ln -s /vagrant /home/vagrant/gowork/src/github.com/tjim/smpcc
 export GOPATH=/home/vagrant/gowork
