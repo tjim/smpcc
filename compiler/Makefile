@@ -2,8 +2,8 @@ BIN=/usr/local/bin
 CXXFLAGS=-I/usr/lib/ocaml
 CFLAGS=-I/usr/lib/ocaml
 
-smpcc: llabs.cmx state.cmx llparse.cmx lllex.cmx options.cmx garbled.cmx gmw.cmx front.cmx main.cmx
-	ocamlfind ocamlopt -package findlib,cil callgraph.cmxa oneret.cmxa $^ -linkpkg -o $@
+smpcc: llabs.cmx state.cmx llparse.cmx lllex.cmx options.cmx garbled.cmx gmw.cmx front.cmx tgraph.cmx main.cmx
+	ocamlfind ocamlopt -package findlib,cil,batteries callgraph.cmxa oneret.cmxa $^ -linkpkg -o $@
 
 parse: llabs.cmx state.cmx llparse.cmx lllex.cmx echo.cmx
 	ocamlfind ocamlopt str.cmxa nums.cmxa $^ -linkpkg -o $@

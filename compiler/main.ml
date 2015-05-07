@@ -603,6 +603,29 @@ let cfg f =
     tbl;
   printf "}\n"
 
+let graph f =
+  let tbl = ref Tgraph.empty in
+  List.iter
+    (fun bl ->
+      let add_target = function
+        | _, Basicblock target -> tbl := Tgraph.add_edge !tbl bl.bname target
+        | _ -> () in
+      match List.rev bl.binstrs with
+      | (_,Switch(_,_,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
+          List.iter add_target (List.map snd ops)
+      | (_,Br(target, None, _))::_ -> (* unconditional branch *)
+          add_target target
+      | (_,Br(_, Some(target, target2), _))::_ -> (* conditional branch *)
+          add_target target;
+          add_target target2;
+      | (_,Indirectbr(_, ops, _))::_ -> (* indirect branch computed by first arg, remaining list the possible targets *)
+          failwith "Error: indirectbr is unsupported"
+      | (_,Return _)::_ -> ()
+      | _ ->
+          failwith "Error: block does not end in branch")
+    f.fblocks;
+  !tbl
+
 let branch_elimination f =
   List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
   List.iter
@@ -819,6 +842,7 @@ begin
      printf "         -run                        Compile and run the program immediately\n";
      printf "         -fv                         Print the free variables of the function\n";
      printf "         -ram                        Print the RAM assignment\n";
+     printf "         -cfg                        Print the control-flow graph in DOT format\n";
      printf "         -pr                         Print the LLVM assembly language of the file\n";
      printf "         -prf                        Print the LLVM assembly language of the function\n";
      printf "         -phi                        Stop after phi elimination\n";
