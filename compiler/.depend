@@ -22,4 +22,6 @@ options.cmo :
 options.cmx :
 state.cmo : llabs.cmx
 state.cmx : llabs.cmx
+tgraph.cmo :
+tgraph.cmx :
 llparse.cmi : llabs.cmx

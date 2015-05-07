@@ -20,6 +20,9 @@ install: smpcc
 uninstall:
 	$(RM) $(BIN)/smpcc
 
+tgraph.cmx: tgraph.ml
+	ocamlfind ocamlopt -c -package batteries $< -o $@
+
 front.cmx: front.ml
 	ocamlfind ocamlopt -c -package findlib,cil $< -o $@
 
