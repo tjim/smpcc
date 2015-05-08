@@ -14,10 +14,10 @@ lllex.cmo : state.cmx llparse.cmi llabs.cmx
 lllex.cmx : state.cmx llparse.cmx llabs.cmx
 llparse.cmo : llabs.cmx llparse.cmi
 llparse.cmx : llabs.cmx llparse.cmi
-main.cmo : state.cmx options.cmx lllex.cmx llabs.cmx gmw.cmx garbled.cmx \
-    front.cmx
-main.cmx : state.cmx options.cmx lllex.cmx llabs.cmx gmw.cmx garbled.cmx \
-    front.cmx
+main.cmo : tgraph.cmx state.cmx options.cmx lllex.cmx llabs.cmx gmw.cmx \
+    garbled.cmx front.cmx
+main.cmx : tgraph.cmx state.cmx options.cmx lllex.cmx llabs.cmx gmw.cmx \
+    garbled.cmx front.cmx
 options.cmo :
 options.cmx :
 state.cmo : llabs.cmx

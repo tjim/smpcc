@@ -603,12 +603,24 @@ let cfg f =
     tbl;
   printf "}\n"
 
+let make_dot g =
+  printf "digraph g {\nrankdir=LR\n";
+  Tgraph.iter_edges (printf "%d -> %d\n") g;
+  printf "}\n"
+
 let graph f =
+  List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
   let tbl = ref Tgraph.empty in
   List.iter
     (fun bl ->
+      let source = State.bl_num bl.bname in
+      let add_node x = tbl := Tgraph.add_node !tbl x in
+      add_node source;
       let add_target = function
-        | _, Basicblock target -> tbl := Tgraph.add_edge !tbl bl.bname target
+        | _, Basicblock target ->
+            let target = State.bl_num target in
+            add_node target;
+            tbl := Tgraph.add_edge !tbl source target 
         | _ -> () in
       match List.rev bl.binstrs with
       | (_,Switch(_,_,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
@@ -624,7 +636,11 @@ let graph f =
       | _ ->
           failwith "Error: block does not end in branch")
     f.fblocks;
-  !tbl
+  make_dot (!tbl);
+  let nodes = Tgraph.tsort (!tbl) in
+  printf "Nodes:";
+  List.iter (printf " %d") nodes;
+  printf "\n"
 
 let branch_elimination f =
   List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
@@ -813,6 +829,7 @@ begin
   let (x,args) = getopt "-fv" args               in options.fv <- x;
   let (x,args) = getopt "-pr" args               in options.pr <- x;
   let (x,args) = getopt "-cfg" args              in options.cfg <- x;
+  let (x,args) = getopt "-graph" args            in options.graph <- x;
   let (x,args) = getopt "-prf" args              in options.prf <- x;
   let (x,args) = getopt "-phi" args              in options.phi <- x;
   let (x,args) = getopt "-branch" args           in options.branch <- x;
@@ -879,6 +896,12 @@ begin
       (fun file ->
         let m = file2cu cil_extra_args file in
         cfg (List.hd m.cfuns))
+      args
+  else if options.graph then
+    List.iter
+      (fun file ->
+        let m = file2cu cil_extra_args file in
+        ignore(graph (List.hd m.cfuns)))
       args
   else
     let file = List.hd args in

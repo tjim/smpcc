@@ -12,6 +12,7 @@ type options = {
     mutable fv: bool;
     mutable pr: bool;
     mutable cfg: bool;
+    mutable graph: bool;
     mutable prf: bool;
     mutable branch: bool;
     mutable load_store: bool;
@@ -36,6 +37,7 @@ let options = {
   fv = false;
   pr = false;
   cfg = false;
+  graph = false;
   prf = false;
   branch = false;
   load_store = false;
