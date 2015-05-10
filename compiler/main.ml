@@ -2,6 +2,7 @@ open Llabs
 open Printf
 open Options
 module V = State.V
+module PMap = BatMap.PMap
 
 (*
   An LLVM file produced by clang, etc., obeys the following conventions:
@@ -561,17 +562,18 @@ let load_store_elimination f =
   if not options.debug_load_store then
     f.fblocks <- split_memory_accesses f.fblocks
 
+let pr_escape s =
+  printf "\"";
+  for i = 0 to String.length s - 1 do
+    let c = s.[i] in
+    match c with
+    | '\"' -> printf "\\\""
+    | '%' -> printf "\\%%"
+    | _ -> printf "%c" c
+  done;
+  printf "\""
+
 let cfg f =
-  let pr_escape s =
-    printf "\"";
-    for i = 0 to String.length s - 1 do
-        let c = s.[i] in
-        match c with
-        | '\"' -> printf "\\\""
-        | '%' -> printf "\\%%"
-        | _ -> printf "%c" c
-    done;
-    printf "\"" in
   let tbl = Hashtbl.create 11 in
   List.iter
     (fun bl ->
@@ -608,17 +610,26 @@ let make_dot g =
   Tgraph.iter_edges (printf "%d -> %d\n") g;
   printf "}\n"
 
+let make_dot_string g =
+  printf "digraph g {\nrankdir=LR\n";
+  Tgraph.iter_edges (fun source target -> 
+    pr_escape source;     
+    printf " -> ";
+    pr_escape target;
+    printf "\n") g;
+  printf "}\n"
+
 let graph f =
   List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
   let tbl = ref Tgraph.empty in
   List.iter
     (fun bl ->
-      let source = State.bl_num bl.bname in
+      let source = (*State.bl_num*) bl.bname in
       let add_node x = tbl := Tgraph.add_node !tbl x in
       add_node source;
       let add_target = function
         | _, Basicblock target ->
-            let target = State.bl_num target in
+            let target = (*State.bl_num*) target in
             add_node target;
             tbl := Tgraph.add_edge !tbl source target 
         | _ -> () in
@@ -636,10 +647,16 @@ let graph f =
       | _ ->
           failwith "Error: block does not end in branch")
     f.fblocks;
-  make_dot (!tbl);
-  let nodes = Tgraph.tsort (!tbl) in
-  printf "Nodes:";
-  List.iter (printf " %d") nodes;
+(*  make_dot (!tbl);*)
+  printf "// Dominators:\n";
+  let root_node = (List.hd(f.fblocks)).bname in
+  let dominators = Tgraph.dominator_tree root_node !tbl in
+  PMap.iter
+    (fun x y -> printf "// %s: %s\n" (string_of_var x) (string_of_var y))
+    dominators;
+(*
+  BatMap.PMap.iter (printf "// %d: %d\n") (Tgraph.dominator_tree 0 !tbl);
+*)
   printf "\n"
 
 let branch_elimination f =

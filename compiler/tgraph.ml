@@ -48,7 +48,7 @@ let remove_edges g source targets =
 (* Graph utilities *)
 (*******************)
 
-let iter_edges f g = 
+let iter_edges f g =
   PMap.iter (fun source targets ->
     PSet.iter (fun target -> f source target) targets) g
 
@@ -68,6 +68,84 @@ let is_edge g source target =
 (*   Printf.fprintf outch "edge [fontname=%S];\n" !font_regular; *)
 (*   iter_nodes g in *)
 (*   Printf.fprintf outch "}\n" *)
+
+let reverse g =
+  fold_edges
+    (fun source target g_reversed ->
+      add_edge g_reversed target source)
+    g
+    empty
+
+(*****************************************************************)
+(* Reverse postorder traversal, useful for dominator calculation *)
+(*****************************************************************)
+let reverse_postorder root g =
+  (* start by labeling the nodes of g in postorder, 0..N-1 *)
+  let node_to_label = ref PMap.empty in
+  let visited = ref PSet.empty in
+  let counter = ref 0 in
+  let next_count() =
+    let count = !counter in
+    counter := !counter + 1;
+    count in
+  let rec label node =
+    if PSet.mem node !visited then () else begin
+      visited := PSet.add node !visited;
+      PSet.iter label (get_targets g node);
+      node_to_label := PMap.add node (next_count()) !node_to_label
+    end in
+  label root;
+  (* The reverse postorder sequence is root_label, root_label-1, ..., 0 *)
+  let root_label = PMap.find root !node_to_label in
+  (* construct a labeled predecessor graph *)
+  let labeled_predecessors =
+    fold_edges
+      (fun source target g -> add_edge g (PMap.find target !node_to_label) (PMap.find source !node_to_label))
+      g empty in
+  (* for each label record the labels of predecessor nodes *)
+  let preds = Array.make (1 + root_label) [] in
+  for i = 0 to root_label-1 do (* we don't need the predecessors of the root label *)
+    (* PSet.elements is in increasing order, we reverse to get decreasing order *)
+    preds.(i) <- List.rev (PSet.elements (PMap.find i labeled_predecessors))
+  done;
+  !node_to_label, root_label, preds
+
+(******************)
+(* Dominator tree *)
+(******************)
+(* A Simple, Fast Dominance Algorithm, by Keith D. Cooper, Timothy J. Harvey, and Ken Kennedy. Figure 3 *)
+let dominator_tree root g =
+  let node_to_label, root_label, preds = reverse_postorder root g in
+  let label_to_node =
+    PMap.foldi (fun n l m -> PMap.add l n m) node_to_label PMap.empty in
+  let doms = Array.make (1 + root_label) (-1) in
+  doms.(root_label) <- root_label;
+  let rec intersect b1 b2 =
+    if b1 = b2 then b1 else
+    if b1 < b2 then intersect doms.(b1) b2 else
+    intersect b1 doms.(b2) in
+  let changed = ref true in
+  while !changed do
+    changed := false;
+    for b = root_label-1 downto 0 do
+      match preds.(b) with (* labels of predecessors in decreasing order. *)
+      | new_idom::other_predecessors -> (* Invariant: new_idom > b, so doms.(new_idom) > 0 *)
+          let new_idom = ref new_idom in
+          List.iter
+            (fun p ->
+              if doms.(p) > 0 then new_idom := intersect p !new_idom)
+            other_predecessors;
+          if doms.(b) != !new_idom then begin
+            doms.(b) <- !new_idom;
+            changed := true
+          end
+      | _ -> failwith "impossible: non-root node without a predecessor"
+    done
+  done;
+  BatEnum.fold
+    (fun m n -> PMap.add n (PMap.find doms.(PMap.find n node_to_label) label_to_node) m)
+    empty
+    (PMap.keys g)
 
 (********************)
 (* Topological sort *)
