@@ -3,6 +3,7 @@ open Printf
 open Options
 module V = State.V
 module PMap = BatMap.PMap
+module PSet = BatSet.PSet
 
 (*
   An LLVM file produced by clang, etc., obeys the following conventions:
@@ -622,18 +623,18 @@ let make_dot_string g =
 
 let graph f =
   List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
-  let tbl = ref Tgraph.empty in
-  let returns = ref 0 in
+  let flow_graph = ref Tgraph.empty in
+  let exit_node = ref None in
   List.iter
     (fun bl ->
       let source = (*State.bl_num*) bl.bname in
-      let add_node x = tbl := Tgraph.add_node !tbl x in
+      let add_node x = flow_graph := Tgraph.add_node !flow_graph x in
       add_node source;
       let add_target = function
         | _, Basicblock target ->
             let target = (*State.bl_num*) target in
             add_node target;
-            tbl := Tgraph.add_edge !tbl source target 
+            flow_graph := Tgraph.add_edge !flow_graph source target 
         | _ -> () in
       match List.rev bl.binstrs with
       | (_,Switch(_,dflt,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
@@ -646,23 +647,63 @@ let graph f =
           add_target target2;
       | (_,Indirectbr(_, ops, _))::_ -> (* indirect branch computed by first arg, remaining list the possible targets *)
           failwith "Error: indirectbr is unsupported"
-      | (_,Return _)::_ -> incr returns
+      | (_,Return _)::_ -> 
+          if !exit_node = None then exit_node := Some source else eprintf "Warning: more than one exit node\n%!"
       | _ ->
           failwith "Error: block does not end in branch")
     f.fblocks;
-(*  make_dot (!tbl);*)
-  printf "%d returns\n" !returns;
+  let exit_node = 
+    match !exit_node with None -> failwith "Error: no exit node\n%!"
+    | Some exit_node -> exit_node in
+  printf "// Exit node: %s\n" (string_of_var exit_node);
   printf "// Dominators:\n";
   let root_node = (List.hd(f.fblocks)).bname in
-  let dominators = Tgraph.dominator_tree root_node !tbl in
+  let dominators = Tgraph.dominator_tree root_node !flow_graph in
   PMap.iter
     (fun x y -> printf "// %s: %s\n" (string_of_var x) (string_of_var y))
     dominators;
-(*
-  BatMap.PMap.iter (printf "// %d: %d\n") (Tgraph.dominator_tree 0 !tbl);
-*)
-  printf "\n"
+  printf "\n";
+  let reverse_flow_graph = Tgraph.reverse !flow_graph in
+  let post_dominators = Tgraph.dominator_tree exit_node reverse_flow_graph in
+  printf "// Postdominators:\n";
+  PMap.iter
+    (fun x y -> printf "// %s: %s\n" (string_of_var x) (string_of_var y))
+    post_dominators;
+  printf "\n";
+  (* Print flow graph *)
+  printf "digraph g {\nrankdir=LR\n";
+  (* Flow edges *)
+  Tgraph.iter_edges
+    (fun x y ->
+      pr_escape (string_of_var x);
+      printf " -> ";
+      pr_escape (string_of_var y);
+      printf "\n")
+    !flow_graph;
+  let one_out n = (1 = PSet.cardinal (Tgraph.get_targets !flow_graph n)) in
+  let one_in n = (1 = PSet.cardinal (Tgraph.get_targets reverse_flow_graph n)) in
+  (* Dominator edges *)
+  PMap.iter
+    (fun x y ->
+      if one_in x then () else begin (* If only one flow edge in to x, y is dominator, don't print *)
+        pr_escape (string_of_var x);
+        printf " -> ";
+        pr_escape (string_of_var y);
+        printf " [arrowhead=diamond, style=dotted]\n" 
+      end)
+    dominators;
+  PMap.iter
+    (fun x y ->
+      if one_out x then () else begin (* If only one flow edge out of x, y is post dominator, don't print *)
+        pr_escape (string_of_var x);
+        printf " -> ";
+        pr_escape (string_of_var y);
+        printf " [arrowhead=tee, style=dashed]\n" 
+      end)
+    post_dominators;
+  printf "}\n"
 
+ 
 let branch_elimination f =
   List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
   List.iter
