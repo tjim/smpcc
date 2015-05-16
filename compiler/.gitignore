@@ -1,7 +1,10 @@
 /*.cmi
 /*.cmx
 /*.o
+/extractir
+/parse
 /lllex.ml
 /llparse.ml
 /llparse.mli
 /llparse.output
+/smpcc
