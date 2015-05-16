@@ -581,7 +581,8 @@ let cfg f =
         | _, Basicblock target -> Hashtbl.add tbl bl.bname target
         | _ -> () in
       match List.rev bl.binstrs with
-      | (_,Switch(_,_,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
+      | (_,Switch(_,dflt,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
+          add_target dflt;
           List.iter add_target (List.map snd ops)
       | (_,Br(target, None, _))::_ -> (* unconditional branch *)
           add_target target
@@ -622,6 +623,7 @@ let make_dot_string g =
 let graph f =
   List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
   let tbl = ref Tgraph.empty in
+  let returns = ref 0 in
   List.iter
     (fun bl ->
       let source = (*State.bl_num*) bl.bname in
@@ -634,7 +636,8 @@ let graph f =
             tbl := Tgraph.add_edge !tbl source target 
         | _ -> () in
       match List.rev bl.binstrs with
-      | (_,Switch(_,_,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
+      | (_,Switch(_,dflt,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
+          add_target dflt;
           List.iter add_target (List.map snd ops)
       | (_,Br(target, None, _))::_ -> (* unconditional branch *)
           add_target target
@@ -643,11 +646,12 @@ let graph f =
           add_target target2;
       | (_,Indirectbr(_, ops, _))::_ -> (* indirect branch computed by first arg, remaining list the possible targets *)
           failwith "Error: indirectbr is unsupported"
-      | (_,Return _)::_ -> ()
+      | (_,Return _)::_ -> incr returns
       | _ ->
           failwith "Error: block does not end in branch")
     f.fblocks;
 (*  make_dot (!tbl);*)
+  printf "%d returns\n" !returns;
   printf "// Dominators:\n";
   let root_node = (List.hd(f.fblocks)).bname in
   let dominators = Tgraph.dominator_tree root_node !tbl in

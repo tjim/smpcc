@@ -25,7 +25,7 @@ let add_node g source =
 let add_edge g source target =
   PMap.add source
     (PSet.add target (PMap.find source (add_node g source)))
-    g
+    (add_node g target)
 
 let add_edges g source targets =
   PSet.fold
