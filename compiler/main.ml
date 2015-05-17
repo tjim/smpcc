@@ -625,14 +625,39 @@ let graph f =
   List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
   let flow_graph = ref Tgraph.empty in
   let exit_node = ref None in
+  let highlow_graph = ref Tgraph.empty in
+  let highvars = ref VSet.empty in
   List.iter
     (fun bl ->
-      let source = (*State.bl_num*) bl.bname in
+      let source = bl.bname in
+      let add_highlow (_, s) = function
+        | _, Basicblock target ->
+            highlow_graph := Tgraph.add_edge !highlow_graph s target;
+        | _ -> () in
+      List.iter
+        (function 
+          | (None, _) -> ()
+          | (Some v, i) ->
+              (* If block is high, all vars assigned in block are high *)
+              highlow_graph := Tgraph.add_edge !highlow_graph source v;
+              (match i with
+              | Call(_,_,_,_,Var(Name(true, "reveal")),_,_,_) ->
+                  (* If instruction is "reveal" then operands don't matter *)
+                  ()
+              | Call(_,_,_,_,Var(Name(true, "input")),_,_,_) ->
+                  (* Result of "input" is always high *)
+                  highvars := VSet.add v !highvars
+              | _ ->
+                  (* Otherwise if operand is high, then assigned var is high *)
+                  VSet.iter 
+                    (fun s -> highlow_graph := Tgraph.add_edge !highlow_graph s v)
+                    (Llabs.free_of_instruction i)))
+        bl.binstrs;
       let add_node x = flow_graph := Tgraph.add_node !flow_graph x in
       add_node source;
       let add_target = function
         | _, Basicblock target ->
-            let target = (*State.bl_num*) target in
+            let target = target in
             add_node target;
             flow_graph := Tgraph.add_edge !flow_graph source target 
         | _ -> () in

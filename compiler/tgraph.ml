@@ -76,6 +76,19 @@ let reverse g =
     g
     empty
 
+(**********************************************************************************)
+(* Nodes between source and target.  Include source if there is a loop to source. *)
+(**********************************************************************************)
+let between source target g =
+  let visited = ref(PSet.add source (PSet.add target PSet.empty)) in
+  let rec label node =
+    if PSet.mem node !visited then () else begin
+      visited := PSet.add node !visited;
+      PSet.iter label (get_targets g node)
+    end in
+  PSet.iter label (get_targets g source);
+  PSet.remove target !visited
+
 (*****************************************************************)
 (* Reverse postorder traversal, useful for dominator calculation *)
 (*****************************************************************)
