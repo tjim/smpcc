@@ -622,37 +622,12 @@ let make_dot_string g =
   printf "}\n"
 
 let graph f =
-  List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
+  (* Calculate flow graph *)
   let flow_graph = ref Tgraph.empty in
   let exit_node = ref None in
-  let highlow_graph = ref Tgraph.empty in
-  let highvars = ref VSet.empty in
   List.iter
     (fun bl ->
       let source = bl.bname in
-      let add_highlow (_, s) = function
-        | _, Basicblock target ->
-            highlow_graph := Tgraph.add_edge !highlow_graph s target;
-        | _ -> () in
-      List.iter
-        (function 
-          | (None, _) -> ()
-          | (Some v, i) ->
-              (* If block is high, all vars assigned in block are high *)
-              highlow_graph := Tgraph.add_edge !highlow_graph source v;
-              (match i with
-              | Call(_,_,_,_,Var(Name(true, "reveal")),_,_,_) ->
-                  (* If instruction is "reveal" then operands don't matter *)
-                  ()
-              | Call(_,_,_,_,Var(Name(true, "input")),_,_,_) ->
-                  (* Result of "input" is always high *)
-                  highvars := VSet.add v !highvars
-              | _ ->
-                  (* Otherwise if operand is high, then assigned var is high *)
-                  VSet.iter 
-                    (fun s -> highlow_graph := Tgraph.add_edge !highlow_graph s v)
-                    (Llabs.free_of_instruction i)))
-        bl.binstrs;
       let add_node x = flow_graph := Tgraph.add_node !flow_graph x in
       add_node source;
       let add_target = function
@@ -677,37 +652,90 @@ let graph f =
       | _ ->
           failwith "Error: block does not end in branch")
     f.fblocks;
+  let flow_graph = !flow_graph in
   let exit_node = 
     match !exit_node with None -> failwith "Error: no exit node\n%!"
     | Some exit_node -> exit_node in
   printf "// Exit node: %s\n" (string_of_var exit_node);
-  printf "// Dominators:\n";
   let root_node = (List.hd(f.fblocks)).bname in
-  let dominators = Tgraph.dominator_tree root_node !flow_graph in
-  PMap.iter
-    (fun x y -> printf "// %s: %s\n" (string_of_var x) (string_of_var y))
-    dominators;
-  printf "\n";
-  let reverse_flow_graph = Tgraph.reverse !flow_graph in
+  let dominators = Tgraph.dominator_tree root_node flow_graph in
+  let reverse_flow_graph = Tgraph.reverse flow_graph in
   let post_dominators = Tgraph.dominator_tree exit_node reverse_flow_graph in
-  printf "// Postdominators:\n";
-  PMap.iter
-    (fun x y -> printf "// %s: %s\n" (string_of_var x) (string_of_var y))
-    post_dominators;
-  printf "\n";
+
+  (* Calculate high-low graph *)
+  let highlow_graph = ref Tgraph.empty in
+  let input_vars = ref VSet.empty in
+  List.iter
+    (fun bl ->
+      let source = bl.bname in
+      List.iter
+        (function 
+          | (None, _) -> ()
+          | (Some v, i) ->
+              (* If a block is high, all vars assigned in block are high *)
+              highlow_graph := Tgraph.add_edge !highlow_graph source v;
+              (* High operands sometimes result in high assigned variables *)
+              (match i with
+              | Call(_,_,_,_,Var(Name(true, "reveal")),_,_,_) ->
+                  (* If an instruction is "reveal" then operands don't matter *)
+                  ()
+              | Call(_,_,_,_,Var(Name(true, "input")),_,_,_) ->
+                  (* The result of "input" is always high *)
+                  input_vars := VSet.add v !input_vars
+              | _ ->
+                  (* Otherwise, if operand is high, then assigned var is high *)
+                  VSet.iter 
+                    (fun s -> highlow_graph := Tgraph.add_edge !highlow_graph s v)
+                    (Llabs.free_of_instruction i)))
+        bl.binstrs;
+      (* If the predicate of a branch is high then the blocks until the postdominator are high *)
+      begin
+        match List.rev bl.binstrs with
+        | (_,Switch(pred,_,_,_))::_
+        | (_,Br(pred, Some _, _))::_ ->
+            let pred_vars = Llabs.free_of_value (snd pred) in
+            let pred_targets = Tgraph.between source (PMap.find source post_dominators) flow_graph in
+            VSet.iter
+              (fun v -> highlow_graph := Tgraph.add_edges !highlow_graph v pred_targets)
+              pred_vars
+        | (_,Br(_, None, _))::_ ->
+            ()
+        | (_,Return _)::_ -> 
+            ()
+        | (_,Indirectbr(_, ops, _))::_ ->
+            failwith "Error: indirectbr is unsupported"
+        | _ ->
+            failwith "Error: block does not end in branch"
+      end)
+    f.fblocks;
+  let highlow_graph = Tgraph.tc !highlow_graph in
+  let high_vars =
+    VSet.fold 
+      (fun v vs -> PSet.union (Tgraph.get_targets highlow_graph v) vs)
+      !input_vars
+      PSet.empty in
+
   (* Print flow graph *)
   printf "digraph g {\nrankdir=LR\n";
-  (* Flow edges *)
+  (* High nodes (blocks) are printed as boxes, low nodes as ovals (the default) *)
+  Tgraph.iter_nodes
+    (fun x ->
+      if not(PSet.mem x high_vars) then () else begin
+        pr_escape (string_of_var x);
+        printf " [shape=box]\n"
+      end)
+    flow_graph;
+  (* Print flow edges *)
   Tgraph.iter_edges
     (fun x y ->
       pr_escape (string_of_var x);
       printf " -> ";
       pr_escape (string_of_var y);
       printf "\n")
-    !flow_graph;
-  let one_out n = (1 = PSet.cardinal (Tgraph.get_targets !flow_graph n)) in
+    flow_graph;
+  let one_out n = (1 = PSet.cardinal (Tgraph.get_targets flow_graph n)) in
   let one_in n = (1 = PSet.cardinal (Tgraph.get_targets reverse_flow_graph n)) in
-  (* Dominator edges *)
+  (* Print dominator and postdominator edges *)
   PMap.iter
     (fun x y ->
       if one_in x then () else begin (* If only one flow edge in to x, y is dominator, don't print *)
@@ -727,7 +755,6 @@ let graph f =
       end)
     post_dominators;
   printf "}\n"
-
  
 let branch_elimination f =
   List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)

@@ -52,6 +52,8 @@ let iter_edges f g =
   PMap.iter (fun source targets ->
     PSet.iter (fun target -> f source target) targets) g
 
+let iter_nodes f g = BatEnum.iter f (PMap.keys g)
+
 (* let fold_edges = PMap.foldi .|. (PSet.fold .|.) *)
 let fold_edges f = PMap.foldi (fun n1 -> PSet.fold (f n1))
 
