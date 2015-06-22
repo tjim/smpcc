@@ -1,7 +1,5 @@
-// run
-// gobind -lang go -outdir ./go_chat/ golang.org/x/mobile/example/smpcc/chat
-// gobind -lang java -outdir ../app/src/main/java/go/chat golang.org/x/mobile/example/smpcc/chat
-// from inside src/golang.org/x/mobile/example/smpcc/chat to generate gobind bindings
+// to create a .aar file run:
+// gomobile bind github.com/tjim/smpcc/runtime/mobile/chat
 package chat
 
 import (
