@@ -1,0 +1,11 @@
+<resources>
+    <string name="title_activity_settings">Settings</string>
+
+    <!-- Strings related to Settings -->
+
+    <!-- Example General settings -->
+    <string name="pref_header_server">Server Settings</string>
+    <string name="pref_server_ip_label">gnatsd server IP</string>
+    <string name="pref_server_ip_default_value">127.0.0.1</string>
+
+</resources>
