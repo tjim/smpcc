@@ -3,6 +3,7 @@ open Printf
 open Options
 module V = State.V
 module PMap = BatMap.PMap
+module PSet = BatSet.PSet
 
 (*
   An LLVM file produced by clang, etc., obeys the following conventions:
@@ -581,7 +582,8 @@ let cfg f =
         | _, Basicblock target -> Hashtbl.add tbl bl.bname target
         | _ -> () in
       match List.rev bl.binstrs with
-      | (_,Switch(_,_,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
+      | (_,Switch(_,dflt,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
+          add_target dflt;
           List.iter add_target (List.map snd ops)
       | (_,Br(target, None, _))::_ -> (* unconditional branch *)
           add_target target
@@ -620,21 +622,23 @@ let make_dot_string g =
   printf "}\n"
 
 let graph f =
-  List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
-  let tbl = ref Tgraph.empty in
+  (* Calculate flow graph *)
+  let flow_graph = ref Tgraph.empty in
+  let exit_node = ref None in
   List.iter
     (fun bl ->
-      let source = (*State.bl_num*) bl.bname in
-      let add_node x = tbl := Tgraph.add_node !tbl x in
+      let source = bl.bname in
+      let add_node x = flow_graph := Tgraph.add_node !flow_graph x in
       add_node source;
       let add_target = function
         | _, Basicblock target ->
-            let target = (*State.bl_num*) target in
+            let target = target in
             add_node target;
-            tbl := Tgraph.add_edge !tbl source target 
+            flow_graph := Tgraph.add_edge !flow_graph source target 
         | _ -> () in
       match List.rev bl.binstrs with
-      | (_,Switch(_,_,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
+      | (_,Switch(_,dflt,ops,_))::_ -> (* first arg determines which of remaining args to branch to *)
+          add_target dflt;
           List.iter add_target (List.map snd ops)
       | (_,Br(target, None, _))::_ -> (* unconditional branch *)
           add_target target
@@ -643,22 +647,115 @@ let graph f =
           add_target target2;
       | (_,Indirectbr(_, ops, _))::_ -> (* indirect branch computed by first arg, remaining list the possible targets *)
           failwith "Error: indirectbr is unsupported"
-      | (_,Return _)::_ -> ()
+      | (_,Return _)::_ -> 
+          if !exit_node = None then exit_node := Some source else eprintf "Warning: more than one exit node\n%!"
       | _ ->
           failwith "Error: block does not end in branch")
     f.fblocks;
-(*  make_dot (!tbl);*)
-  printf "// Dominators:\n";
+  let flow_graph = !flow_graph in
+  let exit_node = 
+    match !exit_node with None -> failwith "Error: no exit node\n%!"
+    | Some exit_node -> exit_node in
+  printf "// Exit node: %s\n" (string_of_var exit_node);
   let root_node = (List.hd(f.fblocks)).bname in
-  let dominators = Tgraph.dominator_tree root_node !tbl in
-  PMap.iter
-    (fun x y -> printf "// %s: %s\n" (string_of_var x) (string_of_var y))
-    dominators;
-(*
-  BatMap.PMap.iter (printf "// %d: %d\n") (Tgraph.dominator_tree 0 !tbl);
-*)
-  printf "\n"
+  let dominators = Tgraph.dominator_tree root_node flow_graph in
+  let reverse_flow_graph = Tgraph.reverse flow_graph in
+  let post_dominators = Tgraph.dominator_tree exit_node reverse_flow_graph in
 
+  (* Calculate high-low graph *)
+  let highlow_graph = ref Tgraph.empty in
+  let input_vars = ref VSet.empty in
+  List.iter
+    (fun bl ->
+      let source = bl.bname in
+      List.iter
+        (function 
+          | (None, _) -> ()
+          | (Some v, i) ->
+              (* If a block is high, all vars assigned in block are high *)
+              highlow_graph := Tgraph.add_edge !highlow_graph source v;
+              (* High operands sometimes result in high assigned variables *)
+              (match i with
+              | Call(_,_,_,_,Var(Name(true, "reveal")),_,_,_) ->
+                  (* If an instruction is "reveal" then operands don't matter *)
+                  ()
+              | Call(_,_,_,_,Var(Name(true, "input")),_,_,_) ->
+                  (* The result of "input" is always high *)
+                  input_vars := VSet.add v !input_vars
+              | _ ->
+                  (* Otherwise, if operand is high, then assigned var is high *)
+                  VSet.iter 
+                    (fun s -> highlow_graph := Tgraph.add_edge !highlow_graph s v)
+                    (Llabs.free_of_instruction i)))
+        bl.binstrs;
+      (* If the predicate of a branch is high then the blocks until the postdominator are high *)
+      begin
+        match List.rev bl.binstrs with
+        | (_,Switch(pred,_,_,_))::_
+        | (_,Br(pred, Some _, _))::_ ->
+            let pred_vars = Llabs.free_of_value (snd pred) in
+            let pred_targets = Tgraph.between source (PMap.find source post_dominators) flow_graph in
+            VSet.iter
+              (fun v -> highlow_graph := Tgraph.add_edges !highlow_graph v pred_targets)
+              pred_vars
+        | (_,Br(_, None, _))::_ ->
+            ()
+        | (_,Return _)::_ -> 
+            ()
+        | (_,Indirectbr(_, ops, _))::_ ->
+            failwith "Error: indirectbr is unsupported"
+        | _ ->
+            failwith "Error: block does not end in branch"
+      end)
+    f.fblocks;
+  let highlow_graph = Tgraph.tc !highlow_graph in
+  let high_vars =
+    VSet.fold 
+      (fun v vs -> PSet.union (Tgraph.get_targets highlow_graph v) vs)
+      !input_vars
+      PSet.empty in
+
+  (* Print flow graph *)
+  printf "digraph g {\nrankdir=LR\n";
+  (* High nodes (blocks) are printed as boxes, low nodes as ovals (the default) *)
+  Tgraph.iter_nodes
+    (fun x ->
+      if not(PSet.mem x high_vars) then () else begin
+        pr_escape (string_of_var x);
+        printf " [shape=box]\n"
+      end)
+    flow_graph;
+  (* Print flow edges *)
+  Tgraph.iter_edges
+    (fun x y ->
+      pr_escape (string_of_var x);
+      printf " -> ";
+      pr_escape (string_of_var y);
+      printf "\n")
+    flow_graph;
+  let one_out n = (1 = PSet.cardinal (Tgraph.get_targets flow_graph n)) in
+  let one_in n = (1 = PSet.cardinal (Tgraph.get_targets reverse_flow_graph n)) in
+  (* Print dominator and postdominator edges *)
+  PMap.iter
+    (fun x y ->
+      if one_in x then () else begin (* If only one flow edge in to x, y is dominator, don't print *)
+        pr_escape (string_of_var x);
+        printf " -> ";
+        pr_escape (string_of_var y);
+        printf " [arrowhead=diamond, style=dotted]\n" 
+      end)
+    dominators;
+  PMap.iter
+    (fun x y ->
+      if one_out x then () else begin (* If only one flow edge out of x, y is post dominator, don't print *)
+        pr_escape (string_of_var x);
+        printf " -> ";
+        pr_escape (string_of_var y);
+        printf " [arrowhead=tee, style=dashed]\n" 
+      end)
+    post_dominators;
+  printf "}\n"
+ 
 let branch_elimination f =
   List.iter (fun bl -> ignore(State.bl_num bl.bname)) f.fblocks; (* assign block numbers *)
   List.iter

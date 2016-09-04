@@ -1,0 +1,16 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+
+
+    <!-- NOTE: EditTextPreference accepts EditText attributes. -->
+    <!-- NOTE: EditTextPreference's summary should be set to its value by the activity code. -->
+    <EditTextPreference
+        android:key="server_ip"
+        android:title="@string/pref_server_ip_label"
+        android:defaultValue="@string/pref_server_ip_default_value"
+        android:selectAllOnFocus="true"
+        android:inputType="text"
+        android:singleLine="true"
+        android:maxLines="1" />
+
+</PreferenceScreen>

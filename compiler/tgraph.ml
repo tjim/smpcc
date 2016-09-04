@@ -25,7 +25,7 @@ let add_node g source =
 let add_edge g source target =
   PMap.add source
     (PSet.add target (PMap.find source (add_node g source)))
-    g
+    (add_node g target)
 
 let add_edges g source targets =
   PSet.fold
@@ -52,6 +52,8 @@ let iter_edges f g =
   PMap.iter (fun source targets ->
     PSet.iter (fun target -> f source target) targets) g
 
+let iter_nodes f g = BatEnum.iter f (PMap.keys g)
+
 (* let fold_edges = PMap.foldi .|. (PSet.fold .|.) *)
 let fold_edges f = PMap.foldi (fun n1 -> PSet.fold (f n1))
 
@@ -75,6 +77,19 @@ let reverse g =
       add_edge g_reversed target source)
     g
     empty
+
+(**********************************************************************************)
+(* Nodes between source and target.  Include source if there is a loop to source. *)
+(**********************************************************************************)
+let between source target g =
+  let visited = ref(PSet.add source (PSet.add target PSet.empty)) in
+  let rec label node =
+    if PSet.mem node !visited then () else begin
+      visited := PSet.add node !visited;
+      PSet.iter label (get_targets g node)
+    end in
+  PSet.iter label (get_targets g source);
+  PSet.remove target !visited
 
 (*****************************************************************)
 (* Reverse postorder traversal, useful for dominator calculation *)
