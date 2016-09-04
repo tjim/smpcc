@@ -1,0 +1,75 @@
+S decides on its input (what it will offer to R).
+There are going to be m transfers.
+S will offer n possibilities per transfer, each possibility is an l-bit vector.
+For transfer j, S offers (xj,0, ..., xj,n-1).
+
+R makes its choices r1...rm in advance. (NB 1-indexed)
+Each choice rj is a number 0 <= rj < n <= k.
+So R wants to receive x1,r1 ... xm,rm.
+Each choice rj can be encoded into k bits by enc(rj) = crj.
+(Encoding must be injective and satisfy distance requirements for security;
+ in practice n must be much less than k, e.g., n=log(k)).
+
+S chooses s (vector of k bits) at random.
+
+R chooses k-bit vectors t1,0 ... tm,0 at random.
+R sets k-bit vectors    t1,1 ... tm,1 such that XOR(tj,0 , tj,1) = crj
+This defines two matrices T0 and T1.
+
+Now we do base OT with R acting as sender and S acting as receiver.
+There are k transfers where S receives according to s0, ..., sk-1,
+and R sends the corresponding columns of T0 and T1.
+
+S forms the received columns into a matrix Q.
+Now we can check that for each qj (row j of Q),
+    XOR(qj,tj,0) = AND(crj, s).
+Now for transfer j S has input (xj,0, ..., xj,n-1) and sends for each 0 <= r < n
+    XOR(xj,r, H(j,XOR(qj,AND(cr,s))
+Note that here for every 0 <= r < n the codeword cr is public,
+and R has chosen one of them crj.
+The point is that S has all the info it needs to send.
+
+Now r knows that its choice is rj, where 0 <= rj < n.
+So it ignores all that S has sent but
+
+[*] = XOR(xj,rj, H(j,XOR(qj,AND(crj,s))))
+
+Then it XORs this with H(j, tj,0) i.e. tj,0 is the jth row of T0.
+Recall
+    XOR(qj,tj,0) = AND(crj, s).
+So,
+    tj,0 = XOR(qj,AND(crj,s))
+So plugging in to [*],
+[*] = XOR(xj,rj, H(j,tj,0))
+Now since R has T0 it can compute H(j,tj,0) and recover xj,rj = XOR([*], H(j,tj,0)).
+
+MODIFICATION for streaming and fork is easy.
+
+MODIFICATION so that R can choose later?
+
+R chooses r1...rm randomly.
+
+R uses "real choices" w1...wm.
+
+Now on transfer j R starts by sending an "adjustment factor" A = (wj - rj) mod n.
+Note that S never knew rj so can't recover wj or rj from this.
+
+Recall in the original version, for transfer j S has input (xj,0, ..., xj,n-1) and sends for each 0 <= r < n
+    XOR(xj,r, H(j,XOR(qj,AND(cr,s))
+
+In our modification S has (xj,0, ..., xj,n-1) and sends for each 0 <= r < n
+
+    XOR(xj,r, H(j,XOR(qj,AND(c((r-A) mod n),s))
+
+Note that when r=wj
+rj = (r-A) mod n
+
+Therefore R looks at the choice where r=wj which has the form
+
+[*] = XOR(xj,wj, H(j,XOR(qj,AND(crj,s))
+
+Just as in the original we have
+    tj,0 = XOR(qj,AND(crj,s))
+So plugging in to [*],
+[*] = XOR(xj,wj, H(j,tj,0))
+Now since R has T0 it can compute H(j,tj,0) and recover xj,wj = XOR([*], H(j,tj,0)).
